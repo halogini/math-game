@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍧 팥빙수 똑같이 나눠주기 작전! | 미니 게임</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts for modern styling -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- Canvas Confetti for winning celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+  <div class="game-app">
+    <!-- Header Controls & Status -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-emoji">🍧</span>
+        <div>
+          <h1>팥빙수 똑같이 나눠주기 작전!</h1>
+          <p class="subtitle">세 명의 친구(A, B, C)와 똑같은 거리 위치를 찾아 팥빙수를 배치하세요!</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <!-- Player Info Badge -->
+        <div class="player-info-card" id="btn-edit-player" title="이름/학번 수정">
+          <span class="player-icon">👤</span>
+          <div class="player-details">
+            <span class="player-name" id="display-player-name">홍길동</span>
+            <span class="player-id" id="display-student-id">학번: 2101</span>
+          </div>
+          <span class="edit-icon">✏️</span>
+        </div>
+
+        <div class="status-card">
+          <span class="label">라운드</span>
+          <span class="value" id="round-display">1 / 5</span>
+        </div>
+        <div class="status-card highlight">
+          <span class="label">총점</span>
+          <span class="value" id="total-score-display">0 <small>점</small></span>
+        </div>
+        <div class="status-card">
+          <span class="label">최고 기록</span>
+          <span class="value" id="high-score-display">0 <small>점</small></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Section -->
+    <main class="game-container">
+      <!-- Game Canvas/Board Area -->
+      <div class="board-wrapper">
+        <div id="game-board" class="game-board">
+          <!-- Background Grid & Decorative Elements -->
+          <div class="board-grid-pattern"></div>
+          
+          <!-- Line Verification Canvas Layer -->
+          <canvas id="line-canvas" class="line-canvas"></canvas>
+
+          <!-- Student Elements & Pins will be dynamically injected here -->
+          <div id="elements-layer" class="elements-layer"></div>
+
+          <!-- Floating Guidance Banner -->
+          <div id="instruction-banner" class="instruction-banner">
+            👉 화면을 클릭하여 A, B, C와 똑같은 거리라고 생각되는 지점에 🍨 팥빙수를 놓으세요!
+          </div>
+
+          <!-- Central Score Popup Effect -->
+          <div id="score-popup" class="score-popup hidden">
+            <div class="score-card-inner">
+              <span id="score-rating-badge" class="rating-badge">완벽해요!</span>
+              <div id="score-number" class="score-number">+98</div>
+              <p id="score-distance-info" class="distance-info">정답과 오차: 1</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="controls-bar">
+          <button id="btn-check-answer" class="btn btn-primary" disabled>
+            🎯 정답 확인하기
+          </button>
+          <button id="btn-next-round" class="btn btn-accent hidden">
+            ▶ 다음 라운드 진행
+          </button>
+          <button id="btn-restart" class="btn btn-outline">
+            🔄 다시 시작
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Initial Player Information Modal (Name & Student ID) -->
+    <div id="player-modal" class="modal-backdrop">
+      <div class="modal-card modal-sm">
+        <div class="modal-header">
+          <span class="modal-trophy">🍧</span>
+          <h2>참가자 정보 입력</h2>
+          <p>게임 시작 전 이름과 학번을 입력해 주세요.</p>
+        </div>
+        <div class="modal-body">
+          <form id="player-form">
+            <div class="form-group">
+              <label for="input-player-name">이름:</label>
+              <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" required />
+            </div>
+            <div class="form-group">
+              <label for="input-student-id">학번:</label>
+              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" required />
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 10px;">
+              🎮 게임 시작하기
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Final Result Modal (Round 5 Complete) -->
+    <div id="result-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <span class="modal-trophy">🏆</span>
+          <h2>게임 완료</h2>
+          <p><span id="result-player-name">홍길동</span>님(<span id="result-student-id">2101</span>)의 5라운드 성적표입니다.</p>
+        </div>
+        
+        <div class="modal-body">
+          <div class="final-score-box">
+            <span class="final-label">최종 획득 점수</span>
+            <div id="final-total-score" class="final-score">460 <small>/ 500</small></div>
+            <div id="new-record-badge" class="new-record-badge hidden">🎉 최고 기록 달성!</div>
+          </div>
+
+          <div class="send-action-box">
+            <button id="btn-send-data" class="btn btn-secondary btn-lg">
+              🚀 기록 전송하기
+            </button>
+            <div id="api-status-msg" class="api-status-msg"></div>
+          </div>
+
+          <!-- Hall of Fame Leaderboard (Ranks 1 to 20) -->
+          <div class="leaderboard-section">
+            <div class="leaderboard-header">
+              <h3>🏆 명예의 전당 (1위 ~ 20위)</h3>
+            </div>
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th>학번</th>
+                    <th>최종 점수</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="round-breakdown">
+            <h3>라운드별 성적 요약</h3>
+            <ul id="round-history-list" class="history-list">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btn-modal-restart" class="btn btn-primary btn-lg">
+            🎮 새 게임 시작하기
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
