@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>🍧 팥빙수 똑같이 나눠주기 작전! | 미니 게임</title>
   <link rel="stylesheet" href="style.css">
   <!-- Google Fonts for modern styling -->
@@ -29,14 +29,13 @@
         </div>
       </div>
       <div class="status-bar">
-        <!-- Player Info Badge -->
-        <div class="player-info-card" id="btn-edit-player" title="이름/학번 수정">
+        <!-- Player Info Badge (Locked after initial entry) -->
+        <div class="player-info-card" id="btn-edit-player">
           <span class="player-icon">👤</span>
           <div class="player-details">
             <span class="player-name" id="display-player-name">홍길동</span>
             <span class="player-id" id="display-student-id">학번: 2101</span>
           </div>
-          <span class="edit-icon">✏️</span>
         </div>
 
         <div class="status-card">
@@ -70,10 +69,10 @@
 
           <!-- Floating Guidance Banner -->
           <div id="instruction-banner" class="instruction-banner">
-            👉 화면을 클릭하여 A, B, C와 똑같은 거리라고 생각되는 지점에 🍨 팥빙수를 놓으세요!
+            👉 화면을 터치하여 A, B, C와 똑같은 거리라고 생각되는 지점에 🍨 팥빙수를 놓으세요!
           </div>
 
-          <!-- Central Score Popup Effect -->
+          <!-- Top-Center Non-blocking Score Popup Effect -->
           <div id="score-popup" class="score-popup hidden">
             <div class="score-card-inner">
               <span id="score-rating-badge" class="rating-badge">완벽해요!</span>
@@ -98,7 +97,7 @@
       </div>
     </main>
 
-    <!-- Initial Player Information Modal (Name & Student ID) -->
+    <!-- Initial Player Information Modal (Entered ONCE at start) -->
     <div id="player-modal" class="modal-backdrop">
       <div class="modal-card modal-sm">
         <div class="modal-header">
@@ -140,28 +139,22 @@
             <div id="new-record-badge" class="new-record-badge hidden">🎉 최고 기록 달성!</div>
           </div>
 
-          <!-- Firebase DB Registration Box -->
+          <!-- Locked Player Info Score Registration Box -->
           <div class="send-action-box">
-            <div class="result-player-inputs">
-              <div class="input-item">
-                <label for="result-input-name">이름:</label>
-                <input type="text" id="result-input-name" class="form-input" placeholder="이름 입력" />
-              </div>
-              <div class="input-item">
-                <label for="result-input-id">학번:</label>
-                <input type="text" id="result-input-id" class="form-input" placeholder="학번 입력(예: 2101)" />
-              </div>
+            <div class="result-locked-player-box">
+              <span class="locked-icon">🔒</span>
+              <span class="locked-text">등록 참가자: <strong id="result-locked-name">홍길동</strong> (학번: <strong id="result-locked-id">2101</strong>)</span>
             </div>
             <button id="btn-send-data" class="btn btn-secondary btn-lg" style="width: 100%;">
-              🔥 Firebase DB에 점수 등록하기
+              🚀 점수 등록하기
             </button>
             <div id="api-status-msg" class="api-status-msg"></div>
           </div>
 
-          <!-- Hall of Fame Leaderboard (Realtime Firebase DB Top 20) -->
+          <!-- Hall of Fame Leaderboard (Top 20) -->
           <div class="leaderboard-section">
             <div class="leaderboard-header">
-              <h3>🏆 명예의 전당 (Firebase 실시간 1위 ~ 20위)</h3>
+              <h3>🏆 명예의 전당 (1위 ~ 20위)</h3>
             </div>
             <div class="leaderboard-table-wrapper">
               <table class="leaderboard-table">
@@ -174,7 +167,7 @@
                   </tr>
                 </thead>
                 <tbody id="leaderboard-tbody">
-                  <!-- Dynamically populated from Firebase DB -->
+                  <!-- Dynamically populated -->
                 </tbody>
               </table>
             </div>

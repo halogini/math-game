@@ -1,5 +1,5 @@
 /**
- * 팥빙수 똑같이 나눠주기 작전! - Game Engine & Firebase Realtime DB Logic
+ * 팥빙수 똑같이 나눠주기 작전! - Game Engine Logic (Anti-Tamper Locked Player System)
  */
 
 // Firebase Configuration Provided by User
@@ -23,7 +23,7 @@ if (window.firebase) {
     }
     firebaseDb = firebase.database();
   } catch (err) {
-    console.error("Firebase init failed:", err);
+    console.error("Initialization failed:", err);
   }
 }
 
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAnswerChecked = false;
   let popupTimeoutId = null;
 
-  // Player Info & Local Leaderboard Backup
+  // Locked Player Info (Entered ONCE at startup, cannot be altered later)
   let playerName = localStorage.getItem('bingsoo_player_name') || '';
   let studentId = localStorage.getItem('bingsoo_student_id') || '';
 
@@ -57,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputStudentId = document.getElementById('input-student-id');
   const displayPlayerName = document.getElementById('display-player-name');
   const displayStudentId = document.getElementById('display-student-id');
-  const btnEditPlayer = document.getElementById('btn-edit-player');
 
   const roundDisplay = document.getElementById('round-display');
   const totalScoreDisplay = document.getElementById('total-score-display');
@@ -74,8 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const scoreDistanceInfo = document.getElementById('score-distance-info');
 
   const resultModal = document.getElementById('result-modal');
-  const resultInputName = document.getElementById('result-input-name');
-  const resultInputId = document.getElementById('result-input-id');
+  const resultLockedName = document.getElementById('result-locked-name');
+  const resultLockedId = document.getElementById('result-locked-id');
   const finalTotalScore = document.getElementById('final-total-score');
   const newRecordBadge = document.getElementById('new-record-badge');
   const roundHistoryList = document.getElementById('round-history-list');
@@ -84,10 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const btnModalRestart = document.getElementById('btn-modal-restart');
 
-  // Start listening to Firebase Realtime Leaderboard (Top 20)
-  listenFirebaseLeaderboard();
+  // Listen to Realtime Leaderboard
+  listenRealtimeLeaderboard();
 
-  // Check initial player registration
+  // Initial Player Registration Check (Strict One-Time Only)
   checkPlayerRegistration();
 
   function checkPlayerRegistration() {
@@ -109,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
       playerName = nameVal;
       studentId = idVal;
 
+      // Lock into localStorage
       localStorage.setItem('bingsoo_player_name', playerName);
       localStorage.setItem('bingsoo_student_id', studentId);
 
@@ -118,17 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  btnEditPlayer.addEventListener('click', () => {
-    inputPlayerName.value = playerName;
-    inputStudentId.value = studentId;
-    playerModal.classList.remove('hidden');
-  });
-
   function updatePlayerInfoDisplay() {
     displayPlayerName.textContent = playerName || '플레이어';
     displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: 2101';
-    if (resultInputName) resultInputName.value = playerName;
-    if (resultInputId) resultInputId.value = studentId;
+    if (resultLockedName) resultLockedName.textContent = playerName;
+    if (resultLockedId) resultLockedId.textContent = studentId;
   }
 
   function initGame() {
@@ -179,8 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
     instructionBanner.classList.remove('hidden');
 
     const width = gameBoard.clientWidth || 800;
-    const height = gameBoard.clientHeight || 520;
-    const padding = 70;
+    const height = gameBoard.clientHeight || 500;
+    const padding = 60;
 
     if (roundNum <= 3) {
       generateStandardLayout(width, height, padding);
@@ -199,10 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
     while (!valid && attempts < 200) {
       attempts++;
       const target = {
-        x: randomRange(padding + 60, width - padding - 60),
-        y: randomRange(padding + 60, height - padding - 60)
+        x: randomRange(padding + 50, width - padding - 50),
+        y: randomRange(padding + 50, height - padding - 50)
       };
-      const R = randomRange(120, Math.min(width, height) * 0.38);
+      const R = randomRange(100, Math.min(width, height) * 0.38);
 
       const angle1 = randomRange(0, Math.PI * 2);
       const angle2 = angle1 + randomRange(Math.PI * 0.5, Math.PI * 0.85);
@@ -234,10 +228,10 @@ document.addEventListener('DOMContentLoaded', () => {
     while (!valid && attempts < 300) {
       attempts++;
       const target = {
-        x: randomRange(padding + 80, width - padding - 80),
-        y: randomRange(padding + 80, height - padding - 80)
+        x: randomRange(padding + 60, width - padding - 60),
+        y: randomRange(padding + 60, height - padding - 60)
       };
-      const R = randomRange(130, Math.min(width, height) * 0.42);
+      const R = randomRange(110, Math.min(width, height) * 0.42);
 
       const angle1 = randomRange(0, Math.PI * 2);
       const deltaAngle = (attempts % 2 === 0) ? randomRange(Math.PI * 0.9, Math.PI * 1.05) : randomRange(Math.PI * 0.3, Math.PI * 0.45);
@@ -275,9 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return min + Math.random() * (max - min);
   }
 
-  // ----------------------------------------------------
-  // Render Student Pins (A, B, C Labels)
-  // ----------------------------------------------------
+  // Render Student Pins
   function renderStudents() {
     studentPositions.forEach(st => {
       const el = document.createElement('div');
@@ -293,21 +285,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ----------------------------------------------------
-  // Interactive Click on Board (Placing Bingsoo 🍨)
+  // Interactive Touch & Click Handlers
   // ----------------------------------------------------
-  gameBoard.addEventListener('click', (e) => {
+  function handleBoardInteraction(e) {
     if (isAnswerChecked) return;
 
+    if (e.type === 'touchstart') {
+      e.preventDefault();
+    }
+
     const rect = gameBoard.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    let clientX = e.clientX;
+    let clientY = e.clientY;
+
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    }
+
+    const clickX = clientX - rect.left;
+    const clickY = clientY - rect.top;
 
     placedPoint = { x: clickX, y: clickY };
     renderPlacedBingsoo();
 
     btnCheckAnswer.disabled = false;
     instructionBanner.classList.add('hidden');
-  });
+  }
+
+  gameBoard.addEventListener('click', handleBoardInteraction);
+  gameBoard.addEventListener('touchstart', handleBoardInteraction, { passive: false });
 
   function renderPlacedBingsoo() {
     const existing = document.getElementById('user-bingsoo-pin');
@@ -368,6 +375,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderAnswerBingsoo() {
+    const existing = document.getElementById('answer-bingsoo-pin');
+    if (existing) existing.remove();
+
     const pin = document.createElement('div');
     pin.id = 'answer-bingsoo-pin';
     pin.className = 'answer-bingsoo-pin';
@@ -471,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ----------------------------------------------------
-  // Game Finish & Realtime Firebase DB Leaderboard
+  // Game Finish & Locked Submission System
   // ----------------------------------------------------
   function finishGame() {
     finalTotalScore.innerHTML = `${totalScore} <small>/ 500</small>`;
@@ -492,9 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
       newRecordBadge.classList.add('hidden');
     }
 
-    // Populate current player inputs in completion box
-    resultInputName.value = playerName || '';
-    resultInputId.value = studentId || '';
+    // Display locked player name and ID
+    if (resultLockedName) resultLockedName.textContent = playerName;
+    if (resultLockedId) resultLockedId.textContent = studentId;
 
     if (window.confetti) {
       confetti({
@@ -519,20 +529,20 @@ document.addEventListener('DOMContentLoaded', () => {
     resultModal.classList.remove('hidden');
   }
 
-  // Realtime listener from Firebase Realtime Database
-  function listenFirebaseLeaderboard() {
+  // Realtime Leaderboard Listener
+  function listenRealtimeLeaderboard() {
     if (!firebaseDb) return;
 
     firebaseDb.ref('scores').orderByChild('score').limitToLast(20).on('value', (snapshot) => {
       const list = [];
       snapshot.forEach(childSnap => {
-        list.push(childSnap.val());
+        const val = childSnap.val();
+        list.push(val);
       });
-      // Reverse so highest score is at index 0 (1st place)
       list.reverse();
       renderHallOfFame(list);
     }, (err) => {
-      console.error("Firebase read error:", err);
+      console.error("Leaderboard read error:", err);
     });
   }
 
@@ -540,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
     leaderboardTbody.innerHTML = '';
 
     if (!list || list.length === 0) {
-      leaderboardTbody.innerHTML = `<tr><td colspan="4" style="padding:15px; color:#64748b;">아직 등록된 기록이 없습니다. 점수를 전송해 보세요!</td></tr>`;
+      leaderboardTbody.innerHTML = `<tr><td colspan="4" style="padding:15px; color:#64748b;">아직 등록된 기록이 없습니다. 첫 점수를 등록해 보세요!</td></tr>`;
       return;
     }
 
@@ -573,46 +583,73 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Push score to Firebase Realtime Database
+  // Strict Anti-Tamper Score Submit (Uses ONLY locked playerName & studentId)
   btnSendData.addEventListener('click', async () => {
-    const finalName = resultInputName.value.trim() || playerName || '익명';
-    const finalId = resultInputId.value.trim() || studentId || '미입력';
-
-    // Update state & local storage
-    playerName = finalName;
-    studentId = finalId;
-    localStorage.setItem('bingsoo_player_name', playerName);
-    localStorage.setItem('bingsoo_student_id', studentId);
-    updatePlayerInfoDisplay();
+    if (!playerName || !studentId) {
+      apiStatusMsg.className = 'api-status-msg error';
+      apiStatusMsg.textContent = '❌ 참가자 정보가 올바르지 않습니다. 다시 시작해 주세요.';
+      return;
+    }
 
     btnSendData.disabled = true;
     apiStatusMsg.className = 'api-status-msg';
-    apiStatusMsg.textContent = '🔥 Firebase Realtime DB로 전송 중...';
+    apiStatusMsg.textContent = '⏳ 점수 등록 중...';
 
     if (firebaseDb) {
       try {
-        await firebaseDb.ref('scores').push({
-          name: finalName,
-          studentId: finalId,
-          score: totalScore,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
+        const snapshot = await firebaseDb.ref('scores').once('value');
+        let existingKey = null;
+        let existingScore = -1;
+
+        snapshot.forEach(child => {
+          const val = child.val();
+          if (val.name === playerName && val.studentId === studentId) {
+            existingKey = child.key;
+            existingScore = val.score;
+          }
         });
 
-        apiStatusMsg.className = 'api-status-msg success';
-        apiStatusMsg.textContent = `🔥 ${finalName}(학번: ${finalId})님의 ${totalScore}점 기록이 Firebase DB에 등록되었습니다!`;
+        if (existingKey) {
+          if (totalScore > existingScore) {
+            const confirmUpdate = confirm(`'${playerName}'님(${studentId})의 기존 등록 점수(${existingScore}점)보다 높은 점수(${totalScore}점)를 달성하셨습니다!\n기존 점수를 갱신하시겠습니까?`);
+            if (confirmUpdate) {
+              await firebaseDb.ref('scores/' + existingKey).update({
+                score: totalScore,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+              });
+              apiStatusMsg.className = 'api-status-msg success';
+              apiStatusMsg.textContent = `🎉 기존 점수(${existingScore}점)에서 ${totalScore}점으로 최고 점수가 성공적으로 갱신되었습니다!`;
+            } else {
+              apiStatusMsg.className = 'api-status-msg';
+              apiStatusMsg.textContent = `기존 점수(${existingScore}점)가 유지되었습니다.`;
+            }
+          } else {
+            apiStatusMsg.className = 'api-status-msg';
+            apiStatusMsg.textContent = `ℹ️ 기존 등록 점수(${existingScore}점)가 현재 점수(${totalScore}점)보다 높거나 같아 갱신되지 않았습니다.`;
+          }
+        } else {
+          await firebaseDb.ref('scores').push({
+            name: playerName,
+            studentId: studentId,
+            score: totalScore,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+          });
+          apiStatusMsg.className = 'api-status-msg success';
+          apiStatusMsg.textContent = `✅ ${playerName}(학번: ${studentId})님의 ${totalScore}점 기록이 등록되었습니다!`;
+        }
       } catch (err) {
-        console.error("Firebase write error:", err);
+        console.error("Score submit error:", err);
         apiStatusMsg.className = 'api-status-msg error';
-        apiStatusMsg.textContent = '❌ 전송 실패: Firebase DB 저장 중 오류가 발생했습니다.';
+        apiStatusMsg.textContent = '❌ 점수 등록 중 오류가 발생했습니다.';
       } finally {
         btnSendData.disabled = false;
       }
     } else {
       setTimeout(() => {
         apiStatusMsg.className = 'api-status-msg success';
-        apiStatusMsg.textContent = `✅ ${finalName}(학번: ${finalId})님의 기록이 로컬 저장소에 안전하게 기록되었습니다.`;
+        apiStatusMsg.textContent = `✅ ${playerName}(학번: ${studentId})님의 ${totalScore}점 기록이 등록되었습니다.`;
         btnSendData.disabled = false;
-      }, 500);
+      }, 400);
     }
   });
 });
