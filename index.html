@@ -9,8 +9,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
   <!-- Canvas Confetti for winning celebrations -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Firebase App & Realtime Database SDKs (Compat v10) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 </head>
 <body>
   <div class="game-app">
@@ -125,7 +130,7 @@
         <div class="modal-header">
           <span class="modal-trophy">🏆</span>
           <h2>게임 완료</h2>
-          <p><span id="result-player-name">홍길동</span>님(<span id="result-student-id">2101</span>)의 5라운드 성적표입니다.</p>
+          <p>5라운드의 팥빙수 배달 성적표입니다.</p>
         </div>
         
         <div class="modal-body">
@@ -135,17 +140,28 @@
             <div id="new-record-badge" class="new-record-badge hidden">🎉 최고 기록 달성!</div>
           </div>
 
+          <!-- Firebase DB Registration Box -->
           <div class="send-action-box">
-            <button id="btn-send-data" class="btn btn-secondary btn-lg">
-              🚀 기록 전송하기
+            <div class="result-player-inputs">
+              <div class="input-item">
+                <label for="result-input-name">이름:</label>
+                <input type="text" id="result-input-name" class="form-input" placeholder="이름 입력" />
+              </div>
+              <div class="input-item">
+                <label for="result-input-id">학번:</label>
+                <input type="text" id="result-input-id" class="form-input" placeholder="학번 입력(예: 2101)" />
+              </div>
+            </div>
+            <button id="btn-send-data" class="btn btn-secondary btn-lg" style="width: 100%;">
+              🔥 Firebase DB에 점수 등록하기
             </button>
             <div id="api-status-msg" class="api-status-msg"></div>
           </div>
 
-          <!-- Hall of Fame Leaderboard (Ranks 1 to 20) -->
+          <!-- Hall of Fame Leaderboard (Realtime Firebase DB Top 20) -->
           <div class="leaderboard-section">
             <div class="leaderboard-header">
-              <h3>🏆 명예의 전당 (1위 ~ 20위)</h3>
+              <h3>🏆 명예의 전당 (Firebase 실시간 1위 ~ 20위)</h3>
             </div>
             <div class="leaderboard-table-wrapper">
               <table class="leaderboard-table">
@@ -158,7 +174,7 @@
                   </tr>
                 </thead>
                 <tbody id="leaderboard-tbody">
-                  <!-- Dynamically populated -->
+                  <!-- Dynamically populated from Firebase DB -->
                 </tbody>
               </table>
             </div>

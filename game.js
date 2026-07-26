@@ -1,6 +1,31 @@
 /**
- * 팥빙수 똑같이 나눠주기 작전! - Game Engine Logic
+ * 팥빙수 똑같이 나눠주기 작전! - Game Engine & Firebase Realtime DB Logic
  */
+
+// Firebase Configuration Provided by User
+const firebaseConfig = {
+  apiKey: "AIzaSyBiY1JBwYxtROIGFW7RUIJ4k7QZHVfNcEA",
+  authDomain: "math-game-halogini.firebaseapp.com",
+  databaseURL: "https://math-game-halogini-default-rtdb.firebaseio.com",
+  projectId: "math-game-halogini",
+  storageBucket: "math-game-halogini.firebasestorage.app",
+  messagingSenderId: "42232060061",
+  appId: "1:42232060061:web:ad26f83ca7d1285b3e5c74",
+  measurementId: "G-F13LE342GQ"
+};
+
+// Initialize Firebase App & Database
+let firebaseDb = null;
+if (window.firebase) {
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    firebaseDb = firebase.database();
+  } catch (err) {
+    console.error("Firebase init failed:", err);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   // Game State
@@ -11,15 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let highScore = parseInt(localStorage.getItem('bingsoo_game_highscore') || '0', 10);
   
   let studentPositions = []; // [{ id: 'A', name: 'A', emoji: '👦', x, y }, ...]
-  let targetPoint = { x: 0, y: 0 }; // Exact location with equal distance to A, B, C
-  let placedPoint = null; // User clicked position { x, y }
+  let targetPoint = { x: 0, y: 0 };
+  let placedPoint = null;
   let isAnswerChecked = false;
   let popupTimeoutId = null;
 
-  // Player Info & Leaderboard
+  // Player Info & Local Leaderboard Backup
   let playerName = localStorage.getItem('bingsoo_player_name') || '';
   let studentId = localStorage.getItem('bingsoo_student_id') || '';
-  let leaderboard = JSON.parse(localStorage.getItem('bingsoo_leaderboard') || '[]');
 
   // DOM Elements
   const gameBoard = document.getElementById('game-board');
@@ -50,8 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const scoreDistanceInfo = document.getElementById('score-distance-info');
 
   const resultModal = document.getElementById('result-modal');
-  const resultPlayerName = document.getElementById('result-player-name');
-  const resultStudentId = document.getElementById('result-student-id');
+  const resultInputName = document.getElementById('result-input-name');
+  const resultInputId = document.getElementById('result-input-id');
   const finalTotalScore = document.getElementById('final-total-score');
   const newRecordBadge = document.getElementById('new-record-badge');
   const roundHistoryList = document.getElementById('round-history-list');
@@ -60,39 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const btnModalRestart = document.getElementById('btn-modal-restart');
 
-  // Initialize Leaderboard Defaults if Empty
-  initLeaderboardDefaults();
+  // Start listening to Firebase Realtime Leaderboard (Top 20)
+  listenFirebaseLeaderboard();
 
   // Check initial player registration
   checkPlayerRegistration();
-
-  function initLeaderboardDefaults() {
-    if (!leaderboard || leaderboard.length === 0) {
-      leaderboard = [
-        { name: '김빙수', studentId: '2105', score: 492 },
-        { name: '이얼음', studentId: '2102', score: 485 },
-        { name: '박팥달', studentId: '2112', score: 478 },
-        { name: '최달콤', studentId: '2108', score: 465 },
-        { name: '정연유', studentId: '2103', score: 450 },
-        { name: '강시원', studentId: '2115', score: 442 },
-        { name: '윤미식', studentId: '2107', score: 435 },
-        { name: '장배달', studentId: '2119', score: 420 },
-        { name: '임탐험', studentId: '2110', score: 412 },
-        { name: '한정확', studentId: '2104', score: 400 },
-        { name: '오마스터', studentId: '2114', score: 390 },
-        { name: '서스피드', studentId: '2106', score: 382 },
-        { name: '신럭키', studentId: '2111', score: 375 },
-        { name: '권에이스', studentId: '2117', score: 360 },
-        { name: '황골드', studentId: '2120', score: 350 },
-        { name: '안나이스', studentId: '2113', score: 342 },
-        { name: '송포인트', studentId: '2116', score: 330 },
-        { name: '류스마트', studentId: '2118', score: 320 },
-        { name: '홍길동', studentId: '2101', score: 310 },
-        { name: '조챌린저', studentId: '2109', score: 300 }
-      ];
-      localStorage.setItem('bingsoo_leaderboard', JSON.stringify(leaderboard));
-    }
-  }
 
   function checkPlayerRegistration() {
     if (!playerName || !studentId) {
@@ -131,8 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function updatePlayerInfoDisplay() {
     displayPlayerName.textContent = playerName || '플레이어';
     displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: 2101';
-    if (resultPlayerName) resultPlayerName.textContent = playerName;
-    if (resultStudentId) resultStudentId.textContent = studentId;
+    if (resultInputName) resultInputName.value = playerName;
+    if (resultInputId) resultInputId.value = studentId;
   }
 
   function initGame() {
@@ -350,7 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateHeaderUI();
     drawVerificationLines();
 
-    // Show center popup (Exactly 1.5 seconds / 1500ms display duration!)
     showScorePopup(roundScore, errorDistance);
 
     btnCheckAnswer.classList.add('hidden');
@@ -427,7 +422,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Score popup duration set to EXACTLY 1.5 seconds (1500ms)
   function showScorePopup(score, errorDistance) {
     if (popupTimeoutId) clearTimeout(popupTimeoutId);
 
@@ -447,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     popupTimeoutId = setTimeout(() => {
       scorePopup.classList.add('hidden');
-    }, 1500); // Exactly 1.5 seconds!
+    }, 1500);
   }
 
   scorePopup.addEventListener('click', () => {
@@ -477,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ----------------------------------------------------
-  // Game Finish & Hall of Fame (Rank 1 to 20)
+  // Game Finish & Realtime Firebase DB Leaderboard
   // ----------------------------------------------------
   function finishGame() {
     finalTotalScore.innerHTML = `${totalScore} <small>/ 500</small>`;
@@ -498,11 +492,9 @@ document.addEventListener('DOMContentLoaded', () => {
       newRecordBadge.classList.add('hidden');
     }
 
-    // Save current session to Leaderboard
-    saveToLeaderboard(playerName, studentId, totalScore);
-
-    // Render Hall of Fame (Top 1 to 20)
-    renderHallOfFame();
+    // Populate current player inputs in completion box
+    resultInputName.value = playerName || '';
+    resultInputId.value = studentId || '';
 
     if (window.confetti) {
       confetti({
@@ -527,24 +519,32 @@ document.addEventListener('DOMContentLoaded', () => {
     resultModal.classList.remove('hidden');
   }
 
-  function saveToLeaderboard(name, id, score) {
-    leaderboard.push({
-      name: name || '익명',
-      studentId: id || '미입력',
-      score: score,
-      timestamp: Date.now()
+  // Realtime listener from Firebase Realtime Database
+  function listenFirebaseLeaderboard() {
+    if (!firebaseDb) return;
+
+    firebaseDb.ref('scores').orderByChild('score').limitToLast(20).on('value', (snapshot) => {
+      const list = [];
+      snapshot.forEach(childSnap => {
+        list.push(childSnap.val());
+      });
+      // Reverse so highest score is at index 0 (1st place)
+      list.reverse();
+      renderHallOfFame(list);
+    }, (err) => {
+      console.error("Firebase read error:", err);
     });
-
-    leaderboard.sort((a, b) => b.score - a.score);
-    leaderboard = leaderboard.slice(0, 20);
-
-    localStorage.setItem('bingsoo_leaderboard', JSON.stringify(leaderboard));
   }
 
-  function renderHallOfFame() {
+  function renderHallOfFame(list) {
     leaderboardTbody.innerHTML = '';
 
-    leaderboard.forEach((item, index) => {
+    if (!list || list.length === 0) {
+      leaderboardTbody.innerHTML = `<tr><td colspan="4" style="padding:15px; color:#64748b;">아직 등록된 기록이 없습니다. 점수를 전송해 보세요!</td></tr>`;
+      return;
+    }
+
+    list.forEach((item, index) => {
       const tr = document.createElement('tr');
 
       const isCurrentPlayer = (item.name === playerName && item.studentId === studentId && item.score === totalScore);
@@ -559,24 +559,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
       tr.innerHTML = `
         <td class="rank-${index + 1}">${rankDisplay}</td>
-        <td>${item.name}</td>
-        <td>${item.studentId}</td>
+        <td>${escapeHtml(item.name || '익명')}</td>
+        <td>${escapeHtml(item.studentId || '미입력')}</td>
         <td><strong>${item.score}점</strong></td>
       `;
       leaderboardTbody.appendChild(tr);
     });
   }
 
-  // Streamlined Send Button: Instant transmission confirmation
-  btnSendData.addEventListener('click', () => {
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function(m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+
+  // Push score to Firebase Realtime Database
+  btnSendData.addEventListener('click', async () => {
+    const finalName = resultInputName.value.trim() || playerName || '익명';
+    const finalId = resultInputId.value.trim() || studentId || '미입력';
+
+    // Update state & local storage
+    playerName = finalName;
+    studentId = finalId;
+    localStorage.setItem('bingsoo_player_name', playerName);
+    localStorage.setItem('bingsoo_student_id', studentId);
+    updatePlayerInfoDisplay();
+
     btnSendData.disabled = true;
     apiStatusMsg.className = 'api-status-msg';
-    apiStatusMsg.textContent = '⏳ 기록 전송 중...';
+    apiStatusMsg.textContent = '🔥 Firebase Realtime DB로 전송 중...';
 
-    setTimeout(() => {
-      apiStatusMsg.className = 'api-status-msg success';
-      apiStatusMsg.textContent = `✅ ${playerName}(학번: ${studentId})님의 ${totalScore}점 기록이 성공적으로 전송되었습니다!`;
-      btnSendData.disabled = false;
-    }, 450);
+    if (firebaseDb) {
+      try {
+        await firebaseDb.ref('scores').push({
+          name: finalName,
+          studentId: finalId,
+          score: totalScore,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        apiStatusMsg.className = 'api-status-msg success';
+        apiStatusMsg.textContent = `🔥 ${finalName}(학번: ${finalId})님의 ${totalScore}점 기록이 Firebase DB에 등록되었습니다!`;
+      } catch (err) {
+        console.error("Firebase write error:", err);
+        apiStatusMsg.className = 'api-status-msg error';
+        apiStatusMsg.textContent = '❌ 전송 실패: Firebase DB 저장 중 오류가 발생했습니다.';
+      } finally {
+        btnSendData.disabled = false;
+      }
+    } else {
+      setTimeout(() => {
+        apiStatusMsg.className = 'api-status-msg success';
+        apiStatusMsg.textContent = `✅ ${finalName}(학번: ${finalId})님의 기록이 로컬 저장소에 안전하게 기록되었습니다.`;
+        btnSendData.disabled = false;
+      }, 500);
+    }
   });
 });
