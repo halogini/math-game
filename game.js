@@ -1,5 +1,5 @@
 /**
- * 팥빙수 똑같이 나눠주기 작전! - Game Engine Logic (Anti-Tamper Locked Player System)
+ * 팥빙수 똑같이 나눠주기 작전! - Game Engine Logic
  */
 
 // Firebase Configuration Provided by User
@@ -35,13 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let roundHistory = []; // { round, score, errorPx }
   let highScore = parseInt(localStorage.getItem('bingsoo_game_highscore') || '0', 10);
   
-  let studentPositions = []; // [{ id: 'A', name: 'A', emoji: '👦', x, y }, ...]
+  let studentPositions = []; // [{ emoji: '👦', x, y }, ...]
   let targetPoint = { x: 0, y: 0 };
   let placedPoint = null;
   let isAnswerChecked = false;
   let popupTimeoutId = null;
 
-  // Locked Player Info (Entered ONCE at startup, cannot be altered later)
+  // Locked Player Info
   let playerName = localStorage.getItem('bingsoo_player_name') || '';
   let studentId = localStorage.getItem('bingsoo_student_id') || '';
 
@@ -64,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnCheckAnswer = document.getElementById('btn-check-answer');
   const btnNextRound = document.getElementById('btn-next-round');
-  const btnRestart = document.getElementById('btn-restart');
   const instructionBanner = document.getElementById('instruction-banner');
 
   const scorePopup = document.getElementById('score-popup');
@@ -86,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Listen to Realtime Leaderboard
   listenRealtimeLeaderboard();
 
-  // Initial Player Registration Check (Strict One-Time Only)
+  // Initial Player Registration Check
   checkPlayerRegistration();
 
   function checkPlayerRegistration() {
@@ -108,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
       playerName = nameVal;
       studentId = idVal;
 
-      // Lock into localStorage
       localStorage.setItem('bingsoo_player_name', playerName);
       localStorage.setItem('bingsoo_student_id', studentId);
 
@@ -212,9 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         targetPoint = target;
         studentPositions = [
-          { id: 'A', name: 'A', emoji: '👦', x: A.x, y: A.y },
-          { id: 'B', name: 'B', emoji: '👧', x: B.x, y: B.y },
-          { id: 'C', name: 'C', emoji: '🧑', x: C.x, y: C.y }
+          { emoji: '👦', x: A.x, y: A.y },
+          { emoji: '👧', x: B.x, y: B.y },
+          { emoji: '🧑', x: C.x, y: C.y }
         ];
         valid = true;
       }
@@ -248,9 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         targetPoint = target;
         studentPositions = [
-          { id: 'A', name: 'A', emoji: '👦', x: A.x, y: A.y },
-          { id: 'B', name: 'B', emoji: '👧', x: B.x, y: B.y },
-          { id: 'C', name: 'C', emoji: '🧑', x: C.x, y: C.y }
+          { emoji: '👦', x: A.x, y: A.y },
+          { emoji: '👧', x: B.x, y: B.y },
+          { emoji: '🧑', x: C.x, y: C.y }
         ];
         valid = true;
       }
@@ -269,17 +267,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return min + Math.random() * (max - min);
   }
 
-  // Render Student Pins
+  // Render Clean Emoji Student Pins
   function renderStudents() {
     studentPositions.forEach(st => {
       const el = document.createElement('div');
       el.className = 'student-pin';
       el.style.left = `${st.x}px`;
       el.style.top = `${st.y}px`;
-      el.innerHTML = `
-        <div class="student-emoji-box">${st.emoji}</div>
-        <div class="student-label">${st.name}</div>
-      `;
+      el.innerHTML = `<div class="student-emoji-box">${st.emoji}</div>`;
       elementsLayer.appendChild(el);
     });
   }
@@ -333,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ----------------------------------------------------
-  // Check Answer & Strict Scoring Calculation
+  // Check Answer
   // ----------------------------------------------------
   btnCheckAnswer.addEventListener('click', () => {
     if (!placedPoint || isAnswerChecked) return;
@@ -427,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
       badge.className = 'distance-badge';
       badge.style.left = `${midX}px`;
       badge.style.top = `${midY}px`;
-      badge.textContent = `${st.name}: ${rA}`;
+      badge.textContent = `거리: ${rA}`;
       elementsLayer.appendChild(badge);
     });
   }
@@ -471,17 +466,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  btnRestart.addEventListener('click', () => {
-    initGame();
-  });
-
   btnModalRestart.addEventListener('click', () => {
     resultModal.classList.add('hidden');
     initGame();
   });
 
   // ----------------------------------------------------
-  // Game Finish & Locked Submission System
+  // Game Finish & Realtime Leaderboard
   // ----------------------------------------------------
   function finishGame() {
     finalTotalScore.innerHTML = `${totalScore} <small>/ 500</small>`;
@@ -502,7 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
       newRecordBadge.classList.add('hidden');
     }
 
-    // Display locked player name and ID
     if (resultLockedName) resultLockedName.textContent = playerName;
     if (resultLockedId) resultLockedId.textContent = studentId;
 
@@ -529,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
     resultModal.classList.remove('hidden');
   }
 
-  // Realtime Leaderboard Listener
   function listenRealtimeLeaderboard() {
     if (!firebaseDb) return;
 
@@ -583,11 +572,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Strict Anti-Tamper Score Submit (Uses ONLY locked playerName & studentId)
   btnSendData.addEventListener('click', async () => {
     if (!playerName || !studentId) {
       apiStatusMsg.className = 'api-status-msg error';
-      apiStatusMsg.textContent = '❌ 참가자 정보가 올바르지 않습니다. 다시 시작해 주세요.';
+      apiStatusMsg.textContent = '❌ 참가자 정보가 올바르지 않습니다.';
       return;
     }
 
@@ -618,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: firebase.database.ServerValue.TIMESTAMP
               });
               apiStatusMsg.className = 'api-status-msg success';
-              apiStatusMsg.textContent = `🎉 기존 점수(${existingScore}점)에서 ${totalScore}점으로 최고 점수가 성공적으로 갱신되었습니다!`;
+              apiStatusMsg.textContent = `🎉 기존 점수(${existingScore}점)에서 ${totalScore}점으로 최고 점수가 갱신되었습니다!`;
             } else {
               apiStatusMsg.className = 'api-status-msg';
               apiStatusMsg.textContent = `기존 점수(${existingScore}점)가 유지되었습니다.`;
