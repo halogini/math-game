@@ -29,8 +29,8 @@
         </div>
       </div>
       <div class="status-bar">
-        <!-- Player Info Badge (Locked after initial entry) -->
-        <div class="player-info-card" id="btn-edit-player">
+        <!-- Player Info Badge -->
+        <div class="player-info-card">
           <span class="player-icon">👤</span>
           <div class="player-details">
             <span class="player-name" id="display-player-name">홍길동</span>
@@ -69,7 +69,7 @@
 
           <!-- Floating Guidance Banner -->
           <div id="instruction-banner" class="instruction-banner">
-            👉 화면을 터치하여 세 명의 친구와 똑같은 거리라고 생각되는 지점에 🍨 팥빙수를 놓으세요!
+            👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!
           </div>
 
           <!-- Top-Center Non-blocking Score Popup Effect -->
@@ -94,26 +94,66 @@
       </div>
     </main>
 
-    <!-- Initial Player Information Modal (Entered ONCE at start) -->
+    <!-- Opening Screen Modal (Features 1st Place Champion, Concise Game Guide & Player Setup) -->
     <div id="player-modal" class="modal-backdrop">
-      <div class="modal-card modal-sm">
-        <div class="modal-header">
-          <span class="modal-trophy">🍧</span>
-          <h2>참가자 정보 입력</h2>
-          <p>게임 시작 전 이름과 학번을 입력해 주세요.</p>
+      <div class="modal-card modal-opening">
+        <div class="opening-banner">
+          <span class="opening-subtitle">전교 1위 챔피언 도전!</span>
+          <h2>👑 명예의 전당 랭킹 1위</h2>
+          
+          <div class="champ-card" id="champ-card-box">
+            <div class="champ-gold-shimmer"></div>
+            <div class="champ-trophy">🥇</div>
+            <div class="champ-info">
+              <span class="champ-name" id="opening-champ-name">김빙수</span>
+              <span class="champ-id" id="opening-champ-id">학번: 2105</span>
+            </div>
+            <div class="champ-score" id="opening-champ-score">492<small>점</small></div>
+          </div>
+
+          <!-- Toggle Opening Leaderboard Button -->
+          <button type="button" id="btn-toggle-opening-leaderboard" class="btn btn-outline btn-sm style-toggle-btn">
+            🏆 명예의 전당 순위표 전체 보기
+          </button>
+
+          <!-- Collapsible Opening Leaderboard Box -->
+          <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th>학번</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody id="opening-leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
+
+        <!-- Simplified Concise Game Purpose Banner -->
+        <div class="game-guide-box short-banner">
+          <div class="guide-title">🍧 팥빙수 똑같이 나눠주기 작전!</div>
+          <p class="guide-desc">세 명의 친구와 똑같은 거리에 팥빙수를 배치하세요!</p>
+        </div>
+
         <div class="modal-body">
           <form id="player-form">
             <div class="form-group">
-              <label for="input-player-name">이름:</label>
+              <label for="input-player-name">도전자 이름:</label>
               <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" required />
             </div>
             <div class="form-group">
               <label for="input-student-id">학번:</label>
               <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" required />
             </div>
-            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 10px;">
-              🎮 게임 시작하기
+            <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
+              ⚡ 챔피언에 도전하기 (게임 시작)
             </button>
           </form>
         </div>
@@ -123,11 +163,12 @@
     <!-- Final Result Modal (Round 5 Complete) -->
     <div id="result-modal" class="modal-backdrop hidden">
       <div class="modal-card modal-lg">
+        <!-- Always Visible Top Modal Header -->
         <div class="modal-header">
           <span class="modal-trophy">🏆</span>
           <h2>게임 완료</h2>
         </div>
-        
+
         <div class="modal-body">
           <div class="final-score-box">
             <span class="final-label">최종 획득 점수</span>

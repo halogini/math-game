@@ -178,7 +178,7 @@ body {
   box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
   overflow: hidden;
   cursor: crosshair;
-  touch-action: manipulation;
+  touch-action: none;
 }
 
 .board-grid-pattern {
@@ -205,31 +205,34 @@ body {
   z-index: 10;
 }
 
-/* Banner */
+/* Responsive Guidance Banner */
 .instruction-banner {
   position: absolute;
-  top: 12px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.88);
   color: #ffffff;
   padding: 6px 14px;
   border-radius: 20px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: clamp(0.72rem, 3vw, 0.82rem);
+  font-weight: 700;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   z-index: 20;
-  white-space: nowrap;
+  max-width: 92%;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
   animation: pulse-bounce 2s infinite ease-in-out;
 }
 
 @keyframes pulse-bounce {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-4px); }
+  50% { transform: translateX(-50%) translateY(-3px); }
 }
 
-/* Student Pin Styles (Clean Emoji Circle) */
+/* Student Pin Styles */
 .student-pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -237,42 +240,73 @@ body {
   flex-direction: column;
   align-items: center;
   pointer-events: none;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .student-emoji-box {
   background: #ffffff;
   border: 3.5px solid #0284c7;
   border-radius: 50%;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 1.8rem;
+  font-size: 1.9rem;
   box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  transition: all 0.2s ease;
 }
 
-/* Placed Bingsoo Pin */
+/* Individual Student Expressions */
+.student-pin.mood-angry .student-emoji-box {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.7);
+  animation: shake-head 0.4s infinite ease-in-out;
+}
+
+.student-pin.mood-happy .student-emoji-box {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.7);
+  transform: scale(1.15);
+}
+
+.student-pin.mood-neutral .student-emoji-box {
+  border-color: #0284c7 !important;
+}
+
+@keyframes shake-head {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+/* Draggable Placed Bingsoo Pin */
 .placed-bingsoo-pin {
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  pointer-events: none;
-  z-index: 15;
-  animation: drop-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto;
+  cursor: grab;
+  z-index: 20;
+  transition: opacity 0.3s ease, transform 0.05s ease-out;
 }
 
-@keyframes drop-bounce {
-  0% { transform: translate(-50%, -100%) scale(0.5); opacity: 0; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.placed-bingsoo-pin.transparent-mode {
+  opacity: 0.65;
+  filter: drop-shadow(0 0 12px rgba(2, 132, 199, 0.6));
+}
+
+.placed-bingsoo-pin.is-dragging {
+  cursor: grabbing !important;
+  transform: translate(-50%, -50%) scale(1.2) !important;
+  z-index: 30;
 }
 
 .bingsoo-icon {
-  font-size: 2.4rem;
-  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.25));
+  font-size: 2.6rem;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.3));
 }
 
 .bingsoo-label {
@@ -284,65 +318,6 @@ body {
   font-weight: 800;
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
-}
-
-/* Exact Target Answer Pin */
-.answer-bingsoo-pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-  z-index: 25;
-  animation: pop-gold 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.target-halo {
-  position: absolute;
-  width: 68px;
-  height: 68px;
-  border: 3px dashed #0284c7;
-  border-radius: 50%;
-  background: rgba(2, 132, 199, 0.15);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: halo-rotate-pulse 3s infinite linear;
-  pointer-events: none;
-}
-
-@keyframes halo-rotate-pulse {
-  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.95); }
-  50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.1); }
-  100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.95); }
-}
-
-@keyframes pop-gold {
-  0% { transform: translate(-50%, -50%) scale(0); }
-  70% { transform: translate(-50%, -50%) scale(1.25); }
-  100% { transform: translate(-50%, -50%) scale(1); }
-}
-
-.answer-icon {
-  font-size: 2.8rem;
-  filter: drop-shadow(0 0 14px rgba(2, 132, 199, 0.95));
-  position: relative;
-  z-index: 2;
-}
-
-.answer-label {
-  background: linear-gradient(135deg, #0284c7, #0d9488);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 14px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
-  white-space: nowrap;
-  border: 2px solid #ffffff;
-  position: relative;
-  z-index: 2;
 }
 
 /* Distance Badges */
@@ -362,7 +337,7 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 
-/* Score Popup */
+/* Non-blocking Score Popup */
 .score-popup {
   position: absolute;
   top: 12px;
@@ -416,7 +391,162 @@ body {
   font-weight: 600;
 }
 
-/* Controls Bar */
+/* Opening Champion Card & Leaderboard */
+.modal-opening {
+  max-width: 500px;
+  text-align: center;
+}
+
+.opening-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.opening-banner h2 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.6rem;
+  color: #0284c7;
+  margin-top: 2px;
+}
+
+.opening-subtitle {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 3px 12px;
+  border-radius: 12px;
+}
+
+.champ-card {
+  position: relative;
+  width: 100%;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  border-radius: 16px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.25);
+  overflow: hidden;
+}
+
+.champ-gold-shimmer {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  transform: rotate(30deg);
+  animation: gold-sweep 3.5s infinite;
+}
+
+@keyframes gold-sweep {
+  0% { transform: translateX(-100%) rotate(30deg); }
+  100% { transform: translateX(100%) rotate(30deg); }
+}
+
+.champ-trophy {
+  font-size: 2.4rem;
+  z-index: 2;
+}
+
+.champ-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 2;
+}
+
+.champ-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #78350f;
+}
+
+.champ-id {
+  font-size: 0.8rem;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.champ-score {
+  font-family: 'Jua', sans-serif;
+  font-size: 2.2rem;
+  color: #d97706;
+  z-index: 2;
+}
+
+/* Simplified Short Game Purpose Banner */
+.game-guide-box.short-banner {
+  background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+  border: 1.5px solid #7dd3fc;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: center;
+  margin-top: 4px;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.08);
+}
+
+.game-guide-box.short-banner .guide-title {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.25rem;
+  color: #0369a1;
+  margin-bottom: 2px;
+  justify-content: center;
+}
+
+.game-guide-box.short-banner .guide-desc {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.style-toggle-btn {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  padding: 6px 14px;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.opening-leaderboard-box {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 8px;
+  margin-top: 6px;
+  overflow: visible;
+}
+
+.style-sparkle-btn {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.4);
+}
+
+/* Result Modal Header */
+.modal-header {
+  text-align: center;
+  position: relative;
+}
+
+.modal-header h2 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.8rem;
+  color: #0284c7;
+}
+
+/* Controls & Buttons */
 .controls-bar {
   display: flex;
   gap: 10px;
@@ -493,6 +623,11 @@ body {
   font-size: 1.05rem;
 }
 
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;
@@ -526,26 +661,6 @@ body {
 
 .modal-sm {
   max-width: 420px;
-}
-
-.modal-header {
-  text-align: center;
-  position: relative;
-}
-
-.modal-trophy {
-  font-size: 3rem;
-}
-
-.modal-header h2 {
-  font-family: 'Jua', sans-serif;
-  font-size: 1.7rem;
-  color: var(--text-main);
-}
-
-.modal-header p {
-  color: var(--text-muted);
-  font-size: 0.88rem;
 }
 
 .modal-footer.centered-footer {
@@ -637,7 +752,7 @@ body {
 .api-status-msg.success { color: #16a34a; }
 .api-status-msg.error { color: #dc2626; }
 
-/* Leaderboard Section (명예의 전당 1위 ~ 20위) */
+/* Leaderboard Section */
 .leaderboard-section {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -654,8 +769,8 @@ body {
 }
 
 .leaderboard-table-wrapper {
-  max-height: 200px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
 }
@@ -671,10 +786,7 @@ body {
   background: #0284c7;
   color: white;
   padding: 7px;
-  position: sticky;
-  top: 0;
   font-weight: 700;
-  z-index: 2;
 }
 
 .leaderboard-table td {
@@ -737,6 +849,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: left;
 }
 
 .form-group label {
@@ -801,10 +914,6 @@ body {
 
   .bingsoo-icon {
     font-size: 2.1rem;
-  }
-
-  .answer-icon {
-    font-size: 2.4rem;
   }
 
   .score-number {

@@ -32,13 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRound = 1;
   const maxRounds = 5;
   let totalScore = 0;
-  let roundHistory = []; // { round, score, errorPx }
+  let roundHistory = [];
   let highScore = parseInt(localStorage.getItem('bingsoo_game_highscore') || '0', 10);
   
-  let studentPositions = []; // [{ emoji: '👦', x, y }, ...]
+  let studentPositions = [];
   let targetPoint = { x: 0, y: 0 };
   let placedPoint = null;
   let isAnswerChecked = false;
+  let isDraggingBingsoo = false;
   let popupTimeoutId = null;
 
   // Locked Player Info
@@ -57,6 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputStudentId = document.getElementById('input-student-id');
   const displayPlayerName = document.getElementById('display-player-name');
   const displayStudentId = document.getElementById('display-student-id');
+
+  const openingChampName = document.getElementById('opening-champ-name');
+  const openingChampId = document.getElementById('opening-champ-id');
+  const openingChampScore = document.getElementById('opening-champ-score');
+  const btnToggleOpeningLeaderboard = document.getElementById('btn-toggle-opening-leaderboard');
+  const openingLeaderboardBox = document.getElementById('opening-leaderboard-box');
+  const openingLeaderboardTbody = document.getElementById('opening-leaderboard-tbody');
 
   const roundDisplay = document.getElementById('round-display');
   const totalScoreDisplay = document.getElementById('total-score-display');
@@ -82,6 +90,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const btnModalRestart = document.getElementById('btn-modal-restart');
 
+  // Toggle Opening Leaderboard View
+  if (btnToggleOpeningLeaderboard && openingLeaderboardBox) {
+    btnToggleOpeningLeaderboard.addEventListener('click', () => {
+      openingLeaderboardBox.classList.toggle('hidden');
+      if (!openingLeaderboardBox.classList.contains('hidden')) {
+        btnToggleOpeningLeaderboard.textContent = '▲ 순위표 접기';
+      } else {
+        btnToggleOpeningLeaderboard.textContent = '🏆 명예의 전당 순위표 전체 보기';
+      }
+    });
+  }
+
   // Listen to Realtime Leaderboard
   listenRealtimeLeaderboard();
 
@@ -89,13 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
   checkPlayerRegistration();
 
   function checkPlayerRegistration() {
-    if (!playerName || !studentId) {
-      playerModal.classList.remove('hidden');
-    } else {
-      playerModal.classList.add('hidden');
-      updatePlayerInfoDisplay();
-      initGame();
+    if (playerName && studentId) {
+      inputPlayerName.value = playerName;
+      inputStudentId.value = studentId;
     }
+    playerModal.classList.remove('hidden');
   }
 
   playerForm.addEventListener('submit', (e) => {
@@ -168,6 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCheckAnswer.classList.remove('hidden');
     btnNextRound.classList.add('hidden');
     scorePopup.classList.add('hidden');
+
+    instructionBanner.textContent = '👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!';
     instructionBanner.classList.remove('hidden');
 
     const width = gameBoard.clientWidth || 800;
@@ -210,9 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         targetPoint = target;
         studentPositions = [
-          { emoji: '👦', x: A.x, y: A.y },
-          { emoji: '👧', x: B.x, y: B.y },
-          { emoji: '🧑', x: C.x, y: C.y }
+          { baseEmoji: '👦', x: A.x, y: A.y, currentEmoji: '🤔' },
+          { baseEmoji: '👧', x: B.x, y: B.y, currentEmoji: '🤔' },
+          { baseEmoji: '🧑', x: C.x, y: C.y, currentEmoji: '🤔' }
         ];
         valid = true;
       }
@@ -246,9 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         targetPoint = target;
         studentPositions = [
-          { emoji: '👦', x: A.x, y: A.y },
-          { emoji: '👧', x: B.x, y: B.y },
-          { emoji: '🧑', x: C.x, y: C.y }
+          { baseEmoji: '👦', x: A.x, y: A.y, currentEmoji: '🤔' },
+          { baseEmoji: '👧', x: B.x, y: B.y, currentEmoji: '🤔' },
+          { baseEmoji: '🧑', x: C.x, y: C.y, currentEmoji: '🤔' }
         ];
         valid = true;
       }
@@ -267,28 +287,75 @@ document.addEventListener('DOMContentLoaded', () => {
     return min + Math.random() * (max - min);
   }
 
-  // Render Clean Emoji Student Pins
+  // Render Student Pins
   function renderStudents() {
-    studentPositions.forEach(st => {
-      const el = document.createElement('div');
-      el.className = 'student-pin';
+    studentPositions.forEach((st, idx) => {
+      let el = document.getElementById(`student-pin-${idx}`);
+      if (!el) {
+        el = document.createElement('div');
+        el.id = `student-pin-${idx}`;
+        el.className = 'student-pin';
+        elementsLayer.appendChild(el);
+      }
       el.style.left = `${st.x}px`;
       el.style.top = `${st.y}px`;
-      el.innerHTML = `<div class="student-emoji-box">${st.emoji}</div>`;
-      elementsLayer.appendChild(el);
+      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}">🤔</div>`;
+    });
+  }
+
+  function updateIndividualStudentExpressions(bingsooPos) {
+    if (!bingsooPos) return;
+
+    const distances = studentPositions.map(st => Math.hypot(bingsooPos.x - st.x, bingsooPos.y - st.y));
+    const targetDist = Math.hypot(bingsooPos.x - targetPoint.x, bingsooPos.y - targetPoint.y);
+
+    const maxD = Math.max(...distances);
+    const minD = Math.min(...distances);
+    const spread = maxD - minD;
+
+    studentPositions.forEach((st, idx) => {
+      const d = distances[idx];
+      let expr = '🤔';
+      let moodClass = 'mood-neutral';
+
+      if (targetDist <= 10 || spread <= 10) {
+        expr = '🤩';
+        moodClass = 'mood-happy';
+      } else {
+        if (Math.abs(d - maxD) < 8 && spread > 16) {
+          expr = '😡';
+          moodClass = 'mood-angry';
+        } else if (Math.abs(d - minD) < 8 && spread > 16) {
+          expr = '😊';
+          moodClass = 'mood-happy';
+        } else {
+          expr = '😟';
+          moodClass = 'mood-disappointed';
+        }
+      }
+
+      st.currentEmoji = expr;
+      const box = document.getElementById(`student-emoji-${idx}`);
+      const pin = document.getElementById(`student-pin-${idx}`);
+      if (box) box.textContent = expr;
+      if (pin) pin.className = `student-pin ${moodClass}`;
+    });
+  }
+
+  function resetStudentExpressionsNeutral() {
+    studentPositions.forEach((st, idx) => {
+      st.currentEmoji = '🤔';
+      const box = document.getElementById(`student-emoji-${idx}`);
+      const pin = document.getElementById(`student-pin-${idx}`);
+      if (box) box.textContent = '🤔';
+      if (pin) pin.className = 'student-pin mood-neutral';
     });
   }
 
   // ----------------------------------------------------
-  // Interactive Touch & Click Handlers
+  // Drag & Interaction Handlers
   // ----------------------------------------------------
-  function handleBoardInteraction(e) {
-    if (isAnswerChecked) return;
-
-    if (e.type === 'touchstart') {
-      e.preventDefault();
-    }
-
+  function getBoardCoords(e) {
     const rect = gameBoard.getBoundingClientRect();
     let clientX = e.clientX;
     let clientY = e.clientY;
@@ -298,33 +365,91 @@ document.addEventListener('DOMContentLoaded', () => {
       clientY = e.touches[0].clientY;
     }
 
-    const clickX = clientX - rect.left;
-    const clickY = clientY - rect.top;
-
-    placedPoint = { x: clickX, y: clickY };
-    renderPlacedBingsoo();
-
-    btnCheckAnswer.disabled = false;
-    instructionBanner.classList.add('hidden');
+    return {
+      x: Math.max(10, Math.min(rect.width - 10, clientX - rect.left)),
+      y: Math.max(10, Math.min(rect.height - 10, clientY - rect.top))
+    };
   }
 
-  gameBoard.addEventListener('click', handleBoardInteraction);
-  gameBoard.addEventListener('touchstart', handleBoardInteraction, { passive: false });
+  function handleStartDrag(e) {
+    const coords = getBoardCoords(e);
+    placedPoint = coords;
+    isDraggingBingsoo = true;
+
+    renderPlacedBingsoo();
+    btnCheckAnswer.disabled = false;
+
+    if (isAnswerChecked) {
+      updateIndividualStudentExpressions(placedPoint);
+      drawVerificationLines();
+    } else {
+      resetStudentExpressionsNeutral();
+    }
+  }
+
+  function handleMoveDrag(e) {
+    if (!isDraggingBingsoo) return;
+
+    if (e.type === 'touchmove') {
+      e.preventDefault();
+    }
+
+    const coords = getBoardCoords(e);
+    placedPoint = coords;
+
+    const pin = document.getElementById('user-bingsoo-pin');
+    if (pin) {
+      pin.style.left = `${placedPoint.x}px`;
+      pin.style.top = `${placedPoint.y}px`;
+      pin.classList.add('is-dragging');
+    }
+
+    if (isAnswerChecked) {
+      updateIndividualStudentExpressions(placedPoint);
+      drawVerificationLines();
+    } else {
+      resetStudentExpressionsNeutral();
+    }
+  }
+
+  function handleEndDrag(e) {
+    if (!isDraggingBingsoo) return;
+    isDraggingBingsoo = false;
+
+    const pin = document.getElementById('user-bingsoo-pin');
+    if (pin) {
+      pin.classList.remove('is-dragging');
+    }
+  }
+
+  gameBoard.addEventListener('mousedown', handleStartDrag);
+  window.addEventListener('mousemove', handleMoveDrag);
+  window.addEventListener('mouseup', handleEndDrag);
+
+  gameBoard.addEventListener('touchstart', handleStartDrag, { passive: false });
+  window.addEventListener('touchmove', handleMoveDrag, { passive: false });
+  window.addEventListener('touchend', handleEndDrag);
 
   function renderPlacedBingsoo() {
-    const existing = document.getElementById('user-bingsoo-pin');
-    if (existing) existing.remove();
-
-    const pin = document.createElement('div');
-    pin.id = 'user-bingsoo-pin';
-    pin.className = 'placed-bingsoo-pin';
+    let pin = document.getElementById('user-bingsoo-pin');
+    if (!pin) {
+      pin = document.createElement('div');
+      pin.id = 'user-bingsoo-pin';
+      pin.className = 'placed-bingsoo-pin';
+      elementsLayer.appendChild(pin);
+    }
     pin.style.left = `${placedPoint.x}px`;
     pin.style.top = `${placedPoint.y}px`;
     pin.innerHTML = `
       <div class="bingsoo-icon">🍨</div>
       <div class="bingsoo-label">내 팥빙수</div>
     `;
-    elementsLayer.appendChild(pin);
+
+    if (isAnswerChecked) {
+      pin.classList.add('transparent-mode');
+    } else {
+      pin.classList.remove('transparent-mode');
+    }
   }
 
   // ----------------------------------------------------
@@ -334,11 +459,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!placedPoint || isAnswerChecked) return;
     isAnswerChecked = true;
 
-    renderAnswerBingsoo();
+    const pin = document.getElementById('user-bingsoo-pin');
+    if (pin) pin.classList.add('transparent-mode');
 
-    const dx = placedPoint.x - targetPoint.x;
-    const dy = placedPoint.y - targetPoint.y;
-    const errorDistance = Math.round(Math.sqrt(dx * dx + dy * dy));
+    instructionBanner.textContent = '👉 팥빙수를 드래그하여 정답 위치를 확인하세요!';
+    instructionBanner.classList.remove('hidden');
+
+    const errorDistance = Math.round(Math.hypot(placedPoint.x - targetPoint.x, placedPoint.y - targetPoint.y));
+
+    updateIndividualStudentExpressions(placedPoint);
 
     const roundScore = calculateStrictScore(errorDistance);
 
@@ -369,62 +498,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return 0;
   }
 
-  function renderAnswerBingsoo() {
-    const existing = document.getElementById('answer-bingsoo-pin');
-    if (existing) existing.remove();
-
-    const pin = document.createElement('div');
-    pin.id = 'answer-bingsoo-pin';
-    pin.className = 'answer-bingsoo-pin';
-    pin.style.left = `${targetPoint.x}px`;
-    pin.style.top = `${targetPoint.y}px`;
-    pin.innerHTML = `
-      <div class="target-halo"></div>
-      <div class="answer-icon">🍧</div>
-      <div class="answer-label">🎯 정답 팥빙수</div>
-    `;
-    elementsLayer.appendChild(pin);
-  }
-
   function drawVerificationLines() {
     ctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
-
-    const rA = Math.round(Math.hypot(studentPositions[0].x - targetPoint.x, studentPositions[0].y - targetPoint.y));
 
     ctx.save();
     ctx.setLineDash([6, 6]);
     ctx.lineWidth = 2.5;
 
     studentPositions.forEach(st => {
+      const d = Math.round(Math.hypot(placedPoint.x - st.x, placedPoint.y - st.y));
       ctx.strokeStyle = '#0284c7';
       ctx.beginPath();
-      ctx.moveTo(targetPoint.x, targetPoint.y);
+      ctx.moveTo(placedPoint.x, placedPoint.y);
       ctx.lineTo(st.x, st.y);
       ctx.stroke();
-    });
 
-    if (placedPoint) {
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(placedPoint.x, placedPoint.y);
-      ctx.lineTo(targetPoint.x, targetPoint.y);
-      ctx.stroke();
-    }
-    ctx.restore();
+      const midX = (placedPoint.x + st.x) / 2;
+      const midY = (placedPoint.y + st.y) / 2;
 
-    studentPositions.forEach(st => {
-      const midX = (targetPoint.x + st.x) / 2;
-      const midY = (targetPoint.y + st.y) / 2;
-
-      const badge = document.createElement('div');
-      badge.className = 'distance-badge';
+      let badge = document.getElementById(`dist-badge-${st.x}-${st.y}`);
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = `dist-badge-${st.x}-${st.y}`;
+        badge.className = 'distance-badge';
+        elementsLayer.appendChild(badge);
+      }
       badge.style.left = `${midX}px`;
       badge.style.top = `${midY}px`;
-      badge.textContent = `거리: ${rA}`;
-      elementsLayer.appendChild(badge);
+      badge.textContent = `거리: ${d}`;
     });
+
+    ctx.restore();
   }
 
   function showScorePopup(score, errorDistance) {
@@ -468,11 +572,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnModalRestart.addEventListener('click', () => {
     resultModal.classList.add('hidden');
-    initGame();
+    checkPlayerRegistration();
   });
 
   // ----------------------------------------------------
-  // Game Finish & Realtime Leaderboard
+  // Game Finish
   // ----------------------------------------------------
   function finishGame() {
     finalTotalScore.innerHTML = `${totalScore} <small>/ 500</small>`;
@@ -496,10 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (resultLockedName) resultLockedName.textContent = playerName;
     if (resultLockedId) resultLockedId.textContent = studentId;
 
-    if (window.confetti) {
+    const avgScore = totalScore / 5;
+
+    if (window.confetti && avgScore >= 80) {
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 120,
+        spread: 80,
         origin: { y: 0.6 }
       });
     }
@@ -517,8 +623,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     resultModal.classList.remove('hidden');
+
+    const cardEl = resultModal.querySelector('.modal-card');
+    if (cardEl) {
+      cardEl.scrollTop = 0;
+    }
   }
 
+  // Realtime Leaderboard Listener
   function listenRealtimeLeaderboard() {
     if (!firebaseDb) return;
 
@@ -529,9 +641,44 @@ document.addEventListener('DOMContentLoaded', () => {
         list.push(val);
       });
       list.reverse();
+
+      if (list.length > 0) {
+        const champ = list[0];
+        if (openingChampName) openingChampName.textContent = champ.name || '김빙수';
+        if (openingChampId) openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 2105';
+        if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
+      }
+
       renderHallOfFame(list);
+      renderOpeningHallOfFame(list);
     }, (err) => {
       console.error("Leaderboard read error:", err);
+    });
+  }
+
+  function renderOpeningHallOfFame(list) {
+    if (!openingLeaderboardTbody) return;
+    openingLeaderboardTbody.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      openingLeaderboardTbody.innerHTML = `<tr><td colspan="4" style="padding:10px; color:#64748b;">등록된 기록이 없습니다.</td></tr>`;
+      return;
+    }
+
+    list.forEach((item, index) => {
+      const tr = document.createElement('tr');
+      let rankDisplay = `${index + 1}위`;
+      if (index === 0) rankDisplay = `🥇 1위`;
+      else if (index === 1) rankDisplay = `🥈 2위`;
+      else if (index === 2) rankDisplay = `🥉 3위`;
+
+      tr.innerHTML = `
+        <td class="rank-${index + 1}">${rankDisplay}</td>
+        <td>${escapeHtml(item.name || '익명')}</td>
+        <td>${escapeHtml(item.studentId || '미입력')}</td>
+        <td><strong>${item.score}점</strong></td>
+      `;
+      openingLeaderboardTbody.appendChild(tr);
     });
   }
 
