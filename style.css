@@ -534,6 +534,39 @@ body {
   box-shadow: 0 6px 18px rgba(2, 132, 199, 0.4);
 }
 
+/* Footer & Privacy Policy Link */
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.privacy-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.privacy-link-btn:hover {
+  color: var(--primary-color);
+}
+
+.privacy-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #334155;
+  line-height: 1.5;
+  text-align: left;
+}
+
 /* Result Modal Header */
 .modal-header {
   text-align: center;

@@ -66,6 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const openingLeaderboardBox = document.getElementById('opening-leaderboard-box');
   const openingLeaderboardTbody = document.getElementById('opening-leaderboard-tbody');
 
+  const btnPrivacyPolicy = document.getElementById('btn-privacy-policy');
+  const privacyModal = document.getElementById('privacy-modal');
+  const btnClosePrivacy = document.getElementById('btn-close-privacy');
+
   const roundDisplay = document.getElementById('round-display');
   const totalScoreDisplay = document.getElementById('total-score-display');
   const highScoreDisplay = document.getElementById('high-score-display');
@@ -89,6 +93,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const apiStatusMsg = document.getElementById('api-status-msg');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const btnModalRestart = document.getElementById('btn-modal-restart');
+
+  // Privacy Policy Modal Handlers
+  if (btnPrivacyPolicy && privacyModal && btnClosePrivacy) {
+    btnPrivacyPolicy.addEventListener('click', () => {
+      privacyModal.classList.remove('hidden');
+    });
+    btnClosePrivacy.addEventListener('click', () => {
+      privacyModal.classList.add('hidden');
+    });
+  }
 
   // Toggle Opening Leaderboard View
   if (btnToggleOpeningLeaderboard && openingLeaderboardBox) {
