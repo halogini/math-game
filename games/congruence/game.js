@@ -335,17 +335,15 @@ function initCongruenceGame() {
     // Update Clues UI with preset starting hints
     updateCluesUI();
 
-    // Reset Timer (60s)
+    // Reset Timer (60s countdown)
     roundTimeLeft = 60;
     updateTimerUI();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       if (isTimerPaused) return;
-      roundTimeLeft--;
-      updateTimerUI();
-      if (roundTimeLeft <= 0) {
-        clearInterval(timerInterval);
-        handleTimeOut();
+      if (roundTimeLeft > 0) {
+        roundTimeLeft--;
+        updateTimerUI();
       }
     }, 1000);
 
@@ -358,13 +356,15 @@ function initCongruenceGame() {
   }
 
   function updateTimerUI() {
-    hudTimer.textContent = `${roundTimeLeft}s`;
-    const pct = Math.max(0, (roundTimeLeft / 60) * 100);
-    timerBar.style.width = `${pct}%`;
-    if (pct < 30) {
-      timerBar.classList.add('warning');
-    } else {
-      timerBar.classList.remove('warning');
+    if (hudTimer) hudTimer.textContent = `${roundTimeLeft}s`;
+    if (timerBar) {
+      const pct = Math.max(0, (roundTimeLeft / 60) * 100);
+      timerBar.style.width = `${pct}%`;
+      if (pct < 30) {
+        timerBar.classList.add('warning');
+      } else {
+        timerBar.classList.remove('warning');
+      }
     }
   }
 
@@ -959,24 +959,10 @@ function initCongruenceGame() {
 
     const measuredCount = measuredSet.size;
 
-    // Check corresponding measured pairs between Left and Right triangles
-    let sidePairs = 0;
-    let anglePairs = 0;
-    const pairedSides = [false, false, false];
-    const pairedAngles = [false, false, false];
-    const sideNames = ['AB', 'BC', 'CA', 'DE', 'EF', 'FD'];
-    const angleNames = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-    for (let i = 0; i < 3; i++) {
-      if (measuredSet.has(`L_side_${sideNames[i]}`) && measuredSet.has(`R_side_${sideNames[i+3]}`)) {
-        sidePairs++;
-        pairedSides[i] = true;
-      }
-      if (measuredSet.has(`L_angle_${angleNames[i]}`) && measuredSet.has(`R_angle_${angleNames[i+3]}`)) {
-        anglePairs++;
-        pairedAngles[i] = true;
-      }
-    }
+    const sideNamesL = ['AB', 'BC', 'CA'];
+    const angleNamesL = ['A', 'B', 'C'];
+    const sideNamesR = ['DE', 'EF', 'FD'];
+    const angleNamesR = ['D', 'E', 'F'];
 
     // Vertex/side adjacency helpers (side i connects vertex i and vertex (i+1)%3)
     function sharedVertexOfSides(s1, s2) {
@@ -992,12 +978,47 @@ function initCongruenceGame() {
       return -1;
     }
 
+    // Helper to check if a single triangle is mathematically 100% determined (Rigid)
+    function checkTriangleDetermined(sidePrefix, anglePrefix, sNames, aNames) {
+      const sides = [0, 1, 2].map(i => measuredSet.has(`${sidePrefix}_${sNames[i]}`));
+      const angles = [0, 1, 2].map(i => measuredSet.has(`${anglePrefix}_${aNames[i]}`));
+      const nSides = sides.filter(Boolean).length;
+      const nAngles = angles.filter(Boolean).length;
+
+      const hasSSS = nSides === 3;
+      let hasSAS = false;
+      if (nSides >= 2 && nAngles >= 1) {
+        for (let a = 0; a < 3; a++) {
+          for (let b = a + 1; b < 3; b++) {
+            if (sides[a] && sides[b]) {
+              const v = sharedVertexOfSides(a, b);
+              if (angles[v]) hasSAS = true;
+            }
+          }
+        }
+      }
+      const hasASA = (nAngles >= 2 && nSides >= 1) || (nAngles === 3 && nSides >= 1);
+      return hasSSS || hasSAS || hasASA;
+    }
+
+    const isDeterminedL = checkTriangleDetermined('L_side', 'L_angle', sideNamesL, angleNamesL);
+    const isDeterminedR = checkTriangleDetermined('R_side', 'R_angle', sideNamesR, angleNamesR);
+
+    // Known elements for Left and Right (either directly measured OR derived from a fully determined triangle)
+    const sideKnownL = [0, 1, 2].map(i => measuredSet.has(`L_side_${sideNamesL[i]}`) || isDeterminedL);
+    const sideKnownR = [0, 1, 2].map(i => measuredSet.has(`R_side_${sideNamesR[i]}`) || isDeterminedR);
+
+    const angleKnownL = [0, 1, 2].map(i => measuredSet.has(`L_angle_${angleNamesL[i]}`) || isDeterminedL);
+    const angleKnownR = [0, 1, 2].map(i => measuredSet.has(`R_angle_${angleNamesR[i]}`) || isDeterminedR);
+
+    const pairedSides = [0, 1, 2].map(i => sideKnownL[i] && sideKnownR[i]);
+    const pairedAngles = [0, 1, 2].map(i => angleKnownL[i] && angleKnownR[i]);
+
     const pairedSideIdx = [0, 1, 2].filter(i => pairedSides[i]);
     const pairedAngleIdx = [0, 1, 2].filter(i => pairedAngles[i]);
 
     const hasSSS = pairedSideIdx.length === 3;
 
-    // SAS: 2 measured+paired sides whose SHARED (included) vertex angle is also measured+paired.
     let hasSAS = false;
     for (let a = 0; a < pairedSideIdx.length && !hasSAS; a++) {
       for (let b = a + 1; b < pairedSideIdx.length && !hasSAS; b++) {
@@ -1006,10 +1027,6 @@ function initCongruenceGame() {
       }
     }
 
-    // ASA: a measured+paired side whose two endpoints are both measured+paired angles.
-    // If all 3 angles ended up known (thanks to the free 3rd-angle reveal above), the
-    // "which side" question disappears entirely — any one paired side is enough, so this
-    // naturally covers what would otherwise be called "AAS" without ever naming it.
     let hasASA = false;
     if (pairedAngleIdx.length === 3 && pairedSideIdx.length >= 1) {
       hasASA = true;
@@ -1081,20 +1098,16 @@ function initCongruenceGame() {
         }
       }
 
-      const isWastedExtra = measuredCount > 6;
-
-      // Dynamic scoring out of 100 max per round
-      // User-selected method: "측정 횟수 단순 차감 방식"
+      // Dynamic scoring based on timeBonus (0-30 pts) and extra student clicks penalty (15 pts per click)
+      // Note: bonusAngleKeys (180-deg auto-revealed 3rd angle) are FREE deductions and NOT student clicks!
       const userClickCount = userClickSet.size; // Direct clicks by student
-      const presetClueCount = measuredSet.size - userClickCount;
+      const presetClueCount = currentPresetCount || 2;
       const minRequiredUserClicks = Math.max(1, 6 - Math.min(5, presetClueCount));
       const extraClicks = Math.max(0, userClickCount - minRequiredUserClicks);
-      const timeBonus = Math.min(30, Math.floor((roundTimeLeft / 60) * 30)); // max 30 pts
+      const timeBonus = Math.min(30, Math.floor((Math.max(0, roundTimeLeft) / 60) * 30));
 
       if (extraClicks === 0) {
-        // PERFECT OPTIMAL SCORE! (100 만점 가능!)
-        const points = 70 + timeBonus; // 70 + 30 = 100 max!
-
+        const points = 70 + timeBonus; // Max 100 pts!
         totalScore += points;
         correctCount++;
         perfectCount++;
@@ -1107,15 +1120,14 @@ function initCongruenceGame() {
             points === 100 ? '🌟 100점 만점!' : `🌟 +${points}점`,
             `🎯 군더더기 없는 최적의 측정(${userClickCount}회)으로 합동 입증 성공!`,
             null,
-            `주어진 힌트를 활용해 '${routeName}' 조건으로 깔끔하게 입증했습니다.`
+            `주어진 힌트를 활용해 '${routeName || '합동'}' 조건으로 깔끔하게 입증했습니다.`
           );
         });
       } else {
-        // DYNAMIC INEFFICIENT SCORE (15 pts lost per extra direct user click)
         const inefficiencyPenalty = 15 * extraClicks;
         const baseScore = Math.max(10, 70 - inefficiencyPenalty);
-        const points = Math.min(99, Math.max(10, baseScore + timeBonus));
-        
+        const points = Math.min(100, Math.max(10, baseScore + timeBonus));
+
         totalScore += points;
         correctCount++;
         hudScore.textContent = totalScore;
@@ -1345,14 +1357,19 @@ function initCongruenceGame() {
         };
 
         if (isRigid) {
-          const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
-          const rotatePt = (pt, center, angle) => {
-            const dx = pt.x - center.x, dy = pt.y - center.y;
-            return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
-          };
-          p0 = rotatePt(p0, centroid, t * 0.15);
-          p1 = rotatePt(p1, centroid, t * 0.15);
-          p2 = rotatePt(p2, centroid, t * 0.15);
+          if (isRigidR && isRigidL) {
+            // Both triangles are 100% rigid and fixed! Do NOT rock or wiggle ("껄떡껄떡" 금지).
+            // They stay completely static at the overlapped position.
+          } else {
+            const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
+            const rotatePt = (pt, center, angle) => {
+              const dx = pt.x - center.x, dy = pt.y - center.y;
+              return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
+            };
+            p0 = rotatePt(p0, centroid, t * 0.15);
+            p1 = rotatePt(p1, centroid, t * 0.15);
+            p2 = rotatePt(p2, centroid, t * 0.15);
+          }
         } else if (numMeasuredSides === 0) {
           if (numMeasuredAngles >= 2) {
             // AAA: Scale relative to centroid. All interior angles are 100% invariant! No side length badges exist.
@@ -1627,7 +1644,7 @@ function initCongruenceGame() {
     finalPerfectCount.textContent = `${perfectCount} 회`;
     finalCeCount.textContent = `${ceCount} 회`;
 
-    if (totalScore > highScore) {
+    if (totalScore > highScore && totalScore > 0) {
       highScore = totalScore;
       safeSetStorage(highScoreStorageKey, highScore);
       hudHighScore.textContent = highScore;
@@ -1895,6 +1912,10 @@ function initCongruenceGame() {
     };
 
     const saveViaREST = async () => {
+      if (highScore > 0 && payload.score <= highScore) {
+        return { success: true, message: `ℹ️ 기존 최고 점수(${highScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.` };
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -1908,8 +1929,11 @@ function initCongruenceGame() {
         clearTimeout(timeoutId);
 
         if (restRes.ok) {
+          highScore = payload.score;
+          safeSetStorage(highScoreStorageKey, highScore);
+          if (hudHighScore) hudHighScore.textContent = highScore;
           fetchLeaderboard();
-          return { success: true, message: `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!` };
+          return { success: true, message: `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!` };
         }
       } catch (err) {
         clearTimeout(timeoutId);
@@ -1954,6 +1978,9 @@ function initCongruenceGame() {
           const primaryKey = matchingKeys[0].key;
           if (payload.score > maxExistingScore) {
             await firebaseDb.ref(`scores/${primaryKey}`).update(payload);
+            highScore = Math.max(highScore, payload.score);
+            safeSetStorage(highScoreStorageKey, highScore);
+            if (hudHighScore) hudHighScore.textContent = highScore;
             statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
           } else {
             statusMsg = `ℹ️ 기존 최고 점수(${maxExistingScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.`;
@@ -1963,7 +1990,10 @@ function initCongruenceGame() {
           }
         } else {
           await firebaseDb.ref('scores').push(payload);
-          statusMsg = `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!`;
+          highScore = Math.max(highScore, payload.score);
+          safeSetStorage(highScoreStorageKey, highScore);
+          if (hudHighScore) hudHighScore.textContent = highScore;
+          statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
         }
 
         fetchLeaderboard();
