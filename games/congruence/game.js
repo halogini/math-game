@@ -1498,11 +1498,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let firebaseRetryCount = 0;
   function fetchLeaderboard() {
     if (firebaseDb) {
-      firebaseDb.ref('scores').once('value', (snapshot) => {
-        processLeaderboardData(snapshot.val());
-      }).catch((err) => {
-        console.warn("Firebase SDK fetch failed, trying REST fallback:", err);
-        fetchRESTLeaderboard();
+      firebaseDb.ref('scores').once('value', (snapScores) => {
+        firebaseDb.ref('scores/dorms').once('value', (snapDorms) => {
+          const combined = {};
+          if (snapScores.val() && typeof snapScores.val() === 'object') {
+            Object.assign(combined, snapScores.val());
+          }
+          if (snapDorms.val() && typeof snapDorms.val() === 'object') {
+            Object.assign(combined, snapDorms.val());
+          }
+          processLeaderboardData(combined);
+        });
       });
       return;
     }
@@ -1516,31 +1522,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fetchRESTLeaderboard() {
-    const restUrl = 'https://math-game-halogini-default-rtdb.firebaseio.com/scores.json';
-    fetch(restUrl)
-      .then(res => res.json())
-      .then(data => {
-        processLeaderboardData(data);
-      })
-      .catch(err => {
-        console.error("REST Leaderboard fetch failed:", err);
-      });
+    Promise.all([
+      fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json').then(r => r.json()).catch(() => null),
+      fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores/dorms.json').then(r => r.json()).catch(() => null)
+    ]).then(([data1, data2]) => {
+      const combined = {};
+      if (data1 && typeof data1 === 'object') Object.assign(combined, data1);
+      if (data2 && typeof data2 === 'object') Object.assign(combined, data2);
+      processLeaderboardData(combined);
+    });
   }
 
   function processLeaderboardData(dataObj) {
-    if (!dataObj) {
-      renderLeaderboardTable(openingLeaderboardTbody, []);
-      renderLeaderboardTable(modalLeaderboardTbody, []);
-      renderLeaderboardTable(gameoverLeaderboardTbody, []);
-      return;
-    }
-
+    if (!dataObj) return;
     const userBestMap = new Map();
     const keys = Object.keys(dataObj);
 
     keys.forEach(k => {
       const val = dataObj[k];
-      if (val && val.name) {
+      if (val && typeof val === 'object' && val.name) {
         // Exclude Bingsoo entries, include Congruence entries and legacy entries
         const valGameId = String(val.gameId || '').trim();
         if (valGameId === 'bingsoo') return;
@@ -1548,10 +1548,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const valName = sanitizeInput(val.name, 12);
         const valStudentId = String(val.studentId || '').trim();
         const valChannel = String(val.channel || '').trim();
-        const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+        const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems' || k === 'dorms');
         const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
 
-        const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
+        const matchesMode = (activeMode === 'dorms') ? (isDormsEntry || !valStudentId || valStudentId === 'DORMS') : (!isDormsEntry);
         if (matchesMode) {
           const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
           if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
@@ -1649,8 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
       timestamp: Date.now()
     };
 
-    if (!firebaseDb) {
-      // Fallback via HTTP REST API for KakaoTalk In-App WebView
+    const saveViaREST = async () => {
       try {
         const restRes = await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
           method: 'POST',
@@ -1665,66 +1664,69 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("REST score save error:", err);
       }
       return { success: false, message: '❌ 점수 등록 중 네트워크 오류가 발생했습니다.' };
-    }
+    };
 
-    try {
-      const snapshot = await firebaseDb.ref('scores').once('value');
-      const matchingKeys = [];
-      let maxExistingScore = -1;
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => resolve({ timeout: true }), 2500);
+    });
 
-      snapshot.forEach(child => {
-        const val = child.val();
-        if (val && String(val.name).trim() === String(payload.name).trim()) {
-          const valGameId = String(val.gameId || '').trim();
-          if (valGameId !== 'congruence') return;
+    const sdkSavePromise = (async () => {
+      if (!firebaseDb) return null;
+      try {
+        const snapshot = await firebaseDb.ref('scores').once('value');
+        const matchingKeys = [];
+        let maxExistingScore = -1;
 
-          const valStudentId = String(val.studentId || '').trim();
-          const valChannel = String(val.channel || '').trim();
-          const isDormsVal = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
-          const isMatch = (activeMode === 'dorms' && isDormsVal)
-                       || (activeMode === 'school' && !isDormsVal && valStudentId === String(payload.studentId).trim());
-          if (isMatch) {
-            matchingKeys.push({ key: child.key, score: parseInt(val.score, 10) || 0 });
-            if ((parseInt(val.score, 10) || 0) > maxExistingScore) {
-              maxExistingScore = parseInt(val.score, 10) || 0;
+        snapshot.forEach(child => {
+          const val = child.val();
+          if (val && String(val.name).trim() === String(payload.name).trim()) {
+            const valGameId = String(val.gameId || '').trim();
+            if (valGameId !== 'congruence') return;
+
+            const valStudentId = String(val.studentId || '').trim();
+            const valChannel = String(val.channel || '').trim();
+            const isDormsVal = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+            const isMatch = (activeMode === 'dorms' && isDormsVal)
+                         || (activeMode === 'school' && !isDormsVal && valStudentId === String(payload.studentId).trim());
+            if (isMatch) {
+              matchingKeys.push({ key: child.key, score: parseInt(val.score, 10) || 0 });
+              if ((parseInt(val.score, 10) || 0) > maxExistingScore) {
+                maxExistingScore = parseInt(val.score, 10) || 0;
+              }
             }
           }
-        }
-      });
-
-      let statusMsg = '';
-      if (matchingKeys.length > 0) {
-        const primaryKey = matchingKeys[0].key;
-        if (payload.score > maxExistingScore) {
-          await firebaseDb.ref(`scores/${primaryKey}`).update(payload);
-          statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
-        } else {
-          statusMsg = `ℹ️ 기존 최고 점수(${maxExistingScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.`;
-        }
-        for (let i = 1; i < matchingKeys.length; i++) {
-          await firebaseDb.ref(`scores/${matchingKeys[i].key}`).remove();
-        }
-      } else {
-        await firebaseDb.ref('scores').push(payload);
-        statusMsg = `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!`;
-      }
-
-      fetchLeaderboard();
-      return { success: true, message: statusMsg };
-    } catch (err) {
-      console.error("Firebase score save error:", err);
-      try {
-        await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
         });
+
+        let statusMsg = '';
+        if (matchingKeys.length > 0) {
+          const primaryKey = matchingKeys[0].key;
+          if (payload.score > maxExistingScore) {
+            await firebaseDb.ref(`scores/${primaryKey}`).update(payload);
+            statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
+          } else {
+            statusMsg = `ℹ️ 기존 최고 점수(${maxExistingScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.`;
+          }
+          for (let i = 1; i < matchingKeys.length; i++) {
+            await firebaseDb.ref(`scores/${matchingKeys[i].key}`).remove();
+          }
+        } else {
+          await firebaseDb.ref('scores').push(payload);
+          statusMsg = `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!`;
+        }
+
         fetchLeaderboard();
-        return { success: true, message: `✅ ${payload.score}점으로 랭킹에 등록되었습니다!` };
-      } catch (e) {
-        return { success: false, message: '❌ 점수 등록 중 오류가 발생했습니다.' };
+        return { success: true, message: statusMsg };
+      } catch (err) {
+        return null;
       }
+    })();
+
+    const result = await Promise.race([sdkSavePromise, timeoutPromise]);
+    if (result && !result.timeout) {
+      return result;
     }
+
+    return await saveViaREST();
   }
 
   // ----------------------------------------------------
