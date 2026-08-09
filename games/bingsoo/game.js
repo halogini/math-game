@@ -60,12 +60,23 @@ function escapeHtml(str) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // ----------------------------------------------------
-  // Channel Mode Detection Logic (?mode=dorms vs ?mode=school)
-  // ----------------------------------------------------
-  const urlParams = new URLSearchParams(window.location.search);
-  const modeParam = urlParams.get('mode');
-  let activeMode = (modeParam === 'dorms' || modeParam === 'dorems') ? 'dorms' : 'school';
+  // Robust Channel Mode Detection (supporting KakaoTalk URL variations)
+  function detectActiveMode() {
+    try {
+      const href = (window.location.href || '').toLowerCase();
+      const search = (window.location.search || '').toLowerCase();
+      const hash = (window.location.hash || '').toLowerCase();
+
+      if (search.includes('mode=dorms') || search.includes('mode=dorems') ||
+          hash.includes('mode=dorms') || hash.includes('mode=dorems') ||
+          href.includes('dorms') || href.includes('dorems')) {
+        return 'dorms';
+      }
+    } catch (e) {}
+    return 'school';
+  }
+
+  let activeMode = detectActiveMode();
 
   const dbRefPath = activeMode === 'dorms' ? 'scores/dorms' : 'scores';
   const nameStorageKey = `halomath_name_${activeMode}`;
