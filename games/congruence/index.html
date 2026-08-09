@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>📐 삼각형의 비밀: 합동 판정 작전! - HaloMath Arcade</title>
+
+  <!-- Security & Meta Tags -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app;">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="description" content="중1 수학 삼각형의 합동 조건(SSS, SAS, ASA)을 직접 측정하고 증명하는 미니게임! 최소 측정으로 완벽한 합동을 증명하세요!">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
+</head>
+<body>
+  <div class="game-container">
+    <!-- Header Controls & Branding -->
+    <header class="game-header">
+      <div class="header-left">
+        <a href="../../index.html" id="btn-back-portal" class="btn-icon-nav" title="아케이드 로비로 이동">
+          ⬅️ <span>로비</span>
+        </a>
+        <div class="game-title-group">
+          <h1>📐 삼각형의 비밀: 합동 판정 작전</h1>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Hall of Fame Leaderboard Button -->
+        <button id="btn-open-leaderboard" class="btn-leaderboard" title="명예의 전당 (랭킹)">
+          🏆 <span>명예의 전당</span>
+        </button>
+        <!-- Sound Toggle -->
+        <button id="btn-sound-toggle" class="btn-sound" title="음소거/음소거 해제">
+          🔊
+        </button>
+        <!-- User Profile Card -->
+        <div class="user-profile-card">
+          <span class="profile-avatar">👤</span>
+          <div class="profile-text">
+            <span class="profile-name" id="display-profile-name">도전자</span>
+            <span class="profile-id" id="display-profile-id">학번 미입력</span>
+          </div>
+          <button id="btn-edit-profile" class="btn-small-edit">✏️</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Workspace -->
+    <main class="game-main">
+      <!-- Status HUD Bar -->
+      <div class="status-hud-bar">
+        <div class="hud-item">
+          <span class="hud-label">STAGE</span>
+          <span class="hud-value highlight-cyan" id="hud-round">1 / 5</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">SCORE</span>
+          <span class="hud-value highlight-gold" id="hud-score">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">HIGH SCORE</span>
+          <span class="hud-value" id="hud-highscore">0</span>
+        </div>
+        <div class="hud-item timer-item">
+          <span class="hud-label">TIME</span>
+          <div class="timer-bar-container">
+            <div id="timer-bar" class="timer-bar-fill"></div>
+          </div>
+          <span class="hud-value timer-text" id="hud-timer">60s</span>
+        </div>
+      </div>
+
+      <!-- Geometry Canvas Stage -->
+      <section class="canvas-section">
+        <div class="canvas-wrapper">
+          <canvas id="geometry-canvas" width="900" height="420"></canvas>
+          
+          <!-- Tool Selection Floating Palette -->
+          <div class="floating-tool-palette">
+            <span class="tool-guide-text">🛠️ 측정 도구:</span>
+            <button id="tool-ruler" class="tool-btn active" data-tool="ruler">
+              📏 자 (변의 길이)
+            </button>
+            <button id="tool-protractor" class="tool-btn" data-tool="protractor">
+              📐 각도기 (내각의 크기)
+            </button>
+          </div>
+
+          <!-- Interactive Hint & Clues Overlay -->
+          <div class="clues-panel" id="clues-panel">
+            <div class="clues-header">
+              <span>📋 수집된 측정 데이터 (총 <strong id="clue-count">0</strong>개)</span>
+              <span class="clue-efficiency-tag" id="clue-efficiency-tag">최적 (0/3)</span>
+            </div>
+            <div class="clues-tags-container" id="clues-tags-container">
+              <span class="clue-empty-msg">변이나 각을 클릭하여 치수를 측정하세요!</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Decision Submission Panel -->
+      <section class="decision-section">
+        <div class="decision-container">
+          <div class="decision-prompt-box">
+            <h3 class="decision-title">💡 이미 측정된 값을 참고해서 변의 길이나 각의 크기를 더 측정해야합니다.</h3>
+            <p class="decision-subtext">두 삼각형이 완벽히 똑같다고(합동이라고) 확신할 수 있는 치수를 모두 측정했다면 제출하세요!</p>
+          </div>
+
+          <button id="btn-submit-decision" class="btn-submit-action">
+            🚀 "측정 데이터가 충분합니다!"
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal: Counter-Example & Round Result -->
+    <div id="result-modal" class="modal-backdrop hidden">
+      <div class="modal-card result-card">
+        <div class="result-header" id="result-header">
+          <span class="result-icon" id="result-icon">✨</span>
+          <h2 id="result-title">판정 결과</h2>
+        </div>
+
+        <div class="result-body">
+          <div class="result-score-badge" id="result-score-badge">+100점</div>
+          <p class="result-subtitle" id="result-subtitle">설명 문구</p>
+
+          <!-- Counter-Example Visual Canvas & Explanation Box -->
+          <div class="counter-example-box" id="counter-example-box">
+            <h4 class="ce-box-title" id="ce-box-title">🎬 왜 아직 부족할까요? (천천히 변화 과정을 보세요!)</h4>
+            <div class="ce-canvas-wrapper">
+              <canvas id="ce-canvas" width="440" height="220"></canvas>
+            </div>
+            <p id="ce-explanation" class="ce-explanation-text">
+              지금까지 잰 힌트만으로는 위 애니메이션처럼 전혀 다른 모양의 삼각형이 완성될 수 있습니다!
+            </p>
+          </div>
+
+          <!-- Educational Theorem Note -->
+          <div class="math-note-box" id="math-note-box">
+            💡 <strong>도움말 힌트:</strong> <span id="math-note-text">양쪽 삼각형에서 대응하는 요소들을 충분히 측정해보세요.</span>
+          </div>
+        </div>
+
+        <div class="result-footer">
+          <button id="btn-next-round" class="btn-modal-action">
+            다음 라운드로 진입 ➔
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Game Over / Final Summary -->
+    <div id="gameover-modal" class="modal-backdrop hidden">
+      <div class="modal-card gameover-card">
+        <div class="gameover-header">
+          <span class="trophy-anim">🏆</span>
+          <h2>합동 수사대 작전 완료!</h2>
+          <p class="gameover-subtitle">모든 라운드를 마쳤습니다. 결과를 확인하세요!</p>
+        </div>
+
+        <div class="final-score-display">
+          <div class="score-circle">
+            <span class="score-num" id="final-total-score">0</span>
+            <span class="score-unit">점</span>
+          </div>
+          <div class="final-stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">🎯 정확 판정</span>
+              <span class="stat-val" id="final-correct-count">0 / 5</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">🌟 완벽(최적) 판정</span>
+              <span class="stat-val" id="final-perfect-count">0 회</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">🚨 반례 폭파</span>
+              <span class="stat-val" id="final-ce-count">0 회</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="new-highscore-banner" class="highscore-banner hidden">
+          🎉 축하합니다! 최고 기록 경신! 🎉
+        </div>
+
+        <!-- Score Registration Action Box -->
+        <div class="send-action-box">
+          <div class="result-locked-player-box">
+            <span class="locked-icon">🔒</span>
+            <span class="locked-text">등록 참가자: <strong id="result-locked-name">도전자</strong> <span id="result-locked-id-span">(학번: <strong id="result-locked-id">미입력</strong>)</span></span>
+          </div>
+          <button id="btn-send-data" class="btn-modal-action btn-primary" style="width: 100%; margin-top: 8px;">
+            🚀 점수 등록하기
+          </button>
+          <div id="api-status-msg" class="api-status-msg"></div>
+        </div>
+
+        <!-- Leaderboard Section inside Game Over -->
+        <div class="leaderboard-section">
+          <h3 class="leaderboard-title">🏆 명예의 전당 (Top 20)</h3>
+          <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th class="th-student-id">학번</th>
+                  <th>최종 점수</th>
+                </tr>
+              </thead>
+              <tbody id="gameover-leaderboard-tbody">
+                <!-- Dynamically populated from Firebase -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gameover-actions">
+          <button id="btn-restart-game" class="btn-modal-action btn-primary">
+            🔄 다시 도전하기
+          </button>
+          <a href="../../index.html" class="btn-modal-action btn-secondary">
+            🏠 아케이드 로비로 이동
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Hall of Fame Leaderboard -->
+    <div id="leaderboard-modal" class="modal-backdrop hidden">
+      <div class="modal-card leaderboard-card">
+        <div class="modal-header-with-close">
+          <h2>🏆 명예의 전당 (Top 20 랭킹)</h2>
+          <button id="btn-close-leaderboard" class="btn-close-icon">✖</button>
+        </div>
+        <div class="leaderboard-table-wrapper">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>이름</th>
+                <th class="th-student-id">학번</th>
+                <th>최종 점수</th>
+              </tr>
+            </thead>
+            <tbody id="modal-leaderboard-tbody">
+              <!-- Dynamically populated from Firebase -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opening Screen Modal (Features 1st Place Champion, Concise Game Guide & Player Setup) -->
+    <div id="profile-modal" class="modal-backdrop hidden">
+      <div class="modal-card profile-card modal-opening">
+        <div class="opening-banner">
+          <span class="opening-subtitle">1위 챔피언 도전!</span>
+          <h2>👑 명예의 전당 랭킹 1위</h2>
+          
+          <div class="champ-card" id="champ-card-box">
+            <div class="champ-gold-shimmer"></div>
+            <div class="champ-trophy">🥇</div>
+            <div class="champ-info">
+              <span class="champ-name" id="opening-champ-name">도전자</span>
+              <span class="champ-id" id="opening-champ-id">학번: 미입력</span>
+            </div>
+            <div class="champ-score" id="opening-champ-score">0<small>점</small></div>
+          </div>
+
+          <!-- Toggle Opening Leaderboard Button -->
+          <button type="button" id="btn-toggle-opening-leaderboard" class="btn-toggle-opening-leaderboard">
+            🏆 명예의 전당 순위표 전체 보기
+          </button>
+
+          <!-- Collapsible Opening Leaderboard Box -->
+          <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th class="th-student-id">학번</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody id="opening-leaderboard-tbody">
+                  <!-- Dynamically populated from Firebase -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Game Purpose Banner -->
+        <div class="game-guide-box short-banner">
+          <div class="guide-title">📐 삼각형의 비밀: 합동 판정 작전!</div>
+          <p class="guide-desc">최소한의 측정으로 두 삼각형이 완벽히 똑같은지 증명하세요!</p>
+        </div>
+
+        <form id="profile-form">
+          <div class="form-group">
+            <label id="label-player-name" for="input-player-name">도전자 이름:</label>
+            <input type="text" id="input-player-name" maxlength="12" placeholder="예: 홍길동" required>
+          </div>
+          <div class="form-group" id="student-id-group">
+            <label for="input-student-id">학번 (숫자/문자 10자 이내):</label>
+            <input type="text" id="input-student-id" maxlength="10" placeholder="예: 10301">
+          </div>
+          <button type="submit" class="btn-modal-action">저장 및 게임 시작</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

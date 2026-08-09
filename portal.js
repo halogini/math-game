@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputStudentId = document.getElementById('input-student-id');
 
   const btnPlayBingsoo = document.getElementById('btn-play-bingsoo');
+  const btnPlayCongruence = document.getElementById('btn-play-congruence');
   const leaderboardTitle = document.getElementById('leaderboard-title');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
@@ -115,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnPlayBingsoo) {
         btnPlayBingsoo.href = `games/bingsoo/index.html?mode=dorms`;
       }
+      if (btnPlayCongruence) {
+        btnPlayCongruence.href = `games/congruence/index.html?mode=dorms`;
+      }
     } else {
       // School Mode
       portalTitle.textContent = '🏫 할로매쓰 - 수학 미니게임 아케이드';
@@ -136,6 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (btnPlayBingsoo) {
         btnPlayBingsoo.href = `games/bingsoo/index.html?mode=school`;
+      }
+      if (btnPlayCongruence) {
+        btnPlayCongruence.href = `games/congruence/index.html?mode=school`;
       }
     }
 
