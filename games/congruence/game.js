@@ -1467,7 +1467,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function fetchLeaderboard() {
     if (!firebaseDb) return;
 
-    const dbRefPath = activeMode === 'dorms' ? 'scores_congruence/dorms' : 'scores';
+    const dbRefPath = 'scores';
     firebaseDb.ref(dbRefPath).orderByChild('score').limitToLast(100).once('value', (snapshot) => {
       const userBestMap = new Map();
 
@@ -1476,7 +1476,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (val && val.name) {
           const valName = sanitizeInput(val.name, 12);
           const valStudentId = String(val.studentId || '').trim();
-          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || val.channel === 'dorms');
+          const valChannel = String(val.channel || '').trim();
+          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
           const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
 
           const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
@@ -1559,10 +1560,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveScoreToFirebase(score) {
     if (!firebaseDb || !playerName) return null;
 
-    const dbRefPath = activeMode === 'dorms' ? 'scores_congruence/dorms' : 'scores';
+    const dbRefPath = 'scores';
     const payload = {
       name: playerName,
       studentId: activeMode === 'school' ? studentId : 'DORMS',
+      channel: activeMode === 'school' ? 'school' : 'dorms',
       score: score,
       gameId: 'congruence',
       timestamp: Date.now()
@@ -1577,8 +1579,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const val = child.val();
         if (val && String(val.name).trim() === String(payload.name).trim()) {
           const valStudentId = String(val.studentId || '').trim();
-          const isMatch = (activeMode === 'dorms' && (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || val.channel === 'dorms'))
-                       || (activeMode === 'school' && valStudentId === String(payload.studentId).trim());
+          const valChannel = String(val.channel || '').trim();
+          const isDormsVal = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+          const isMatch = (activeMode === 'dorms' && isDormsVal)
+                       || (activeMode === 'school' && !isDormsVal && valStudentId === String(payload.studentId).trim());
           if (isMatch) {
             matchingKeys.push({ key: child.key, score: parseInt(val.score, 10) || 0 });
             if ((parseInt(val.score, 10) || 0) > maxExistingScore) {
