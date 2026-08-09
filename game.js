@@ -1,9 +1,11 @@
 /**
  * 팥빙수 똑같이 나눠주기 작전! - Game Engine Logic
+ * 
+ * Security & Input Validation Enhanced Version
  */
 
-// Firebase Configuration Provided by User
-const firebaseConfig = {
+// Dynamic Firebase Configuration (Supports window.ENV or Default Fallback)
+const defaultFirebaseConfig = {
   apiKey: "AIzaSyBiY1JBwYxtROIGFW7RUIJ4k7QZHVfNcEA",
   authDomain: "math-game-halogini.firebaseapp.com",
   databaseURL: "https://math-game-halogini-default-rtdb.firebaseio.com",
@@ -13,6 +15,8 @@ const firebaseConfig = {
   appId: "1:42232060061:web:ad26f83ca7d1285b3e5c74",
   measurementId: "G-F13LE342GQ"
 };
+
+const firebaseConfig = (window.ENV && window.ENV.FIREBASE_CONFIG) ? window.ENV.FIREBASE_CONFIG : defaultFirebaseConfig;
 
 // Initialize Firebase App & Database
 let firebaseDb = null;
@@ -25,6 +29,34 @@ if (window.firebase) {
   } catch (err) {
     console.error("Initialization failed:", err);
   }
+}
+
+// ----------------------------------------------------
+// Security & Input Validation Helpers
+// ----------------------------------------------------
+function sanitizeInput(str, maxLen = 12) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/[<>'"/]/g, '') // strip dangerous HTML characters
+    .trim()
+    .slice(0, maxLen);
+}
+
+function isValidName(name) {
+  return typeof name === 'string' && name.trim().length >= 1 && name.trim().length <= 12;
+}
+
+function isValidStudentId(id) {
+  if (typeof id !== 'string') return false;
+  const trimmed = id.trim();
+  return trimmed.length >= 1 && trimmed.length <= 10 && /^[a-zA-Z0-9가-힣\-]+$/.test(trimmed);
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -42,9 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let isDraggingBingsoo = false;
   let popupTimeoutId = null;
 
-  // Locked Player Info
-  let playerName = localStorage.getItem('bingsoo_player_name') || '';
-  let studentId = localStorage.getItem('bingsoo_student_id') || '';
+  // Locked Player Info (Sanitized)
+  let playerName = sanitizeInput(localStorage.getItem('bingsoo_player_name') || '', 12);
+  let studentId = sanitizeInput(localStorage.getItem('bingsoo_student_id') || '', 10);
 
   // DOM Elements
   const gameBoard = document.getElementById('game-board');
@@ -130,27 +162,39 @@ document.addEventListener('DOMContentLoaded', () => {
     playerModal.classList.remove('hidden');
   }
 
+  // Form Submit Handler with Strict Validation
   playerForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const nameVal = inputPlayerName.value.trim();
-    const idVal = inputStudentId.value.trim();
+    const rawName = inputPlayerName.value;
+    const rawId = inputStudentId.value;
 
-    if (nameVal && idVal) {
-      playerName = nameVal;
-      studentId = idVal;
+    const cleanName = sanitizeInput(rawName, 12);
+    const cleanId = sanitizeInput(rawId, 10);
 
-      localStorage.setItem('bingsoo_player_name', playerName);
-      localStorage.setItem('bingsoo_student_id', studentId);
-
-      updatePlayerInfoDisplay();
-      playerModal.classList.add('hidden');
-      initGame();
+    if (!isValidName(cleanName)) {
+      alert('도전자 이름은 1자 이상 12자 이하로 입력해 주세요.');
+      return;
     }
+
+    if (!isValidStudentId(cleanId)) {
+      alert('학번은 1자 이상 10자 이하의 영문, 숫자, 한글로 입력해 주세요.');
+      return;
+    }
+
+    playerName = cleanName;
+    studentId = cleanId;
+
+    localStorage.setItem('bingsoo_player_name', playerName);
+    localStorage.setItem('bingsoo_student_id', studentId);
+
+    updatePlayerInfoDisplay();
+    playerModal.classList.add('hidden');
+    initGame();
   });
 
   function updatePlayerInfoDisplay() {
     displayPlayerName.textContent = playerName || '플레이어';
-    displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: 2101';
+    displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: 미입력';
     if (resultLockedName) resultLockedName.textContent = playerName;
     if (resultLockedId) resultLockedId.textContent = studentId;
   }
@@ -467,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ----------------------------------------------------
-  // Check Answer
+  // Check Answer & Strict Score Calculation
   // ----------------------------------------------------
   btnCheckAnswer.addEventListener('click', () => {
     if (!placedPoint || isAnswerChecked) return;
@@ -644,7 +688,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Realtime Leaderboard Listener
+  // ----------------------------------------------------
+  // Realtime Leaderboard Listener & Secure Rendering
+  // ----------------------------------------------------
   function listenRealtimeLeaderboard() {
     if (!firebaseDb) return;
 
@@ -652,7 +698,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const list = [];
       snapshot.forEach(childSnap => {
         const val = childSnap.val();
-        list.push(val);
+        if (val) {
+          list.push({
+            name: sanitizeInput(val.name, 12),
+            studentId: sanitizeInput(val.studentId, 10),
+            score: Math.max(0, Math.min(500, parseInt(val.score, 10) || 0))
+          });
+        }
       });
       list.reverse();
 
@@ -697,6 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderHallOfFame(list) {
+    if (!leaderboardTbody) return;
     leaderboardTbody.innerHTML = '';
 
     if (!list || list.length === 0) {
@@ -727,16 +780,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, function(m) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
-    });
-  }
-
+  // ----------------------------------------------------
+  // Score Submission Handler with Anti-Tampering & Validation
+  // ----------------------------------------------------
   btnSendData.addEventListener('click', async () => {
-    if (!playerName || !studentId) {
+    // 1. Input Validation
+    if (!isValidName(playerName) || !isValidStudentId(studentId)) {
       apiStatusMsg.className = 'api-status-msg error';
-      apiStatusMsg.textContent = '❌ 참가자 정보가 올바르지 않습니다.';
+      apiStatusMsg.textContent = '❌ 참가자 정보가 올바르지 않습니다. (이름 1~12자, 학번 1~10자)';
+      return;
+    }
+
+    // 2. Anti-Tampering Verification
+    if (typeof totalScore !== 'number' || isNaN(totalScore) || totalScore < 0 || totalScore > 500) {
+      apiStatusMsg.className = 'api-status-msg error';
+      apiStatusMsg.textContent = '❌ 유효하지 않은 점수 범위입니다.';
+      return;
+    }
+
+    const calculatedSum = roundHistory.reduce((acc, cur) => acc + cur.score, 0);
+    if (roundHistory.length !== maxRounds || calculatedSum !== totalScore) {
+      apiStatusMsg.className = 'api-status-msg error';
+      apiStatusMsg.textContent = '❌ 라운드 성적 데이터 검증 실패: 점수 변조가 감지되었습니다.';
       return;
     }
 
@@ -752,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         snapshot.forEach(child => {
           const val = child.val();
-          if (val.name === playerName && val.studentId === studentId) {
+          if (val && val.name === playerName && val.studentId === studentId) {
             existingKey = child.key;
             existingScore = val.score;
           }

@@ -168,11 +168,11 @@
           <form id="player-form">
             <div class="form-group">
               <label for="input-player-name">도전자 이름:</label>
-              <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" required />
+              <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" maxlength="12" required />
             </div>
             <div class="form-group">
               <label for="input-student-id">학번:</label>
-              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" required />
+              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" pattern="[a-zA-Z0-9가-힣\-]+" title="영문, 숫자, 한글만 입력 가능합니다." required />
             </div>
             <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
               ⚡ 챔피언에 도전하기 (게임 시작)
