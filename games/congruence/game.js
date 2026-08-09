@@ -142,6 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let activeMode = detectActiveMode();
 
+  const nameStorageKey = `halomath_name_${activeMode}`;
+  const idStorageKey = `halomath_id_${activeMode}`;
+  const highScoreStorageKey = `congruence_highscore_${activeMode}`;
+
   // Safe LocalStorage helpers for In-App WebViews (e.g. KakaoTalk)
   function safeGetStorage(key, fallback = '') {
     try {
@@ -1413,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (totalScore > highScore) {
       highScore = totalScore;
-      localStorage.setItem(highScoreStorageKey, highScore);
+      safeSetStorage(highScoreStorageKey, highScore);
       hudHighScore.textContent = highScore;
       newHighscoreBanner.classList.remove('hidden');
     } else {
@@ -1740,9 +1744,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Pre-fill profile inputs on load
+  if (inputPlayerName && !inputPlayerName.value) {
+    inputPlayerName.value = playerName || '도전자';
+  }
+
   btnEditProfile.addEventListener('click', () => {
-    inputPlayerName.value = playerName;
-    if (activeMode === 'school') inputStudentId.value = studentId;
+    inputPlayerName.value = playerName || '도전자';
+    if (activeMode === 'school') inputStudentId.value = studentId || '미입력';
     profileModal.classList.remove('hidden');
   });
 
@@ -1750,24 +1759,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   profileForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const cleanName = sanitizeInput(inputPlayerName.value, 12);
+    let cleanName = sanitizeInput(inputPlayerName.value, 12);
     if (!cleanName) {
-      alert('이름/닉네임을 입력해 주세요.');
-      return;
+      cleanName = '도전자';
+      if (inputPlayerName) inputPlayerName.value = '도전자';
     }
 
     if (activeMode === 'school') {
-      const cleanId = sanitizeInput(inputStudentId.value, 10);
-      if (!cleanId) {
-        alert('학번을 입력해 주세요.');
-        return;
-      }
-      studentId = cleanId;
-      localStorage.setItem(idStorageKey, studentId);
+      let cleanId = sanitizeInput(inputStudentId.value, 10);
+      studentId = cleanId || '미입력';
+      safeSetStorage(idStorageKey, studentId);
     }
 
     playerName = cleanName;
-    localStorage.setItem(nameStorageKey, playerName);
+    safeSetStorage(nameStorageKey, playerName);
 
     updateProfileDisplay();
     profileModal.classList.add('hidden');
