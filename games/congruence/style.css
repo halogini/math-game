@@ -422,6 +422,13 @@ body {
   animation: redPulseWaste 0.8s ease-in-out infinite alternate !important;
 }
 
+.clue-tag.bonus-tag {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: var(--gold-star);
+  box-shadow: 0 0 6px var(--gold-glow);
+}
+
 @keyframes redPulseWaste {
   0% {
     background: rgba(239, 68, 68, 0.25) !important;
@@ -559,6 +566,7 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   display: flex;
@@ -573,6 +581,11 @@ body {
 .modal-backdrop.hidden {
   opacity: 0;
   pointer-events: none;
+  display: none !important;
+}
+
+.hidden {
+  display: none !important;
 }
 
 #result-modal.modal-backdrop {
@@ -1184,6 +1197,7 @@ body {
 
   .modal-card {
     max-height: 88vh;
+    max-height: 88dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
@@ -1192,8 +1206,20 @@ body {
     margin: 10px auto;
   }
 
+  /* #result-modal .modal-card carries a desktop-only fixed width + 440px
+     right-shift (to sit beside the right-hand triangle). On phones that pushes
+     the whole card off the right edge of the screen, so it must be reset here. */
+  #result-modal .modal-card {
+    width: 96%;
+    max-width: 96%;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 10px;
+  }
+
   .modal-card.modal-opening {
     max-height: 90vh;
+    max-height: 90dvh;
     padding: 14px;
   }
 
@@ -1224,5 +1250,21 @@ body {
 
   .champ-score {
     font-size: 1.5rem;
+  }
+
+  /* #result-modal.modal-backdrop overrides align-items/padding on the base
+     .modal-backdrop for the desktop "float beside triangle" layout — reset to
+     the same scrollable, centered mobile behavior as every other modal. */
+  #result-modal.modal-backdrop {
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .ce-canvas-wrapper {
+    max-width: 100%;
+  }
+
+  #ce-canvas {
+    height: 130px;
   }
 }

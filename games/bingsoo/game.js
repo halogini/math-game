@@ -59,7 +59,7 @@ function escapeHtml(str) {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initBingsooGame() {
   // Robust Channel Mode Detection (supporting KakaoTalk URL variations)
   function detectActiveMode() {
     try {
@@ -1109,4 +1109,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 400);
     }
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initBingsooGame);
+} else {
+  initBingsooGame();
+}

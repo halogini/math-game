@@ -120,10 +120,7 @@ class SoundEngine {
 
 const sounds = new SoundEngine();
 
-// ----------------------------------------------------
-// Main Game Logic
-// ----------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
+function initCongruenceGame() {
   // Robust Channel Mode Detection (supporting KakaoTalk URL variations)
   function detectActiveMode() {
     try {
@@ -191,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let isTrulyCongruent = true;
   let trueTheorem = 'SSS'; // 'SSS' | 'SAS' | 'ASA'
   let measuredSet = new Set(); // e.g. "L_side_AB", "R_angle_E"
+  let userClickSet = new Set(); // Tracks direct user measurements for scoring efficiency
+  let bonusAngleKeys = new Set(); // angle keys that were auto-revealed for free (see registerMeasurement)
   let hoverTarget = null; // { type: 'side'|'angle', key: 'AB', sideIndex: 0, triangle: 'L'|'R' }
   let successAnimReqId = null;
   let failureAnimReqId = null;
@@ -298,9 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
     studentIdGroup.style.display = 'none';
   }
 
-  // Always show Opening Modal on page load (features 1st Place Champion & Game Purpose)
+  let isTimerPaused = true;
+
+  // Always show Opening Modal on page load & pre-render Round 1 Triangles
+  initGame();
   fetchLeaderboard();
-  profileModal.classList.remove('hidden');
+  if (profileModal) profileModal.classList.remove('hidden');
 
   function initGame() {
     currentRound = 1;
@@ -322,6 +324,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hudRound.textContent = `${roundNum} / ${maxRounds}`;
     measuredSet.clear();
+    bonusAngleKeys.clear();
+    userClickSet.clear();
+    hoverTarget = null; // Clear any stale hover/selection highlight left over from the previous round
     uncheckRadios();
 
     // Generate Triangle Data based on Round Preset
@@ -335,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimerUI();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
+      if (isTimerPaused) return;
       roundTimeLeft--;
       updateTimerUI();
       if (roundTimeLeft <= 0) {
@@ -605,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const norm = getOutwardNormal(p1, p2, centroid);
         const badgeX = midX + norm.x * 32;
         const badgeY = midY + norm.y * 32;
-        drawBadge(badgeX, badgeY, `${sideNames[i]} = ${tri.sidesCm[i]}cm`, '#f59e0b', true, sideNames[i]);
+        drawBadge(badgeX, badgeY, `${sideNames[i]} = ${tri.sidesCm[i]}`, '#f59e0b', true, sideNames[i]);
       }
     }
 
@@ -766,42 +772,100 @@ document.addEventListener('DOMContentLoaded', () => {
     drawBadge(badgeX, badgeY, text, color);
   }
 
-  // Canvas Mouse Interactivity
-  canvas.addEventListener('mousemove', (e) => {
+  // Canvas Interactivity (Pointer Events unify mouse / touch / pen so taps on
+  // tablets & phones behave identically to mouse clicks, instead of relying on
+  // 'mousemove' + 'click', which touch browsers only emit as synthetic,
+  // unreliable events and never emit a true "hover" for).
+  canvas.style.touchAction = 'none'; // Prevent the page from scrolling/zooming while measuring
+
+  function getCanvasCoords(e) {
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    return {
+      mx: (e.clientX - rect.left) * (canvas.width / rect.width),
+      my: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
 
-    hoverTarget = findTargetAt(mx, my);
-    renderCanvas();
-  });
+  function getTargetKey(target) {
+    if (target.type === 'side') {
+      const sideNames = target.triangle === 'L' ? ['AB', 'BC', 'CA'] : ['DE', 'EF', 'FD'];
+      return `${target.triangle}_side_${sideNames[target.sideIndex]}`;
+    } else if (target.type === 'angle') {
+      const angleNames = target.triangle === 'L' ? ['A', 'B', 'C'] : ['D', 'E', 'F'];
+      return `${target.triangle}_angle_${angleNames[target.angleIndex]}`;
+    }
+    return null;
+  }
 
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
-
+  function selectTargetAt(mx, my) {
     const target = findTargetAt(mx, my);
     if (target) {
-      let key = '';
-      if (target.type === 'side') {
-        const sideNames = target.triangle === 'L' ? ['AB', 'BC', 'CA'] : ['DE', 'EF', 'FD'];
-        key = `${target.triangle}_side_${sideNames[target.sideIndex]}`;
-      } else {
-        const angleNames = target.triangle === 'L' ? ['A', 'B', 'C'] : ['D', 'E', 'F'];
-        key = `${target.triangle}_angle_${angleNames[target.angleIndex]}`;
-      }
-
-      // Irreversible measurement: once measured, it cannot be canceled/deleted
-      if (!measuredSet.has(key)) {
+      const key = getTargetKey(target);
+      if (key && !measuredSet.has(key)) {
         measuredSet.add(key);
+        userClickSet.add(key);
         sounds.playMeasure();
+        registerMeasurement(target, key);
       }
 
       updateCluesUI();
+    }
+    return target;
+  }
+
+  canvas.addEventListener('pointermove', (e) => {
+    // Only show a "hover" preview for real mouse/pen input; touch has no hover concept,
+    // so we skip this and just resolve the tap directly on pointerdown instead.
+    if (e.pointerType === 'mouse' || e.pointerType === 'pen') {
+      const { mx, my } = getCanvasCoords(e);
+      hoverTarget = findTargetAt(mx, my);
       renderCanvas();
     }
   });
+
+  canvas.addEventListener('pointerleave', () => {
+    hoverTarget = null;
+    renderCanvas();
+  });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    const { mx, my } = getCanvasCoords(e);
+    if (e.pointerType === 'touch') {
+      // Touch: resolve and clear immediately so nothing stays visually "stuck highlighted"
+      // once the finger lifts and the player moves on (e.g. taps "다음 라운드").
+      selectTargetAt(mx, my);
+      hoverTarget = null;
+    } else {
+      hoverTarget = findTargetAt(mx, my);
+      selectTargetAt(mx, my);
+    }
+    renderCanvas();
+  });
+
+  // ----------------------------------------------------
+  // Auto-reveal the 3rd angle once 2 angles of the same triangle are known
+  // ("삼각형의 세 내각의 합은 180˚" — this is prior knowledge, not a new fact,
+  // so it should never cost a separate measurement or read as a new/ambiguous
+  // situation. This also means a player who measures two angles + one side
+  // always ends up with all three angles known, so there's never a case where
+  // it matters *which* side they picked — it always behaves like "한 변과
+  // 그 양 끝각" (ASA), and the AAS distinction never needs to come up.)
+  // ----------------------------------------------------
+  function registerMeasurement(target, key) {
+    if (target.type !== 'angle') return;
+    const triangleTag = target.triangle;
+    const angleNames = triangleTag === 'L' ? ['A', 'B', 'C'] : ['D', 'E', 'F'];
+    const angleKeys = angleNames.map(n => `${triangleTag}_angle_${n}`);
+    const measuredCount = angleKeys.filter(k => measuredSet.has(k)).length;
+
+    if (measuredCount === 2) {
+      const missingKey = angleKeys.find(k => !measuredSet.has(k));
+      if (missingKey && !measuredSet.has(missingKey)) {
+        measuredSet.add(missingKey);
+        bonusAngleKeys.add(missingKey);
+      }
+    }
+  }
 
   function findTargetAt(mx, my) {
     // Check Triangle Left
@@ -870,10 +934,15 @@ document.addEventListener('DOMContentLoaded', () => {
     measuredSet.forEach(key => {
       const parts = key.split('_'); // e.g. ["L", "side", "AB"]
       const isAngle = parts[1] === 'angle';
-      const labelHtml = isAngle ? `📐 ∠${parts[2]}` : `📏 <span style="text-decoration: overline; border-top: 1.5px solid currentColor; padding-top: 1px;">${parts[2]}</span>`;
+      const isBonus = bonusAngleKeys.has(key);
+      const icon = isBonus ? '🎁' : (isAngle ? '📐' : '📏');
+      const labelHtml = isAngle
+        ? `${icon} ∠${parts[2]}`
+        : `${icon} <span style="text-decoration: overline; border-top: 1.5px solid currentColor; padding-top: 1px;">${parts[2]}</span>`;
       const tagSpan = document.createElement('span');
-      tagSpan.className = `clue-tag ${isAngle ? 'angle-tag' : ''}`;
+      tagSpan.className = `clue-tag ${isAngle ? 'angle-tag' : ''} ${isBonus ? 'bonus-tag' : ''}`;
       tagSpan.innerHTML = labelHtml;
+      if (isBonus) tagSpan.title = '나머지 각은 삼각형의 세 내각의 합(180˚)으로 자동으로 알 수 있어요!';
       cluesContainer.appendChild(tagSpan);
     });
   }
@@ -909,9 +978,50 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const hasSSS = (sidePairs === 3);
-    const hasSAS = (sidePairs >= 2 && anglePairs >= 1);
-    const hasASA = (sidePairs >= 1 && anglePairs >= 2);
+    // Vertex/side adjacency helpers (side i connects vertex i and vertex (i+1)%3)
+    function sharedVertexOfSides(s1, s2) {
+      const e1 = [s1, (s1 + 1) % 3];
+      const e2 = [s2, (s2 + 1) % 3];
+      return e1.find(v => e2.includes(v));
+    }
+    function sideBetweenVertices(v1, v2) {
+      for (let s = 0; s < 3; s++) {
+        const ends = [s, (s + 1) % 3];
+        if (ends.includes(v1) && ends.includes(v2)) return s;
+      }
+      return -1;
+    }
+
+    const pairedSideIdx = [0, 1, 2].filter(i => pairedSides[i]);
+    const pairedAngleIdx = [0, 1, 2].filter(i => pairedAngles[i]);
+
+    const hasSSS = pairedSideIdx.length === 3;
+
+    // SAS: 2 measured+paired sides whose SHARED (included) vertex angle is also measured+paired.
+    let hasSAS = false;
+    for (let a = 0; a < pairedSideIdx.length && !hasSAS; a++) {
+      for (let b = a + 1; b < pairedSideIdx.length && !hasSAS; b++) {
+        const v = sharedVertexOfSides(pairedSideIdx[a], pairedSideIdx[b]);
+        if (pairedAngleIdx.includes(v)) hasSAS = true;
+      }
+    }
+
+    // ASA: a measured+paired side whose two endpoints are both measured+paired angles.
+    // If all 3 angles ended up known (thanks to the free 3rd-angle reveal above), the
+    // "which side" question disappears entirely — any one paired side is enough, so this
+    // naturally covers what would otherwise be called "AAS" without ever naming it.
+    let hasASA = false;
+    if (pairedAngleIdx.length === 3 && pairedSideIdx.length >= 1) {
+      hasASA = true;
+    } else {
+      for (let a = 0; a < pairedAngleIdx.length && !hasASA; a++) {
+        for (let b = a + 1; b < pairedAngleIdx.length && !hasASA; b++) {
+          const s = sideBetweenVertices(pairedAngleIdx[a], pairedAngleIdx[b]);
+          if (s !== -1 && pairedSideIdx.includes(s)) hasASA = true;
+        }
+      }
+    }
+
     const isValidProof = hasSSS || hasSAS || hasASA;
 
     if (!isValidProof) {
@@ -920,12 +1030,12 @@ document.addEventListener('DOMContentLoaded', () => {
       let ceType = 'UNDER_MEASURED';
       let msg = '🚨 두 삼각형이 완전히 포개지는 지 확신하려면 더 많은 측정값이 필요합니다.';
 
-      if (sidePairs === 0 && anglePairs === 3) {
+      if (pairedAngleIdx.length >= 2 && pairedSideIdx.length === 0) {
         ceType = 'AAA_TRAP';
-        msg = '🚨 각도만 측정하면 크기가 다른 삼각형이 만들어질 수 있습니다!';
-      } else if (sidePairs === 2 && anglePairs === 1 && !hasSAS) {
+        msg = '🚨 각도만 측정하면 모양은 같아도 크기가 다른 삼각형이 만들어질 수 있습니다! 변도 측정해보세요.';
+      } else if (pairedSideIdx.length === 2 && pairedAngleIdx.length >= 1) {
         ceType = 'SSA_TRAP';
-        msg = '🚨 두 변이 같아도, 그 사이의 끼인각을 재지 않으면 다른 모양이 생겨납니다!';
+        msg = '🚨 지금 잰 치수만으로는 모양이 두 가지로 나올 수 있어요. 다른 변이나 각을 측정해보세요.';
       }
 
       playFailureAnimation(ceType, msg, pairedSides, pairedAngles, () => {
@@ -974,11 +1084,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const isWastedExtra = measuredCount > 6;
 
       // Dynamic scoring out of 100 max per round
-      const minEssential = 6; // Essential clues across both triangles (3 left + 3 right)
-      const extraCount = Math.max(0, measuredCount - minEssential);
+      // User-selected method: "측정 횟수 단순 차감 방식"
+      const userClickCount = userClickSet.size; // Direct clicks by student
+      const presetClueCount = measuredSet.size - userClickCount;
+      const minRequiredUserClicks = Math.max(1, 6 - Math.min(5, presetClueCount));
+      const extraClicks = Math.max(0, userClickCount - minRequiredUserClicks);
       const timeBonus = Math.min(30, Math.floor((roundTimeLeft / 60) * 30)); // max 30 pts
 
-      if (isOptimalRoute && extraCount === 0) {
+      if (extraClicks === 0) {
         // PERFECT OPTIMAL SCORE! (100 만점 가능!)
         const points = 70 + timeBonus; // 70 + 30 = 100 max!
 
@@ -992,14 +1105,14 @@ document.addEventListener('DOMContentLoaded', () => {
           showResultModal(
             true,
             points === 100 ? '🌟 100점 만점!' : `🌟 +${points}점`,
-            `🎯 최소한의 측정만으로 삼각형 합동 판정에 성공했습니다!`,
+            `🎯 군더더기 없는 최적의 측정(${userClickCount}회)으로 합동 입증 성공!`,
             null,
-            `주어진 힌트를 활용해 '${routeName}' 조건으로 군더더기 없이 깔끔하게 입증했습니다.`
+            `주어진 힌트를 활용해 '${routeName}' 조건으로 깔끔하게 입증했습니다.`
           );
         });
       } else {
-        // DYNAMIC INEFFICIENT SCORE (Deduction scales with extra measurements!)
-        const inefficiencyPenalty = 15 * Math.max(1, extraCount); // 15 pts lost per extra clue
+        // DYNAMIC INEFFICIENT SCORE (15 pts lost per extra direct user click)
+        const inefficiencyPenalty = 15 * extraClicks;
         const baseScore = Math.max(10, 70 - inefficiencyPenalty);
         const points = Math.min(99, Math.max(10, baseScore + timeBonus));
         
@@ -1007,17 +1120,15 @@ document.addEventListener('DOMContentLoaded', () => {
         correctCount++;
         hudScore.textContent = totalScore;
 
-        let hintReason = '💡 최소한의 필수 치수 외에 불필요한 치수를 더 측정하여 점수가 일부 감점되었습니다.';
-
         playSuccessAnimation(() => {
           sounds.playSuccess();
           highlightInefficientClues();
           showResultModal(
             true,
-            `+${points}점 (비효율 감점)`,
-            `⚠️ 합동 입증은 성공했지만, 측정하는데 너무 많은 에너지를 소비했습니다.`,
+            `+${points}점 (불필요한 측정 -${inefficiencyPenalty}점)`,
+            `⚠️ 합동 입증은 성공했지만, 추가 측정(${extraClicks}회)이 포함되었습니다.`,
             null,
-            hintReason
+            `필수 치수만으로 최소 입증 시 100점 만점을 받을 수 있습니다.`
           );
         });
       }
@@ -1144,17 +1255,20 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let notified = false;
     
-    // Check if side or angle is measured on EITHER triangle so its visual value is 100% locked!
-    const isMeasuredSide = [
-      measuredSet.has('L_side_AB') || measuredSet.has('R_side_DE'),
-      measuredSet.has('L_side_BC') || measuredSet.has('R_side_EF'),
-      measuredSet.has('L_side_CA') || measuredSet.has('R_side_FD')
-    ];
-    const isMeasuredAngle = [
-      measuredSet.has('L_angle_A') || measuredSet.has('R_angle_D'),
-      measuredSet.has('L_angle_B') || measuredSet.has('R_angle_E'),
-      measuredSet.has('L_angle_C') || measuredSet.has('R_angle_F')
-    ];
+    const isMeasuredSideL = [measuredSet.has('L_side_AB'), measuredSet.has('L_side_BC'), measuredSet.has('L_side_CA')];
+    const isMeasuredAngleL = [measuredSet.has('L_angle_A'), measuredSet.has('L_angle_B'), measuredSet.has('L_angle_C')];
+    const numMeasuredSidesL = (isMeasuredSideL[0]?1:0) + (isMeasuredSideL[1]?1:0) + (isMeasuredSideL[2]?1:0);
+    const numMeasuredAnglesL = (isMeasuredAngleL[0]?1:0) + (isMeasuredAngleL[1]?1:0) + (isMeasuredAngleL[2]?1:0);
+    const isRigidL = (numMeasuredSidesL === 3) || (numMeasuredSidesL === 2 && numMeasuredAnglesL >= 1 && ceType !== 'SSA_TRAP') || (numMeasuredSidesL === 1 && numMeasuredAnglesL >= 2);
+
+    const isMeasuredSideR = [measuredSet.has('R_side_DE'), measuredSet.has('R_side_EF'), measuredSet.has('R_side_FD')];
+    const isMeasuredAngleR = [measuredSet.has('R_angle_D'), measuredSet.has('R_angle_E'), measuredSet.has('R_angle_F')];
+    const numMeasuredSidesR = (isMeasuredSideR[0]?1:0) + (isMeasuredSideR[1]?1:0) + (isMeasuredSideR[2]?1:0);
+    const numMeasuredAnglesR = (isMeasuredAngleR[0]?1:0) + (isMeasuredAngleR[1]?1:0) + (isMeasuredAngleR[2]?1:0);
+    const isRigidR = (numMeasuredSidesR === 3) || (numMeasuredSidesR === 2 && numMeasuredAnglesR >= 1 && ceType !== 'SSA_TRAP') || (numMeasuredSidesR === 1 && numMeasuredAnglesR >= 2);
+
+    let wiggleTarget = 'R';
+    if (isRigidR && !isRigidL) wiggleTarget = 'L';
     
     function animateFailure(timestamp) {
       if (!startTime) startTime = timestamp;
@@ -1164,26 +1278,82 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const easeOverlap = progressOverlaping < 0.5 ? 4 * progressOverlaping * Math.pow(progressOverlaping, 2) : 1 - Math.pow(-2 * progressOverlaping + 2, 3) / 2;
       
-      let p0 = {x: originalRightPts[0].x, y: originalRightPts[0].y};
-      let p1 = {x: originalRightPts[1].x, y: originalRightPts[1].y};
-      let p2 = {x: originalRightPts[2].x, y: originalRightPts[2].y};
+      let p0_R = {x: originalRightPts[0].x, y: originalRightPts[0].y};
+      let p1_R = {x: originalRightPts[1].x, y: originalRightPts[1].y};
+      let p2_R = {x: originalRightPts[2].x, y: originalRightPts[2].y};
+      
+      let p0_L = {x: triangleLeft.pts[0].x, y: triangleLeft.pts[0].y};
+      let p1_L = {x: triangleLeft.pts[1].x, y: triangleLeft.pts[1].y};
+      let p2_L = {x: triangleLeft.pts[2].x, y: triangleLeft.pts[2].y};
       
       // Phase 1: Overlap target triangle
-      p0.x += (triangleLeft.pts[0].x - p0.x) * easeOverlap;
-      p0.y += (triangleLeft.pts[0].y - p0.y) * easeOverlap;
-      p1.x += (triangleLeft.pts[1].x - p1.x) * easeOverlap;
-      p1.y += (triangleLeft.pts[1].y - p1.y) * easeOverlap;
-      p2.x += (triangleLeft.pts[2].x - p2.x) * easeOverlap;
-      p2.y += (triangleLeft.pts[2].y - p2.y) * easeOverlap;
+      p0_R.x += (p0_L.x - p0_R.x) * easeOverlap;
+      p0_R.y += (p0_L.y - p0_R.y) * easeOverlap;
+      p1_R.x += (p1_L.x - p1_R.x) * easeOverlap;
+      p1_R.y += (p1_L.y - p1_R.y) * easeOverlap;
+      p2_R.x += (p2_L.x - p2_R.x) * easeOverlap;
+      p2_R.y += (p2_L.y - p2_R.y) * easeOverlap;
       
       // Phase 2: Wiggle with 100% invariant measured lengths and angles
       if (progressWiggling > 0) {
         const t = Math.sin(progressWiggling * Math.PI * 2);
         
-        const numMeasuredSides = (isMeasuredSide[0]?1:0) + (isMeasuredSide[1]?1:0) + (isMeasuredSide[2]?1:0);
-        const numMeasuredAngles = (isMeasuredAngle[0]?1:0) + (isMeasuredAngle[1]?1:0) + (isMeasuredAngle[2]?1:0);
+        let p0, p1, p2, isMeasuredSide, isMeasuredAngle, numMeasuredSides, numMeasuredAngles, isRigid;
+        
+        if (wiggleTarget === 'L') {
+          p0 = p0_L; p1 = p1_L; p2 = p2_L;
+          isMeasuredSide = isMeasuredSideL; isMeasuredAngle = isMeasuredAngleL;
+          numMeasuredSides = numMeasuredSidesL; numMeasuredAngles = numMeasuredAnglesL;
+          isRigid = isRigidL;
+        } else {
+          p0 = p0_R; p1 = p1_R; p2 = p2_R;
+          isMeasuredSide = isMeasuredSideR; isMeasuredAngle = isMeasuredAngleR;
+          numMeasuredSides = numMeasuredSidesR; numMeasuredAngles = numMeasuredAnglesR;
+          isRigid = isRigidR;
+        }
 
-        if (numMeasuredSides === 0) {
+        const slideLadder = (pFixed, pSlide1, pSlide2, tOffset) => {
+          const ux = pSlide1.x - pFixed.x, uy = pSlide1.y - pFixed.y;
+          const vx = pSlide2.x - pFixed.x, vy = pSlide2.y - pFixed.y;
+          const s0 = Math.hypot(ux, uy);
+          const d0 = Math.hypot(vx, vy);
+          if (s0 < 0.001 || d0 < 0.001) return [pSlide1, pSlide2];
+          
+          const dirU = { x: ux / s0, y: uy / s0 };
+          const dirV = { x: vx / d0, y: vy / d0 };
+          
+          const L = Math.hypot(pSlide1.x - pSlide2.x, pSlide1.y - pSlide2.y);
+          const cosTheta = dirU.x * dirV.x + dirU.y * dirV.y;
+          const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
+          
+          const sMax = L / (sinTheta + 0.0001);
+          let s = s0 + tOffset * 20;
+          if (s > sMax * 0.98) s = sMax * 0.98;
+          if (s < 5) s = 5;
+          
+          const disc = L * L - s * s * sinTheta * sinTheta;
+          if (disc < 0) return [pSlide1, pSlide2];
+          
+          const root1 = s * cosTheta + Math.sqrt(disc);
+          const root2 = s * cosTheta - Math.sqrt(disc);
+          const d = Math.abs(root1 - d0) < Math.abs(root2 - d0) ? root1 : root2;
+          
+          return [
+            { x: pFixed.x + dirU.x * s, y: pFixed.y + dirU.y * s },
+            { x: pFixed.x + dirV.x * d, y: pFixed.y + dirV.y * d }
+          ];
+        };
+
+        if (isRigid) {
+          const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
+          const rotatePt = (pt, center, angle) => {
+            const dx = pt.x - center.x, dy = pt.y - center.y;
+            return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
+          };
+          p0 = rotatePt(p0, centroid, t * 0.15);
+          p1 = rotatePt(p1, centroid, t * 0.15);
+          p2 = rotatePt(p2, centroid, t * 0.15);
+        } else if (numMeasuredSides === 0) {
           if (numMeasuredAngles >= 2) {
             // AAA: Scale relative to centroid. All interior angles are 100% invariant! No side length badges exist.
             const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
@@ -1191,34 +1361,67 @@ document.addEventListener('DOMContentLoaded', () => {
             p0 = { x: centroid.x + (p0.x - centroid.x) * scale, y: centroid.y + (p0.y - centroid.y) * scale };
             p1 = { x: centroid.x + (p1.x - centroid.x) * scale, y: centroid.y + (p1.y - centroid.y) * scale };
             p2 = { x: centroid.x + (p2.x - centroid.x) * scale, y: centroid.y + (p2.y - centroid.y) * scale };
+          } else if (numMeasuredAngles === 1) {
+            // 1 Angle measured, 0 sides. The angle's vertex is fixed, and the two sides forming it scale independently!
+            if (isMeasuredAngle[0]) {
+              const dx1 = p1.x - p0.x, dy1 = p1.y - p0.y; const len1 = Math.hypot(dx1, dy1) || 1;
+              const dx2 = p2.x - p0.x, dy2 = p2.y - p0.y; const len2 = Math.hypot(dx2, dy2) || 1;
+              p1.x += (dx1/len1) * t * 20; p1.y += (dy1/len1) * t * 20;
+              p2.x -= (dx2/len2) * t * 20; p2.y -= (dy2/len2) * t * 20;
+            } else if (isMeasuredAngle[1]) {
+              const dx0 = p0.x - p1.x, dy0 = p0.y - p1.y; const len0 = Math.hypot(dx0, dy0) || 1;
+              const dx2 = p2.x - p1.x, dy2 = p2.y - p1.y; const len2 = Math.hypot(dx2, dy2) || 1;
+              p0.x += (dx0/len0) * t * 20; p0.y += (dy0/len0) * t * 20;
+              p2.x -= (dx2/len2) * t * 20; p2.y -= (dy2/len2) * t * 20;
+            } else if (isMeasuredAngle[2]) {
+              const dx0 = p0.x - p2.x, dy0 = p0.y - p2.y; const len0 = Math.hypot(dx0, dy0) || 1;
+              const dx1 = p1.x - p2.x, dy1 = p1.y - p2.y; const len1 = Math.hypot(dx1, dy1) || 1;
+              p0.x += (dx0/len0) * t * 20; p0.y += (dy0/len0) * t * 20;
+              p1.x -= (dx1/len1) * t * 20; p1.y -= (dy1/len1) * t * 20;
+            }
           } else {
             p2.x += t * 30;
             p2.y += Math.cos(progressWiggling * Math.PI * 4) * 20;
           }
         } else if (numMeasuredSides === 2 && numMeasuredAngles >= 1 && ceType === 'SSA_TRAP') {
-          // SSA TRAP: Exactly 2 sides measured + 1 non-included angle measured.
-          // Discrete alternate triangle reflection that preserves ALL 2 side lengths & 1 angle 100%!
-          if (t > 0) {
-            let refBase, refDrop, refMove;
-            if (isMeasuredSide[0] && isMeasuredSide[1]) {
-               if (isMeasuredAngle[0]) { refBase = p0; refDrop = p1; refMove = p2; }
-               else if (isMeasuredAngle[2]) { refBase = p2; refDrop = p1; refMove = p0; }
-            } else if (isMeasuredSide[1] && isMeasuredSide[2]) {
-               if (isMeasuredAngle[1]) { refBase = p1; refDrop = p2; refMove = p0; }
-               else if (isMeasuredAngle[0]) { refBase = p0; refDrop = p2; refMove = p1; }
-            } else if (isMeasuredSide[2] && isMeasuredSide[0]) {
-               if (isMeasuredAngle[2]) { refBase = p2; refDrop = p0; refMove = p1; }
-               else if (isMeasuredAngle[1]) { refBase = p1; refDrop = p0; refMove = p2; }
-            }
-            if (refBase && refDrop && refMove) {
-               const dx = refMove.x - refBase.x, dy = refMove.y - refBase.y;
-               const len2 = dx*dx + dy*dy;
-               if (len2 > 0) {
-                 const dot = ((refDrop.x - refBase.x)*dx + (refDrop.y - refBase.y)*dy) / len2;
-                 const hx = refBase.x + dx * dot, hy = refBase.y + dy * dot;
-                 refMove.x = 2*hx - refMove.x; 
-                 refMove.y = 2*hy - refMove.y;
-               }
+          // SSA TRAP: Smoothly oscillate to the other valid root!
+          let refBase, refDrop, refMove;
+          if (isMeasuredSide[0] && isMeasuredSide[1]) {
+             if (isMeasuredAngle[0]) { refBase = p0; refDrop = p1; refMove = p2; }
+             else if (isMeasuredAngle[2]) { refBase = p2; refDrop = p1; refMove = p0; }
+          } else if (isMeasuredSide[1] && isMeasuredSide[2]) {
+             if (isMeasuredAngle[1]) { refBase = p1; refDrop = p2; refMove = p0; }
+             else if (isMeasuredAngle[0]) { refBase = p0; refDrop = p2; refMove = p1; }
+          } else if (isMeasuredSide[2] && isMeasuredSide[0]) {
+             if (isMeasuredAngle[2]) { refBase = p2; refDrop = p0; refMove = p1; }
+             else if (isMeasuredAngle[1]) { refBase = p1; refDrop = p0; refMove = p2; }
+          }
+          if (refBase && refDrop && refMove) {
+            const ux0 = refMove.x - refBase.x, uy0 = refMove.y - refBase.y;
+            const uLen = Math.hypot(ux0, uy0);
+            if (uLen > 0.0001) {
+              const ux = ux0 / uLen, uy = uy0 / uLen; // fixed ray direction — this IS the measured angle
+              const L = Math.hypot(refDrop.x - refMove.x, refDrop.y - refMove.y); // fixed side length to preserve
+              const vx = refDrop.x - refBase.x, vy = refDrop.y - refBase.y;
+              const vDotU = vx * ux + vy * uy;
+              const vLen2 = vx * vx + vy * vy;
+              const disc = vDotU * vDotU - (vLen2 - L * L);
+              if (disc >= 0) {
+                const sqrtDisc = Math.sqrt(disc);
+                const sCurrent = uLen;
+                const sA = vDotU + sqrtDisc;
+                const sB = vDotU - sqrtDisc;
+                let sTarget = null;
+                if (Math.abs(sA - sCurrent) > 0.5 && sA > 0.01) sTarget = sA;
+                else if (Math.abs(sB - sCurrent) > 0.5 && sB > 0.01) sTarget = sB;
+
+                if (sTarget !== null) {
+                  const blend = (1 - Math.cos(progressWiggling * Math.PI * 2)) / 2;
+                  const sNow = sCurrent + (sTarget - sCurrent) * blend;
+                  refMove.x = refBase.x + ux * sNow;
+                  refMove.y = refBase.y + uy * sNow;
+                }
+              }
             }
           }
         } else if (numMeasuredSides === 2) {
@@ -1243,46 +1446,55 @@ document.addEventListener('DOMContentLoaded', () => {
           };
 
           if (isMeasuredSide[0]) {
-            // Side 0 (p0-p1) is measured! p0 and p1 are fixed! Length |p1-p0| NEVER changes!
             if (isMeasuredAngle[0]) {
               const dx = p2.x - p0.x, dy = p2.y - p0.y; const len = Math.hypot(dx, dy) || 1;
               p2.x += (dx/len) * t * 30; p2.y += (dy/len) * t * 30;
             } else if (isMeasuredAngle[1]) {
               const dx = p2.x - p1.x, dy = p2.y - p1.y; const len = Math.hypot(dx, dy) || 1;
               p2.x += (dx/len) * t * 30; p2.y += (dy/len) * t * 30;
+            } else if (isMeasuredAngle[2]) {
+              const res = slideLadder(p2, p0, p1, t); p0 = res[0]; p1 = res[1];
             } else {
               p2 = rotatePt(p2, p1, t * 0.4);
             }
           } else if (isMeasuredSide[1]) {
-            // Side 1 (p1-p2) is measured! p1 and p2 are fixed! Length |p2-p1| NEVER changes!
             if (isMeasuredAngle[1]) {
               const dx = p0.x - p1.x, dy = p0.y - p1.y; const len = Math.hypot(dx, dy) || 1;
               p0.x += (dx/len) * t * 30; p0.y += (dy/len) * t * 30;
             } else if (isMeasuredAngle[2]) {
               const dx = p0.x - p2.x, dy = p0.y - p2.y; const len = Math.hypot(dx, dy) || 1;
               p0.x += (dx/len) * t * 30; p0.y += (dy/len) * t * 30;
+            } else if (isMeasuredAngle[0]) {
+              const res = slideLadder(p0, p1, p2, t); p1 = res[0]; p2 = res[1];
             } else {
               p0 = rotatePt(p0, p2, t * 0.4);
             }
           } else if (isMeasuredSide[2]) {
-            // Side 2 (p2-p0) is measured! p2 and p0 are fixed! Length |p0-p2| NEVER changes!
             if (isMeasuredAngle[2]) {
               const dx = p1.x - p2.x, dy = p1.y - p2.y; const len = Math.hypot(dx, dy) || 1;
               p1.x += (dx/len) * t * 30; p1.y += (dy/len) * t * 30;
             } else if (isMeasuredAngle[0]) {
               const dx = p1.x - p0.x, dy = p1.y - p0.y; const len = Math.hypot(dx, dy) || 1;
               p1.x += (dx/len) * t * 30; p1.y += (dy/len) * t * 30;
+            } else if (isMeasuredAngle[1]) {
+              const res = slideLadder(p1, p2, p0, t); p2 = res[0]; p0 = res[1];
             } else {
               p1 = rotatePt(p1, p0, t * 0.4);
             }
           }
         }
+        if (wiggleTarget === 'L') {
+          p0_L = p0; p1_L = p1; p2_L = p2;
+        } else {
+          p0_R = p0; p1_R = p1; p2_R = p2;
+        }
       }
       
-      let currentPts = [p0, p1, p2];
-      
-      triangleRight.pts = currentPts;
+      const prevLeftPts = triangleLeft.pts;
+      triangleLeft.pts = [p0_L, p1_L, p2_L];
+      triangleRight.pts = [p0_R, p1_R, p2_R];
       renderCanvas();
+      triangleLeft.pts = prevLeftPts;
       
       // Trigger modal immediately when wiggling starts (1.5s) instead of waiting for an end
       if (elapsed >= 1500 && !notified) {
@@ -1791,23 +2003,30 @@ document.addEventListener('DOMContentLoaded', () => {
     inputPlayerName.value = playerName || '도전자';
   }
 
-  btnEditProfile.addEventListener('click', () => {
-    inputPlayerName.value = playerName || '도전자';
-    if (activeMode === 'school') inputStudentId.value = studentId || '미입력';
+  if (btnEditProfile) {
+    btnEditProfile.addEventListener('click', () => {
+      inputPlayerName.value = playerName || '도전자';
+      if (activeMode === 'school') inputStudentId.value = studentId || '미입력';
+      profileModal.classList.remove('hidden');
+    });
+  }
+
+  // Show profile modal on load
+  if (profileModal) {
     profileModal.classList.remove('hidden');
-  });
+  }
 
-  let isGameStarted = false;
+  const btnStartGame = profileForm ? profileForm.querySelector('button[type="submit"]') : null;
 
-  profileForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    let cleanName = sanitizeInput(inputPlayerName.value, 12);
+  function handleStartGame(e) {
+    if (e) e.preventDefault();
+    let cleanName = sanitizeInput(inputPlayerName ? inputPlayerName.value : '', 12);
     if (!cleanName) {
       cleanName = '도전자';
       if (inputPlayerName) inputPlayerName.value = '도전자';
     }
 
-    if (activeMode === 'school') {
+    if (activeMode === 'school' && inputStudentId) {
       let cleanId = sanitizeInput(inputStudentId.value, 10);
       studentId = cleanId || '미입력';
       safeSetStorage(idStorageKey, studentId);
@@ -1817,11 +2036,23 @@ document.addEventListener('DOMContentLoaded', () => {
     safeSetStorage(nameStorageKey, playerName);
 
     updateProfileDisplay();
-    profileModal.classList.add('hidden');
-
-    if (!isGameStarted) {
-      isGameStarted = true;
-      initGame();
+    if (profileModal) {
+      profileModal.classList.add('hidden');
+      profileModal.style.display = 'none';
     }
-  });
-});
+    isTimerPaused = false;
+  }
+
+  if (profileForm) {
+    profileForm.addEventListener('submit', handleStartGame);
+  }
+  if (btnStartGame) {
+    btnStartGame.addEventListener('click', handleStartGame);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCongruenceGame);
+} else {
+  initCongruenceGame();
+}
