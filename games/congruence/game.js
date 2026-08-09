@@ -129,13 +129,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const modeParam = urlParams.get('mode');
   let activeMode = (modeParam === 'dorms' || modeParam === 'dorems') ? 'dorms' : 'school';
 
-  const nameStorageKey = `halomath_name_${activeMode}`;
-  const idStorageKey = `halomath_id_${activeMode}`;
-  const highScoreStorageKey = `congruence_highscore_${activeMode}`;
+  // Safe LocalStorage helpers for In-App WebViews (e.g. KakaoTalk)
+  function safeGetStorage(key, fallback = '') {
+    try {
+      return localStorage.getItem(key) || fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
 
-  let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
-  let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
-  let highScore = parseInt(localStorage.getItem(highScoreStorageKey) || '0', 10);
+  function safeSetStorage(key, val) {
+    try {
+      localStorage.setItem(key, val);
+    } catch (e) {
+      console.warn("Storage restricted:", e);
+    }
+  }
+
+  let playerName = sanitizeInput(safeGetStorage(nameStorageKey), 12);
+  let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey), 10) : '';
+  let highScore = parseInt(safeGetStorage(highScoreStorageKey, '0'), 10);
 
   // Hide all Lobby navigation buttons unconditionally in ALL modes
   const btnBackPortal = document.getElementById('btn-back-portal');
@@ -1467,71 +1480,98 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let firebaseRetryCount = 0;
   function fetchLeaderboard() {
-    if (!firebaseDb) {
-      if (firebaseRetryCount < 10) {
-        firebaseRetryCount++;
-        setTimeout(fetchLeaderboard, 400);
-      }
+    if (firebaseDb) {
+      firebaseDb.ref('scores').once('value', (snapshot) => {
+        processLeaderboardData(snapshot.val());
+      }).catch((err) => {
+        console.warn("Firebase SDK fetch failed, trying REST fallback:", err);
+        fetchRESTLeaderboard();
+      });
       return;
     }
 
-    firebaseDb.ref('scores').once('value', (snapshot) => {
-      const userBestMap = new Map();
+    if (firebaseRetryCount < 3) {
+      firebaseRetryCount++;
+      setTimeout(fetchLeaderboard, 400);
+    } else {
+      fetchRESTLeaderboard();
+    }
+  }
 
-      snapshot.forEach(child => {
-        const val = child.val();
-        if (val && val.name) {
-          // Exclude Bingsoo entries, include Congruence entries and legacy entries
-          const valGameId = String(val.gameId || '').trim();
-          if (valGameId === 'bingsoo') return;
-
-          const valName = sanitizeInput(val.name, 12);
-          const valStudentId = String(val.studentId || '').trim();
-          const valChannel = String(val.channel || '').trim();
-          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
-          const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
-
-          const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
-          if (matchesMode) {
-            const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
-            if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
-              userBestMap.set(userKey, {
-                name: valName,
-                studentId: valStudentId,
-                score: score
-              });
-            }
-          }
-        }
+  function fetchRESTLeaderboard() {
+    const restUrl = 'https://math-game-halogini-default-rtdb.firebaseio.com/scores.json';
+    fetch(restUrl)
+      .then(res => res.json())
+      .then(data => {
+        processLeaderboardData(data);
+      })
+      .catch(err => {
+        console.error("REST Leaderboard fetch failed:", err);
       });
+  }
 
-      const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
-      const top20 = list.slice(0, 20);
+  function processLeaderboardData(dataObj) {
+    if (!dataObj) {
+      renderLeaderboardTable(openingLeaderboardTbody, []);
+      renderLeaderboardTable(modalLeaderboardTbody, []);
+      renderLeaderboardTable(gameoverLeaderboardTbody, []);
+      return;
+    }
 
-      if (top20.length > 0) {
-        const champ = top20[0];
-        if (openingChampName) openingChampName.textContent = champ.name || '도전자';
-        if (openingChampId) {
-          if (activeMode === 'school') {
-            openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
-            openingChampId.style.display = 'inline';
-          } else {
-            openingChampId.style.display = 'none';
+    const userBestMap = new Map();
+    const keys = Object.keys(dataObj);
+
+    keys.forEach(k => {
+      const val = dataObj[k];
+      if (val && val.name) {
+        // Exclude Bingsoo entries, include Congruence entries and legacy entries
+        const valGameId = String(val.gameId || '').trim();
+        if (valGameId === 'bingsoo') return;
+
+        const valName = sanitizeInput(val.name, 12);
+        const valStudentId = String(val.studentId || '').trim();
+        const valChannel = String(val.channel || '').trim();
+        const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+        const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
+
+        const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
+        if (matchesMode) {
+          const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
+          if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
+            userBestMap.set(userKey, {
+              name: valName,
+              studentId: valStudentId,
+              score: score
+            });
           }
         }
-        if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
-      } else {
-        if (openingChampName) openingChampName.textContent = '도전자';
-        if (openingChampId) openingChampId.textContent = activeMode === 'school' ? '학번: 미입력' : '';
-        if (openingChampScore) openingChampScore.innerHTML = `0<small>점</small>`;
       }
-
-      renderLeaderboardTable(openingLeaderboardTbody, top20);
-      renderLeaderboardTable(modalLeaderboardTbody, top20);
-      renderLeaderboardTable(gameoverLeaderboardTbody, top20);
-    }, (err) => {
-      console.error("Leaderboard fetch error:", err);
     });
+
+    const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
+    const top20 = list.slice(0, 20);
+
+    if (top20.length > 0) {
+      const champ = top20[0];
+      if (openingChampName) openingChampName.textContent = champ.name || '도전자';
+      if (openingChampId) {
+        if (activeMode === 'school') {
+          openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
+          openingChampId.style.display = 'inline';
+        } else {
+          openingChampId.style.display = 'none';
+        }
+      }
+      if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
+    } else {
+      if (openingChampName) openingChampName.textContent = '도전자';
+      if (openingChampId) openingChampId.textContent = activeMode === 'school' ? '학번: 미입력' : '';
+      if (openingChampScore) openingChampScore.innerHTML = `0<small>점</small>`;
+    }
+
+    renderLeaderboardTable(openingLeaderboardTbody, top20);
+    renderLeaderboardTable(modalLeaderboardTbody, top20);
+    renderLeaderboardTable(gameoverLeaderboardTbody, top20);
   }
 
   function updateTableHeadersMode() {
@@ -1581,9 +1621,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function saveScoreToFirebase(score) {
-    if (!firebaseDb || !playerName) return null;
+    if (!playerName) return { success: false, message: '❌ 참가자 이름이 입력되지 않았습니다.' };
 
-    const dbRefPath = 'scores';
     const payload = {
       name: playerName,
       studentId: activeMode === 'school' ? studentId : 'DORMS',
@@ -1593,8 +1632,26 @@ document.addEventListener('DOMContentLoaded', () => {
       timestamp: Date.now()
     };
 
+    if (!firebaseDb) {
+      // Fallback via HTTP REST API for KakaoTalk In-App WebView
+      try {
+        const restRes = await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (restRes.ok) {
+          fetchLeaderboard();
+          return { success: true, message: `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!` };
+        }
+      } catch (err) {
+        console.error("REST score save error:", err);
+      }
+      return { success: false, message: '❌ 점수 등록 중 네트워크 오류가 발생했습니다.' };
+    }
+
     try {
-      const snapshot = await firebaseDb.ref(dbRefPath).once('value');
+      const snapshot = await firebaseDb.ref('scores').once('value');
       const matchingKeys = [];
       let maxExistingScore = -1;
 
@@ -1622,16 +1679,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (matchingKeys.length > 0) {
         const primaryKey = matchingKeys[0].key;
         if (payload.score > maxExistingScore) {
-          await firebaseDb.ref(`${dbRefPath}/${primaryKey}`).update(payload);
+          await firebaseDb.ref(`scores/${primaryKey}`).update(payload);
           statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
         } else {
           statusMsg = `ℹ️ 기존 최고 점수(${maxExistingScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.`;
         }
         for (let i = 1; i < matchingKeys.length; i++) {
-          await firebaseDb.ref(`${dbRefPath}/${matchingKeys[i].key}`).remove();
+          await firebaseDb.ref(`scores/${matchingKeys[i].key}`).remove();
         }
       } else {
-        await firebaseDb.ref(dbRefPath).push(payload);
+        await firebaseDb.ref('scores').push(payload);
         statusMsg = `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!`;
       }
 
@@ -1639,7 +1696,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return { success: true, message: statusMsg };
     } catch (err) {
       console.error("Firebase score save error:", err);
-      return { success: false, message: '❌ 점수 등록 중 오류가 발생했습니다.' };
+      try {
+        await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        fetchLeaderboard();
+        return { success: true, message: `✅ ${payload.score}점으로 랭킹에 등록되었습니다!` };
+      } catch (e) {
+        return { success: false, message: '❌ 점수 등록 중 오류가 발생했습니다.' };
+      }
     }
   }
 

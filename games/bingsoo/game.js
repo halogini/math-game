@@ -736,43 +736,57 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   let bingsooFirebaseRetryCount = 0;
   function listenRealtimeLeaderboard() {
-    if (!firebaseDb) {
-      if (bingsooFirebaseRetryCount < 10) {
-        bingsooFirebaseRetryCount++;
-        setTimeout(listenRealtimeLeaderboard, 400);
-      }
+    if (firebaseDb) {
+      firebaseDb.ref('scores').on('value', (snapshot) => {
+        processBingsooLeaderboardData(snapshot.val());
+      });
       return;
     }
 
-    firebaseDb.ref('scores').on('value', (snapshot) => {
-      const userBestMap = new Map();
-      snapshot.forEach(childSnap => {
-        const val = childSnap.val();
-        if (val && val.name) {
-          const valGameId = String(val.gameId || '').trim();
-          if (valGameId === 'congruence') return; // Skip congruence entries
+    if (bingsooFirebaseRetryCount < 3) {
+      bingsooFirebaseRetryCount++;
+      setTimeout(listenRealtimeLeaderboard, 400);
+    } else {
+      fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json')
+        .then(res => res.json())
+        .then(data => processBingsooLeaderboardData(data))
+        .catch(err => console.error("REST Bingsoo fetch error:", err));
+    }
+  }
 
-          const valName = sanitizeInput(val.name, 12);
-          const valStudentId = sanitizeInput(val.studentId || '', 10);
-          const valChannel = String(val.channel || '').trim();
-          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
-          const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
+  function processBingsooLeaderboardData(dataObj) {
+    if (!dataObj) return;
+    const userBestMap = new Map();
+    const keys = Object.keys(dataObj);
 
-          const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
-          if (matchesMode) {
-            const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
-            if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
-              userBestMap.set(userKey, {
-                name: valName,
-                studentId: valStudentId,
-                score: score
-              });
-            }
+    keys.forEach(k => {
+      const val = dataObj[k];
+      if (val && val.name) {
+        const valGameId = String(val.gameId || '').trim();
+        if (valGameId === 'congruence') return; // Skip congruence entries
+
+        const valName = sanitizeInput(val.name, 12);
+        const valStudentId = sanitizeInput(val.studentId || '', 10);
+        const valChannel = String(val.channel || '').trim();
+        const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+        const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
+
+        const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
+        if (matchesMode) {
+          const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
+          if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
+            userBestMap.set(userKey, {
+              name: valName,
+              studentId: valStudentId,
+              score: score
+            });
           }
         }
-      });
-      const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
-      const top20 = list.slice(0, 20);
+      }
+    });
+
+    const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
+    const top20 = list.slice(0, 20);
 
       if (top20.length > 0) {
         const champ = top20[0];
