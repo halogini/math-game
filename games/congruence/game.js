@@ -1474,6 +1474,10 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshot.forEach(child => {
         const val = child.val();
         if (val && val.name) {
+          // STRICT GAME ISOLATION: Only include entries for Congruence Game!
+          const valGameId = String(val.gameId || '').trim();
+          if (valGameId !== 'congruence') return;
+
           const valName = sanitizeInput(val.name, 12);
           const valStudentId = String(val.studentId || '').trim();
           const valChannel = String(val.channel || '').trim();
@@ -1509,6 +1513,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
+      } else {
+        if (openingChampName) openingChampName.textContent = '도전자';
+        if (openingChampId) openingChampId.textContent = activeMode === 'school' ? '학번: 미입력' : '';
+        if (openingChampScore) openingChampScore.innerHTML = `0<small>점</small>`;
       }
 
       renderLeaderboardTable(openingLeaderboardTbody, top20);
@@ -1519,8 +1527,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function updateTableHeadersMode() {
+    const studentIdHeaders = document.querySelectorAll('.th-student-id');
+    studentIdHeaders.forEach(th => {
+      th.style.display = (activeMode === 'school') ? '' : 'none';
+    });
+  }
+
   function renderLeaderboardTable(tbodyEl, list) {
     if (!tbodyEl) return;
+    updateTableHeadersMode();
     tbodyEl.innerHTML = '';
 
     const colSpan = activeMode === 'school' ? 4 : 3;
@@ -1578,6 +1594,9 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshot.forEach(child => {
         const val = child.val();
         if (val && String(val.name).trim() === String(payload.name).trim()) {
+          const valGameId = String(val.gameId || '').trim();
+          if (valGameId !== 'congruence') return;
+
           const valStudentId = String(val.studentId || '').trim();
           const valChannel = String(val.channel || '').trim();
           const isDormsVal = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');

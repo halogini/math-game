@@ -742,6 +742,9 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshot.forEach(childSnap => {
         const val = childSnap.val();
         if (val) {
+          const valGameId = String(val.gameId || '').trim();
+          if (valGameId && valGameId !== 'bingsoo') return;
+
           const valStudentId = sanitizeInput(val.studentId || '', 10);
           const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || val.channel === 'dorms' || val.channel === 'dorems');
 
