@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🍧 팥빙수 똑같이 나눠주기 작전! | 할로매쓰 게임 #1</title>
+  
+  <!-- Security & Compliance Meta Tags -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app;">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
+  
+  <!-- SEO Description & Open Graph Meta Tags -->
+  <meta name="description" content="세 명의 친구와 완벽히 똑같은 거리의 위치를 찾아 팥빙수를 배달하는 신나고 유쾌한 수학 미니 게임!">
+  <meta property="og:title" content="🍧 팥빙수 똑같이 나눠주기 작전! | 할로매쓰 게임 #1">
+  <meta property="og:description" content="세 명의 친구와 완벽히 똑같은 거리의 위치를 찾아 팥빙수를 배달하세요!">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts for modern styling -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Canvas Confetti for winning celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Firebase App & Realtime Database SDKs (Compat v10) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
+</head>
+<body>
+  <div class="game-app">
+    <!-- Portal Back Nav Bar -->
+    <nav class="portal-nav-bar">
+      <a href="../../index.html" id="btn-back-portal" class="btn-portal-home">
+        🏠 할로매쓰 홈으로
+      </a>
+    </nav>
+
+    <!-- Header Controls & Status -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-emoji">🍧</span>
+        <div>
+          <h1 id="game-main-title">팥빙수 똑같이 나눠주기 작전!</h1>
+          <p class="subtitle">세 명의 친구와 똑같은 거리 위치를 찾아 팥빙수를 배치하세요!</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <!-- Player Info Badge -->
+        <div class="player-info-card">
+          <span class="player-icon">👤</span>
+          <div class="player-details">
+            <span class="player-name" id="display-player-name">도전자</span>
+            <span class="player-id" id="display-student-id">학번: 2101</span>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <span class="label">라운드</span>
+          <span class="value" id="round-display">1 / 5</span>
+        </div>
+        <div class="status-card highlight">
+          <span class="label">총점</span>
+          <span class="value" id="total-score-display">0 <small>점</small></span>
+        </div>
+        <div class="status-card">
+          <span class="label">최고 기록</span>
+          <span class="value" id="high-score-display">0 <small>점</small></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Section -->
+    <main class="game-container">
+      <!-- Game Canvas/Board Area -->
+      <div class="board-wrapper">
+        <div id="game-board" class="game-board">
+          <!-- Background Grid & Decorative Elements -->
+          <div class="board-grid-pattern"></div>
+          
+          <!-- Line Verification Canvas Layer -->
+          <canvas id="line-canvas" class="line-canvas"></canvas>
+
+          <!-- Student Elements & Pins will be dynamically injected here -->
+          <div id="elements-layer" class="elements-layer"></div>
+
+          <!-- Floating Guidance Banner -->
+          <div id="instruction-banner" class="instruction-banner">
+            👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!
+          </div>
+
+          <!-- Top-Center Non-blocking Score Popup Effect -->
+          <div id="score-popup" class="score-popup hidden">
+            <div class="score-card-inner">
+              <span id="score-rating-badge" class="rating-badge">완벽해요!</span>
+              <div id="score-number" class="score-number">+98</div>
+              <p id="score-distance-info" class="distance-info">정답과 오차: 1</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="controls-bar">
+          <button id="btn-check-answer" class="btn btn-primary" disabled>
+            🎯 정답 확인하기
+          </button>
+          <button id="btn-next-round" class="btn btn-accent hidden">
+            ▶ 다음 라운드 진행
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer Privacy Policy Link -->
+    <footer class="app-footer">
+      <a href="../../privacy.html" id="btn-privacy-policy" class="privacy-link-btn" target="_blank" rel="noopener noreferrer">
+        🔒 개인정보처리방침
+      </a>
+    </footer>
+
+    <!-- Opening Screen Modal (Features 1st Place Champion, Concise Game Guide & Player Setup) -->
+    <div id="player-modal" class="modal-backdrop">
+      <div class="modal-card modal-opening">
+        <div class="opening-banner">
+          <span class="opening-subtitle">1위 챔피언 도전!</span>
+          <h2>👑 명예의 전당 랭킹 1위</h2>
+          
+          <div class="champ-card" id="champ-card-box">
+            <div class="champ-gold-shimmer"></div>
+            <div class="champ-trophy">🥇</div>
+            <div class="champ-info">
+              <span class="champ-name" id="opening-champ-name">김빙수</span>
+              <span class="champ-id" id="opening-champ-id">학번: 2105</span>
+            </div>
+            <div class="champ-score" id="opening-champ-score">492<small>점</small></div>
+          </div>
+
+          <!-- Toggle Opening Leaderboard Button -->
+          <button type="button" id="btn-toggle-opening-leaderboard" class="btn btn-outline btn-sm style-toggle-btn">
+            🏆 명예의 전당 순위표 전체 보기
+          </button>
+
+          <!-- Collapsible Opening Leaderboard Box -->
+          <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr id="tr-opening-th">
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-opening-id">학번</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody id="opening-leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simplified Concise Game Purpose Banner -->
+        <div class="game-guide-box short-banner">
+          <div class="guide-title">🍧 팥빙수 똑같이 나눠주기 작전!</div>
+          <p class="guide-desc">세 명의 친구와 똑같은 거리에 팥빙수를 배치하세요!</p>
+        </div>
+
+        <div class="modal-body">
+          <form id="player-form">
+            <div class="form-group">
+              <label for="input-player-name" id="label-player-name">도전자 이름:</label>
+              <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" maxlength="12" required />
+            </div>
+            <div class="form-group" id="student-id-group">
+              <label for="input-student-id">학번:</label>
+              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" pattern="[a-zA-Z0-9가-힣\-]+" title="영문, 숫자, 한글만 입력 가능합니다." required />
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
+              ⚡ 챔피언에 도전하기 (게임 시작)
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacy-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-sm">
+        <div class="modal-header">
+          <span class="modal-trophy">🔒</span>
+          <h2>개인정보처리방침</h2>
+        </div>
+        <div class="modal-body privacy-body">
+          <p><strong>1. 수집 항목</strong>: 이름, 학번</p>
+          <p><strong>2. 수집 목적</strong>: 미니 게임 명예의 전당 랭킹 등록 및 리더보드 게시</p>
+          <p><strong>3. 보유 및 이용 기간</strong>: 데이터베이스 초기화 시까지 또는 이용자 삭제 요청 시까지</p>
+          <p><strong>4. 동의 거부 권리</strong>: 참가자는 서비스 제공에 필요한 최소한의 개인정보 수집 동의를 거부할 수 있으며, 동의 거부 시 점수 등록 기능이 제한될 수 있습니다.</p>
+        </div>
+        <div class="modal-footer centered-footer">
+          <button type="button" id="btn-close-privacy" class="btn btn-outline">
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Final Result Modal (Round 5 Complete) -->
+    <div id="result-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-lg">
+        <!-- Always Visible Top Modal Header -->
+        <div class="modal-header">
+          <span class="modal-trophy">🏆</span>
+          <h2>게임 완료</h2>
+        </div>
+
+        <div class="modal-body">
+          <div class="final-score-box">
+            <span class="final-label">최종 획득 점수</span>
+            <div id="final-total-score" class="final-score">460 <small>/ 500</small></div>
+            <div id="new-record-badge" class="new-record-badge hidden">🎉 최고 기록 달성!</div>
+          </div>
+
+          <!-- Locked Player Info Score Registration Box -->
+          <div class="send-action-box">
+            <div class="result-locked-player-box">
+              <span class="locked-icon">🔒</span>
+              <span class="locked-text">등록 참가자: <strong id="result-locked-name">홍길동</strong> <span id="result-locked-id-span">(학번: <strong id="result-locked-id">2101</strong>)</span></span>
+            </div>
+            <button id="btn-send-data" class="btn btn-secondary btn-lg" style="width: 100%;">
+              🚀 점수 등록하기
+            </button>
+            <div id="api-status-msg" class="api-status-msg"></div>
+          </div>
+
+          <!-- Hall of Fame Leaderboard (Top 20) -->
+          <div class="leaderboard-section">
+            <div class="leaderboard-header">
+              <h3 id="result-leaderboard-title">🏆 명예의 전당 (1위 ~ 20위)</h3>
+            </div>
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr id="tr-result-th">
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-result-id">학번</th>
+                    <th>최종 점수</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="round-breakdown">
+            <h3>라운드별 성적 요약</h3>
+            <ul id="round-history-list" class="history-list">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+        </div>
+
+        <div class="modal-footer centered-footer">
+          <button id="btn-modal-restart" class="btn btn-primary btn-lg">
+            🎮 새 게임 시작하기
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
