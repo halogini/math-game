@@ -142,8 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let activeMode = detectActiveMode();
 
-  const nameStorageKey = `halomath_name_${activeMode}`;
-  const idStorageKey = `halomath_id_${activeMode}`;
+  const nameStorageKey = `congruence_name_${activeMode}`;
+  const idStorageKey = `congruence_id_${activeMode}`;
   const highScoreStorageKey = `congruence_highscore_${activeMode}`;
 
   // Safe LocalStorage helpers for In-App WebViews (e.g. KakaoTalk)
@@ -1571,7 +1571,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (item.name) {
           const valGameId = String(item.gameId || '').trim();
-          if (valGameId === 'bingsoo') return;
+          if (valGameId !== 'congruence') return;
 
           const valName = sanitizeInput(item.name, 12);
           const valStudentId = String(item.studentId || '').trim();

@@ -79,8 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeMode = detectActiveMode();
 
   const dbRefPath = activeMode === 'dorms' ? 'scores/dorms' : 'scores';
-  const nameStorageKey = `halomath_name_${activeMode}`;
-  const idStorageKey = `halomath_id_${activeMode}`;
+  const nameStorageKey = `bingsoo_name_${activeMode}`;
+  const idStorageKey = `bingsoo_id_${activeMode}`;
   const highScoreStorageKey = `bingsoo_highscore_${activeMode}`;
 
   // Safe LocalStorage helpers for WebViews & sandboxed browsers
@@ -833,7 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (item.name) {
           const valGameId = String(item.gameId || '').trim();
-          if (valGameId === 'congruence') return;
+          if (valGameId && valGameId !== 'bingsoo') return;
 
           const valName = sanitizeInput(item.name, 12);
           const valStudentId = sanitizeInput(item.studentId || '', 10);
@@ -1083,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
       studentId: activeMode === 'dorms' ? 'DORMS' : String(studentId).trim(),
       score: Number(totalScore),
       channel: activeMode,
+      gameId: 'bingsoo',
       timestamp: (window.firebase && firebase.database && typeof firebase.database.ServerValue !== 'undefined') ? firebase.database.ServerValue.TIMESTAMP : Date.now()
     };
 
