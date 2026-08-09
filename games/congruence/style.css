@@ -1173,4 +1173,56 @@ body {
   .condition-options {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  /* Mobile Modal & Leaderboard Scroll Fixes */
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-card {
+    max-height: 88vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    width: 96%;
+    padding: 14px;
+    margin: 10px auto;
+  }
+
+  .modal-card.modal-opening {
+    max-height: 90vh;
+    padding: 14px;
+  }
+
+  .leaderboard-table-wrapper {
+    max-height: 220px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 8px 6px;
+    font-size: 0.8rem;
+  }
+
+  .champ-card {
+    padding: 8px 12px;
+  }
+
+  .champ-trophy {
+    font-size: 1.6rem;
+  }
+
+  .champ-name {
+    font-size: 0.95rem;
+  }
+
+  .champ-score {
+    font-size: 1.5rem;
+  }
 }

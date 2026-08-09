@@ -1437,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnToggleOpeningLeaderboard && openingLeaderboardBox) {
     btnToggleOpeningLeaderboard.addEventListener('click', () => {
+      fetchLeaderboard();
       openingLeaderboardBox.classList.toggle('hidden');
     });
   }
@@ -1464,19 +1465,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  let firebaseRetryCount = 0;
   function fetchLeaderboard() {
-    if (!firebaseDb) return;
+    if (!firebaseDb) {
+      if (firebaseRetryCount < 10) {
+        firebaseRetryCount++;
+        setTimeout(fetchLeaderboard, 400);
+      }
+      return;
+    }
 
-    const dbRefPath = 'scores';
-    firebaseDb.ref(dbRefPath).orderByChild('score').limitToLast(100).once('value', (snapshot) => {
+    firebaseDb.ref('scores').once('value', (snapshot) => {
       const userBestMap = new Map();
 
       snapshot.forEach(child => {
         const val = child.val();
         if (val && val.name) {
-          // STRICT GAME ISOLATION: Only include entries for Congruence Game!
+          // Exclude Bingsoo entries, include Congruence entries and legacy entries
           const valGameId = String(val.gameId || '').trim();
-          if (valGameId !== 'congruence') return;
+          if (valGameId === 'bingsoo') return;
 
           const valName = sanitizeInput(val.name, 12);
           const valStudentId = String(val.studentId || '').trim();

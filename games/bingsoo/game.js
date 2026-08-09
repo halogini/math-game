@@ -734,37 +734,44 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   // Realtime Leaderboard Listener & Secure Rendering
   // ----------------------------------------------------
+  let bingsooFirebaseRetryCount = 0;
   function listenRealtimeLeaderboard() {
-    if (!firebaseDb) return;
+    if (!firebaseDb) {
+      if (bingsooFirebaseRetryCount < 10) {
+        bingsooFirebaseRetryCount++;
+        setTimeout(listenRealtimeLeaderboard, 400);
+      }
+      return;
+    }
 
-    firebaseDb.ref('scores').orderByChild('score').limitToLast(100).on('value', (snapshot) => {
-      const list = [];
+    firebaseDb.ref('scores').on('value', (snapshot) => {
+      const userBestMap = new Map();
       snapshot.forEach(childSnap => {
         const val = childSnap.val();
-        if (val) {
+        if (val && val.name) {
           const valGameId = String(val.gameId || '').trim();
-          if (valGameId && valGameId !== 'bingsoo') return;
+          if (valGameId === 'congruence') return; // Skip congruence entries
 
+          const valName = sanitizeInput(val.name, 12);
           const valStudentId = sanitizeInput(val.studentId || '', 10);
-          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || val.channel === 'dorms' || val.channel === 'dorems');
+          const valChannel = String(val.channel || '').trim();
+          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
+          const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
 
-          if (activeMode === 'dorms' && isDormsEntry) {
-            list.push({
-              name: sanitizeInput(val.name, 12),
-              studentId: '',
-              score: Math.max(0, Math.min(500, parseInt(val.score, 10) || 0))
-            });
-          } else if (activeMode === 'school' && !isDormsEntry) {
-            list.push({
-              name: sanitizeInput(val.name, 12),
-              studentId: valStudentId,
-              score: Math.max(0, Math.min(500, parseInt(val.score, 10) || 0))
-            });
+          const matchesMode = (activeMode === 'dorms' && isDormsEntry) || (activeMode === 'school' && !isDormsEntry);
+          if (matchesMode) {
+            const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
+            if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
+              userBestMap.set(userKey, {
+                name: valName,
+                studentId: valStudentId,
+                score: score
+              });
+            }
           }
         }
       });
-      list.reverse();
-
+      const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
       const top20 = list.slice(0, 20);
 
       if (top20.length > 0) {
