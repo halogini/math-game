@@ -1497,19 +1497,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let firebaseRetryCount = 0;
   function fetchLeaderboard() {
+    const fetchViaREST = () => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 3500);
+
+      Promise.all([
+        fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', { signal: controller.signal }).then(r => r.json()).catch(() => null),
+        fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores/dorms.json', { signal: controller.signal }).then(r => r.json()).catch(() => null)
+      ]).then(([data1, data2]) => {
+        clearTimeout(id);
+        const combined = {};
+        if (data1 && typeof data1 === 'object') Object.assign(combined, data1);
+        if (data2 && typeof data2 === 'object') Object.assign(combined, data2);
+        processLeaderboardData(combined);
+      }).catch(() => clearTimeout(id));
+    };
+
     if (firebaseDb) {
-      firebaseDb.ref('scores').once('value', (snapScores) => {
-        firebaseDb.ref('scores/dorms').once('value', (snapDorms) => {
-          const combined = {};
-          if (snapScores.val() && typeof snapScores.val() === 'object') {
-            Object.assign(combined, snapScores.val());
-          }
-          if (snapDorms.val() && typeof snapDorms.val() === 'object') {
-            Object.assign(combined, snapDorms.val());
-          }
-          processLeaderboardData(combined);
+      let isResolved = false;
+
+      const timeoutId = setTimeout(() => {
+        if (!isResolved) {
+          isResolved = true;
+          console.warn("Firebase SDK leaderboard fetch timed out. Falling back to REST API.");
+          fetchViaREST();
+        }
+      }, 2500);
+
+      firebaseDb.ref('scores').once('value')
+        .then(snapScores => {
+          return firebaseDb.ref('scores/dorms').once('value').then(snapDorms => {
+            if (isResolved) return;
+            isResolved = true;
+            clearTimeout(timeoutId);
+            const combined = {};
+            if (snapScores.val() && typeof snapScores.val() === 'object') {
+              Object.assign(combined, snapScores.val());
+            }
+            if (snapDorms.val() && typeof snapDorms.val() === 'object') {
+              Object.assign(combined, snapDorms.val());
+            }
+            processLeaderboardData(combined);
+          });
+        })
+        .catch(err => {
+          if (isResolved) return;
+          isResolved = true;
+          clearTimeout(timeoutId);
+          console.warn("Firebase SDK fetch failed. Falling back to REST API:", err);
+          fetchViaREST();
         });
-      });
       return;
     }
 
@@ -1517,20 +1554,8 @@ document.addEventListener('DOMContentLoaded', () => {
       firebaseRetryCount++;
       setTimeout(fetchLeaderboard, 400);
     } else {
-      fetchRESTLeaderboard();
+      fetchViaREST();
     }
-  }
-
-  function fetchRESTLeaderboard() {
-    Promise.all([
-      fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json').then(r => r.json()).catch(() => null),
-      fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores/dorms.json').then(r => r.json()).catch(() => null)
-    ]).then(([data1, data2]) => {
-      const combined = {};
-      if (data1 && typeof data1 === 'object') Object.assign(combined, data1);
-      if (data2 && typeof data2 === 'object') Object.assign(combined, data2);
-      processLeaderboardData(combined);
-    });
   }
 
   function processLeaderboardData(dataObj) {
@@ -1654,21 +1679,28 @@ document.addEventListener('DOMContentLoaded', () => {
       channel: activeMode === 'school' ? 'school' : 'dorms',
       score: score,
       gameId: 'congruence',
-      timestamp: Date.now()
+      timestamp: (window.firebase && firebase.database && typeof firebase.database.ServerValue !== 'undefined') ? firebase.database.ServerValue.TIMESTAMP : Date.now()
     };
 
     const saveViaREST = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       try {
         const restRes = await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
+
         if (restRes.ok) {
           fetchLeaderboard();
           return { success: true, message: `✅ ${payload.score}점으로 랭킹에 성공적으로 등록되었습니다!` };
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         console.error("REST score save error:", err);
       }
       return { success: false, message: '❌ 점수 등록 중 네트워크 오류가 발생했습니다.' };
