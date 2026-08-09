@@ -83,12 +83,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const idStorageKey = `halomath_id_${activeMode}`;
   const highScoreStorageKey = `bingsoo_highscore_${activeMode}`;
 
+  // Safe LocalStorage helpers for WebViews & sandboxed browsers
+  function safeGetStorage(key, fallback = '') {
+    try {
+      return localStorage.getItem(key) || fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function safeSetStorage(key, val) {
+    try {
+      localStorage.setItem(key, val);
+    } catch (e) {
+      console.warn("Storage restricted:", e);
+    }
+  }
+
   // Game State
   let currentRound = 1;
   const maxRounds = 5;
   let totalScore = 0;
   let roundHistory = [];
-  let highScore = parseInt(localStorage.getItem(highScoreStorageKey) || '0', 10);
+  let highScore = parseInt(safeGetStorage(highScoreStorageKey, '0'), 10);
   
   let studentPositions = [];
   let targetPoint = { x: 0, y: 0 };
@@ -98,8 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let popupTimeoutId = null;
 
   // Locked Player Info (Sanitized)
-  let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
-  let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
+  let playerName = sanitizeInput(safeGetStorage(nameStorageKey) || '도전자', 12);
+  let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey) || '', 10) : '';
 
   // DOM Elements
   const gameBoard = document.getElementById('game-board');
@@ -211,31 +228,26 @@ document.addEventListener('DOMContentLoaded', () => {
     playerModal.classList.remove('hidden');
   }
 
-  // Form Submit Handler with Strict Validation
+  // Form Submit Handler
   playerForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const rawName = inputPlayerName.value;
-    const cleanName = sanitizeInput(rawName, 12);
-
-    if (!isValidName(cleanName)) {
-      alert('도전자 이름/닉네임은 1자 이상 12자 이하로 입력해 주세요.');
-      return;
+    const rawName = inputPlayerName ? inputPlayerName.value : '';
+    let cleanName = sanitizeInput(rawName, 12);
+    if (!cleanName) {
+      cleanName = '도전자';
+      if (inputPlayerName) inputPlayerName.value = '도전자';
     }
 
     let cleanId = '';
     if (activeMode === 'school') {
-      const rawId = inputStudentId.value;
-      cleanId = sanitizeInput(rawId, 10);
-      if (!isValidStudentId(cleanId)) {
-        alert('학번은 1자 이상 10자 이하의 영문, 숫자, 한글로 입력해 주세요.');
-        return;
-      }
+      const rawId = inputStudentId ? inputStudentId.value : '';
+      cleanId = sanitizeInput(rawId, 10) || '미입력';
       studentId = cleanId;
-      localStorage.setItem(idStorageKey, studentId);
+      safeSetStorage(idStorageKey, studentId);
     }
 
     playerName = cleanName;
-    localStorage.setItem(nameStorageKey, playerName);
+    safeSetStorage(nameStorageKey, playerName);
 
     updatePlayerInfoDisplay();
     playerModal.classList.add('hidden');
@@ -698,7 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isNewRecord = false;
     if (totalScore > highScore) {
       highScore = totalScore;
-      localStorage.setItem(highScoreStorageKey, highScore.toString());
+      safeSetStorage(highScoreStorageKey, highScore.toString());
       highScoreDisplay.innerHTML = `${highScore} <small>점</small>`;
       isNewRecord = true;
     }
