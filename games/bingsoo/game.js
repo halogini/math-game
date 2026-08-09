@@ -799,25 +799,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
     const top20 = list.slice(0, 20);
 
-      if (top20.length > 0) {
-        const champ = top20[0];
-        if (openingChampName) openingChampName.textContent = champ.name || '김빙수';
-        if (openingChampId) {
-          if (activeMode === 'school') {
-            openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
-            openingChampId.style.display = '';
-          } else {
-            openingChampId.style.display = 'none';
-          }
+    if (top20.length > 0) {
+      const champ = top20[0];
+      if (openingChampName) openingChampName.textContent = champ.name || '김빙수';
+      if (openingChampId) {
+        if (activeMode === 'school') {
+          openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
+          openingChampId.style.display = '';
+        } else {
+          openingChampId.style.display = 'none';
         }
-        if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
       }
+      if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
+    }
 
-      renderHallOfFame(top20);
-      renderOpeningHallOfFame(top20);
-    }, (err) => {
-      console.error("Leaderboard read error:", err);
-    });
+    renderHallOfFame(top20);
+    renderOpeningHallOfFame(top20);
   }
 
   function renderOpeningHallOfFame(list) {
