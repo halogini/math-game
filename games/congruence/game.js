@@ -1536,34 +1536,42 @@ document.addEventListener('DOMContentLoaded', () => {
   function processLeaderboardData(dataObj) {
     if (!dataObj) return;
     const userBestMap = new Map();
-    const keys = Object.keys(dataObj);
 
-    keys.forEach(k => {
-      const val = dataObj[k];
-      if (val && typeof val === 'object' && val.name) {
-        // Exclude Bingsoo entries, include Congruence entries and legacy entries
-        const valGameId = String(val.gameId || '').trim();
-        if (valGameId === 'bingsoo') return;
+    const collectNodes = (obj, isDormsSubtree = false) => {
+      if (!obj || typeof obj !== 'object') return;
 
-        const valName = sanitizeInput(val.name, 12);
-        const valStudentId = String(val.studentId || '').trim();
-        const valChannel = String(val.channel || '').trim();
-        const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems' || k === 'dorms');
-        const score = Math.max(0, Math.min(500, parseInt(val.score, 10) || 0));
+      Object.keys(obj).forEach(key => {
+        const item = obj[key];
+        if (!item || typeof item !== 'object') return;
 
-        const matchesMode = (activeMode === 'dorms') ? (isDormsEntry || !valStudentId || valStudentId === 'DORMS') : (!isDormsEntry);
-        if (matchesMode) {
-          const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
-          if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
-            userBestMap.set(userKey, {
-              name: valName,
-              studentId: valStudentId,
-              score: score
-            });
+        if (item.name) {
+          const valGameId = String(item.gameId || '').trim();
+          if (valGameId === 'bingsoo') return;
+
+          const valName = sanitizeInput(item.name, 12);
+          const valStudentId = String(item.studentId || '').trim();
+          const valChannel = String(item.channel || '').trim();
+          const isDormsEntry = isDormsSubtree || (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems' || key === 'dorms');
+          const score = Math.max(0, Math.min(500, parseInt(item.score, 10) || 0));
+
+          const matchesMode = (activeMode === 'dorms') ? (isDormsEntry || !valStudentId || valStudentId === 'DORMS') : (!isDormsEntry);
+          if (matchesMode) {
+            const userKey = activeMode === 'school' ? `${valName}_${valStudentId}` : valName;
+            if (!userBestMap.has(userKey) || score > userBestMap.get(userKey).score) {
+              userBestMap.set(userKey, {
+                name: valName,
+                studentId: valStudentId,
+                score: score
+              });
+            }
           }
+        } else {
+          collectNodes(item, key === 'dorms' || isDormsSubtree);
         }
-      }
-    });
+      });
+    };
+
+    collectNodes(dataObj);
 
     const list = Array.from(userBestMap.values()).sort((a, b) => b.score - a.score);
     const top20 = list.slice(0, 20);
