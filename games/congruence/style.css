@@ -688,8 +688,9 @@ body {
   justify-content: center;
   align-items: flex-end;
   padding: 10px;
-  padding-bottom: 72px; /* Positions right above the bottom submit button */
-  pointer-events: none;
+  padding-bottom: 16px;
+  /* Block clicks to submit buttons underneath; card stays interactive */
+  pointer-events: auto;
 }
 
 #result-modal .modal-card {
@@ -702,6 +703,30 @@ body {
   max-width: 580px;
   margin: 0 auto;
   padding: 16px 20px;
+}
+
+/* Hide submit stack / clues while overlap anim or result sheet is open */
+.game-container.is-animating .decision-section,
+.game-container.modal-open .decision-section,
+body.modal-open .decision-section {
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.game-container.is-animating .clues-panel,
+.game-container.modal-open .clues-panel {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game-container.is-animating .floating-tool-palette,
+.game-container.modal-open .floating-tool-palette {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .modal-card {
@@ -1493,11 +1518,18 @@ body {
     font-size: 0.9rem;
   }
 
+  .canvas-wrapper {
+    overflow: visible;
+  }
+
   .clues-panel {
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
+    position: static;
+    margin-top: 8px;
+    left: auto;
+    right: auto;
+    bottom: auto;
     padding: 8px 10px;
+    border-radius: 12px;
   }
 
   .clues-header {
@@ -1507,12 +1539,11 @@ body {
   }
 
   .decision-section {
-    margin-top: 2px;
-    position: sticky;
-    bottom: 0;
-    z-index: 20;
+    margin-top: 6px;
+    position: relative;
+    z-index: 1;
     padding-bottom: env(safe-area-inset-bottom);
-    background: linear-gradient(to top, rgba(7, 10, 18, 0.96) 70%, transparent);
+    background: none;
   }
 
   .decision-buttons {
@@ -1528,6 +1559,15 @@ body {
     padding: 14px 12px;
     min-height: 48px;
     white-space: normal;
+  }
+
+  .game-container.is-stack-layout #geometry-canvas {
+    max-height: min(52vh, 560px);
+  }
+
+  .game-container.is-animating.is-stack-layout #geometry-canvas,
+  .game-container.modal-open.is-stack-layout #geometry-canvas {
+    max-height: min(48vh, 520px);
   }
 
   .status-hud-bar {
@@ -1559,16 +1599,58 @@ body {
     margin: 8px auto;
   }
 
+  /* Bottom sheet: leave upper canvas visible for overlap / counterexample replay */
+  #result-modal.modal-backdrop {
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.15) 0%,
+      rgba(0, 0, 0, 0.45) 42%,
+      rgba(0, 0, 0, 0.72) 100%
+    );
+    pointer-events: auto;
+  }
+
   #result-modal .modal-card {
     width: 100%;
     max-width: 100%;
-    margin: 8px auto 12px;
+    margin: 0;
+    border-radius: 18px 18px 0 0;
+    max-height: 46dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
   }
 
-  #result-modal.modal-backdrop {
-    align-items: flex-start;
-    padding: 8px;
-    justify-content: flex-start;
+  #result-modal .result-header {
+    margin-bottom: 8px;
+  }
+
+  #result-modal .result-header h2 {
+    font-size: 1.15rem;
+  }
+
+  #result-modal .result-subtitle {
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+
+  #result-modal .math-note-box {
+    font-size: 0.78rem;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+
+  #result-modal .view-toggle-container {
+    margin-bottom: 8px;
+  }
+
+  #result-modal .btn-view-toggle,
+  #result-modal .btn-modal-action {
+    min-height: 44px;
+    font-size: 0.95rem;
   }
 
   .modal-card.modal-opening {

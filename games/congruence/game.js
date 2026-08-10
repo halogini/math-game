@@ -436,6 +436,7 @@ function initCongruenceGame() {
   function startRound(roundNum) {
     if (successAnimReqId) { cancelAnimationFrame(successAnimReqId); successAnimReqId = null; }
     if (failureAnimReqId) { cancelAnimationFrame(failureAnimReqId); failureAnimReqId = null; }
+    setUiPhase('play');
 
     hudRound.textContent = `${roundNum} / ${maxRounds}`;
     measuredSet.clear();
@@ -670,12 +671,22 @@ function initCongruenceGame() {
     }));
   }
 
+  function setUiPhase(phase) {
+    // phase: 'play' | 'animating' | 'modal'
+    if (gameContainerEl) {
+      gameContainerEl.classList.toggle('is-animating', phase === 'animating');
+      gameContainerEl.classList.toggle('modal-open', phase === 'modal');
+    }
+    document.body.classList.toggle('modal-open', phase === 'modal');
+  }
+
   function applyCanvasLayout(force) {
     const stack = shouldStackLayout();
     if (!force && stack === isStackLayout) return;
 
-    if (successAnimReqId) { cancelAnimationFrame(successAnimReqId); successAnimReqId = null; }
-    if (failureAnimReqId) { cancelAnimationFrame(failureAnimReqId); failureAnimReqId = null; }
+    // Don't tear down in-flight / result-screen triangle poses
+    if (successAnimReqId || failureAnimReqId) return;
+    if (resultModal && !resultModal.classList.contains('hidden')) return;
 
     isStackLayout = stack;
     if (gameContainerEl) gameContainerEl.classList.toggle('is-stack-layout', stack);
@@ -702,7 +713,6 @@ function initCongruenceGame() {
     }
     savedOriginalLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
     savedOriginalRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
-    activeResultView = 'initial';
     renderCanvas();
   }
 
@@ -1327,6 +1337,7 @@ function initCongruenceGame() {
     if (btnSSS) btnSSS.disabled = true;
     if (btnSAS) btnSAS.disabled = true;
     if (btnASA) btnASA.disabled = true;
+    setUiPhase('animating');
 
     const measuredCount = measuredSet.size;
 
@@ -1599,12 +1610,19 @@ function initCongruenceGame() {
       }
     }
 
+    setUiPhase('modal');
     if (resultModal) resultModal.classList.remove('hidden');
   }
 
   if (btnNextRound) {
     btnNextRound.onclick = () => {
       if (resultModal) resultModal.classList.add('hidden');
+      setUiPhase('play');
+      const floatingToolPalette = document.querySelector('.floating-tool-palette');
+      if (floatingToolPalette) {
+        floatingToolPalette.style.opacity = '1';
+        floatingToolPalette.style.pointerEvents = 'auto';
+      }
       if (currentRound < maxRounds) {
         currentRound++;
         startRound(currentRound);
@@ -1615,8 +1633,17 @@ function initCongruenceGame() {
   }
 
   // Success Animation Logic (Rigid Body Translation & Rotation -> 0% Size Warping!)
+  function ensureCanvasVisibleForAnim() {
+    const wrap = document.querySelector('.canvas-wrapper');
+    if (wrap && typeof wrap.scrollIntoView === 'function') {
+      wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
   function playSuccessAnimation(onComplete) {
     if (successAnimReqId) cancelAnimationFrame(successAnimReqId);
+    successAnimReqId = null;
+    ensureCanvasVisibleForAnim();
     let startTime = null;
     
     // Disable tool hover during animation
@@ -1667,6 +1694,7 @@ function initCongruenceGame() {
       if (progress < 1.0) {
         successAnimReqId = requestAnimationFrame(animateSuccess);
       } else {
+        successAnimReqId = null;
         triangleRight.pts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
         renderCanvas();
         hoverTarget = oldHover;
@@ -1681,6 +1709,8 @@ function initCongruenceGame() {
   function playFailureAnimation(ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR, onComplete) {
     lastFailureArgs = { ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR };
     if (failureAnimReqId) cancelAnimationFrame(failureAnimReqId);
+    failureAnimReqId = null;
+    ensureCanvasVisibleForAnim();
     let startTime = null;
     const oldHover = hoverTarget;
     hoverTarget = null;
@@ -2161,6 +2191,7 @@ function initCongruenceGame() {
     }
     if (apiStatusMsg) apiStatusMsg.textContent = '';
 
+    setUiPhase('modal');
     if (gameoverModal) gameoverModal.classList.remove('hidden');
     fetchLeaderboard();
   }
@@ -2168,6 +2199,7 @@ function initCongruenceGame() {
   if (btnRestartGame) {
     btnRestartGame.onclick = () => {
       if (gameoverModal) gameoverModal.classList.add('hidden');
+      setUiPhase('play');
       initGame();
     };
   }
