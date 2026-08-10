@@ -1152,6 +1152,10 @@ function initCongruenceGame() {
       
       const inefficiencyPenalty = 10 * extraClicks;
 
+      // Implicit Time-Elapsed Penalty (Rewards fast decision-making, prevents tie scores on leaderboard)
+      const timeSpent = Math.max(0, 60 - roundTimeLeft);
+      const timePenalty = Math.max(0, Math.floor((timeSpent - 3) * 0.8));
+
       const baseScore = 50; // Base score for proving congruence!
       let conditionBonus = 0;
       if (claimMatchedPaired) {
@@ -1160,7 +1164,7 @@ function initCongruenceGame() {
         conditionBonus = 20; // Partial condition bonus when single triangle condition matches
       }
 
-      const rawScore = baseScore + conditionBonus - inefficiencyPenalty;
+      const rawScore = baseScore + conditionBonus - inefficiencyPenalty - timePenalty;
       const points = Math.max(0, rawScore);
 
       roundScores[currentRound - 1] = points;
