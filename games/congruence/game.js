@@ -201,11 +201,17 @@ function initCongruenceGame() {
   let currentPresetCount = 2;
   let presetAngleKeys = [];
 
+  // Design-space triangle points (always generated in 900×420 side-by-side)
+  let designLeftPts = null;
+  let designRightPts = null;
+  let isStackLayout = false;
+
   // Canvas References
   const canvas = document.getElementById('geometry-canvas');
   const ctx = canvas.getContext('2d');
   const ceCanvas = document.getElementById('ce-canvas');
   const ceCtx = ceCanvas ? ceCanvas.getContext('2d') : null;
+  const gameContainerEl = document.querySelector('.game-container');
 
   // DOM Elements
   const channelBadge = document.getElementById('channel-badge');
@@ -589,8 +595,9 @@ function initCongruenceGame() {
       ]
     };
 
-    savedOriginalLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
-    savedOriginalRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
+    designLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
+    designRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
+    applyCanvasLayout(true);
 
     // Fully randomized starting preset clues (Random target triangle & random element combinations!)
     presetAngleKeys = [];
@@ -642,6 +649,73 @@ function initCongruenceGame() {
   }
 
   // ----------------------------------------------------
+  // Canvas Layout (side-by-side desktop / stacked mobile)
+  // ----------------------------------------------------
+  function shouldStackLayout() {
+    return window.innerWidth <= 700 && window.innerHeight >= window.innerWidth;
+  }
+
+  function ptsCentroid(pts) {
+    return {
+      x: (pts[0].x + pts[1].x + pts[2].x) / 3,
+      y: (pts[0].y + pts[1].y + pts[2].y) / 3
+    };
+  }
+
+  function mapPtsToCenter(pts, toCenter, scale) {
+    const c = ptsCentroid(pts);
+    return pts.map(p => ({
+      x: toCenter.x + (p.x - c.x) * scale,
+      y: toCenter.y + (p.y - c.y) * scale
+    }));
+  }
+
+  function applyCanvasLayout(force) {
+    const stack = shouldStackLayout();
+    if (!force && stack === isStackLayout) return;
+
+    if (successAnimReqId) { cancelAnimationFrame(successAnimReqId); successAnimReqId = null; }
+    if (failureAnimReqId) { cancelAnimationFrame(failureAnimReqId); failureAnimReqId = null; }
+
+    isStackLayout = stack;
+    if (gameContainerEl) gameContainerEl.classList.toggle('is-stack-layout', stack);
+
+    if (stack) {
+      canvas.width = 420;
+      canvas.height = 720;
+    } else {
+      canvas.width = 900;
+      canvas.height = 420;
+    }
+
+    if (!designLeftPts || !designRightPts || !triangleLeft || !triangleRight) {
+      renderCanvas();
+      return;
+    }
+
+    if (stack) {
+      triangleLeft.pts = mapPtsToCenter(designLeftPts, { x: 210, y: 175 }, 0.92);
+      triangleRight.pts = mapPtsToCenter(designRightPts, { x: 210, y: 505 }, 0.92);
+    } else {
+      triangleLeft.pts = designLeftPts.map(p => ({ x: p.x, y: p.y }));
+      triangleRight.pts = designRightPts.map(p => ({ x: p.x, y: p.y }));
+    }
+    savedOriginalLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
+    savedOriginalRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
+    activeResultView = 'initial';
+    renderCanvas();
+  }
+
+  let layoutResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(layoutResizeTimer);
+    layoutResizeTimer = setTimeout(() => applyCanvasLayout(false), 120);
+  });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => applyCanvasLayout(true), 200);
+  });
+
+  // ----------------------------------------------------
   // Canvas Rendering & Tool Interactivity
   // ----------------------------------------------------
   function renderCanvas() {
@@ -659,13 +733,20 @@ function initCongruenceGame() {
 
     // Dividers & Titles
     ctx.fillStyle = 'rgba(6, 182, 212, 0.6)';
-    ctx.font = 'bold 16px Jua';
-    ctx.fillText('🔺 삼각형 △ABC', 50, 32);
-    ctx.fillStyle = 'rgba(236, 72, 153, 0.6)';
-    ctx.fillText('🔻 삼각형 △DEF', 490, 32);
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.beginPath(); ctx.moveTo(450, 20); ctx.lineTo(450, 400); ctx.stroke();
+    ctx.font = isStackLayout ? 'bold 15px Jua' : 'bold 16px Jua';
+    if (isStackLayout) {
+      ctx.fillText('🔺 삼각형 △ABC', 24, 28);
+      ctx.fillStyle = 'rgba(236, 72, 153, 0.6)';
+      ctx.fillText('🔻 삼각형 △DEF', 24, 368);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.beginPath(); ctx.moveTo(24, 350); ctx.lineTo(canvas.width - 24, 350); ctx.stroke();
+    } else {
+      ctx.fillText('🔺 삼각형 △ABC', 50, 32);
+      ctx.fillStyle = 'rgba(236, 72, 153, 0.6)';
+      ctx.fillText('🔻 삼각형 △DEF', 490, 32);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.beginPath(); ctx.moveTo(450, 20); ctx.lineTo(450, 400); ctx.stroke();
+    }
 
     // Draw Triangles
     const prevLeftPts = triangleLeft ? triangleLeft.pts : null;

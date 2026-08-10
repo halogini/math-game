@@ -33,6 +33,11 @@
   -webkit-user-select: none;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--bg-dark);
   background-image: 
@@ -42,21 +47,31 @@ body {
   color: var(--text-main);
   font-family: var(--font-body);
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   overflow-x: hidden;
+  touch-action: manipulation;
 }
 
 .game-container {
   width: 100%;
   max-width: 1000px;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: 12px 16px;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
   gap: 12px;
 }
+
+/* Desktop: full labels / Mobile: short labels */
+.label-short { display: none; }
+.label-full { display: inline; }
 
 /* ----------------------------------------------------
    Header & Nav Bar
@@ -319,11 +334,24 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(6, 182, 212, 0.05);
 }
 
+.game-container.is-stack-layout .canvas-wrapper {
+  /* room for clues overlay under lower triangle */
+  padding-bottom: 0;
+}
+
 #geometry-canvas {
   width: 100%;
-  height: 400px;
+  height: auto;
+  aspect-ratio: 900 / 420;
   display: block;
   cursor: crosshair;
+  touch-action: none;
+  max-height: min(48vh, 420px);
+}
+
+.game-container.is-stack-layout #geometry-canvas {
+  aspect-ratio: 420 / 720;
+  max-height: min(62vh, 720px);
 }
 
 .canvas-tool-bar {
@@ -1307,20 +1335,199 @@ body {
 }
 
 /* ----------------------------------------------------
-   Responsive Adjustments
+   Responsive: Tablet
    ---------------------------------------------------- */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .game-container {
-    padding: 8px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .game-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .game-title-group {
+    min-width: 0;
+  }
+
+  .game-title-group h1 {
+    font-size: 1.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .game-subtitle {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .header-stat-badge {
+    min-width: 56px;
+    padding: 4px 8px;
+  }
+
+  .decision-buttons {
     gap: 8px;
   }
-  
-  .game-header {
-    padding: 8px 12px;
-  }
-  
-  .game-title-group h1 {
+
+  .btn-submit-action {
     font-size: 1.05rem;
+    padding: 12px 8px;
+  }
+}
+
+/* ----------------------------------------------------
+   Responsive: Phone / narrow tablet
+   ---------------------------------------------------- */
+@media (max-width: 700px) {
+  .label-full { display: none; }
+  .label-short { display: inline; }
+
+  .game-container {
+    padding: 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .game-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .header-left {
+    width: 100%;
+  }
+
+  .game-title-group h1 {
+    font-size: 1.1rem;
+    white-space: normal;
+  }
+
+  .game-subtitle {
+    display: none; /* prevents vertical squeezed text on narrow widths */
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .user-profile-card {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+
+  .profile-name {
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 7em;
+  }
+
+  .header-stat-badge {
+    flex: 0 0 auto;
+    min-width: 52px;
+    padding: 4px 6px;
+  }
+
+  .stat-badge-label {
+    font-size: 0.62rem;
+  }
+
+  .stat-badge-val {
+    font-size: 0.9rem;
+  }
+
+  .btn-sound {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+
+  .canvas-tool-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .floating-tool-palette {
+    width: 100%;
+    justify-content: stretch;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .tool-guide-text {
+    display: none;
+  }
+
+  .tool-btn {
+    flex: 1;
+    min-height: 44px;
+    padding: 10px 8px;
+    font-size: 0.9rem;
+  }
+
+  .clues-panel {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    padding: 8px 10px;
+  }
+
+  .clues-header {
+    font-size: 0.72rem;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .decision-section {
+    margin-top: 2px;
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: linear-gradient(to top, rgba(7, 10, 18, 0.96) 70%, transparent);
+  }
+
+  .decision-buttons {
+    flex-direction: column;
+    max-width: none;
+    gap: 8px;
+  }
+
+  .btn-submit-action {
+    width: 100%;
+    flex: none;
+    font-size: 1.05rem;
+    padding: 14px 12px;
+    min-height: 48px;
+    white-space: normal;
   }
 
   .status-hud-bar {
@@ -1329,63 +1536,58 @@ body {
     gap: 6px;
   }
 
-  .canvas-tool-bar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .btn-submit-action {
-    width: 100%;
-    font-size: 1rem;
-    padding: 10px;
-  }
-
-  #geometry-canvas {
-    height: 350px;
-  }
-
   .condition-options {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* Mobile Modal & Leaderboard Scroll Fixes */
   .modal-backdrop {
-    padding: 10px;
+    padding: 8px;
     align-items: flex-start;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
   .modal-card {
-    max-height: 88vh;
-    max-height: 88dvh;
+    max-height: 90vh;
+    max-height: 90dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
-    width: 96%;
+    width: 100%;
+    max-width: 100%;
     padding: 14px;
-    margin: 10px auto;
+    margin: 8px auto;
   }
 
-  /* #result-modal .modal-card carries a desktop-only fixed width + 440px
-     right-shift (to sit beside the right-hand triangle). On phones that pushes
-     the whole card off the right edge of the screen, so it must be reset here. */
   #result-modal .modal-card {
-    width: 96%;
-    max-width: 96%;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 10px;
+    width: 100%;
+    max-width: 100%;
+    margin: 8px auto 12px;
+  }
+
+  #result-modal.modal-backdrop {
+    align-items: flex-start;
+    padding: 8px;
+    justify-content: flex-start;
   }
 
   .modal-card.modal-opening {
-    max-height: 90vh;
-    max-height: 90dvh;
-    padding: 14px;
+    max-height: 92vh;
+    max-height: 92dvh;
+    padding: 12px;
+  }
+
+  .view-toggle-buttons {
+    flex-wrap: wrap;
+  }
+
+  .btn-view-toggle,
+  .btn-modal-action {
+    min-height: 44px;
   }
 
   .leaderboard-table-wrapper {
-    max-height: 220px;
+    max-height: 200px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
@@ -1394,7 +1596,7 @@ body {
   .leaderboard-table th,
   .leaderboard-table td {
     padding: 8px 6px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
   }
 
   .champ-card {
@@ -1413,19 +1615,68 @@ body {
     font-size: 1.5rem;
   }
 
-  /* #result-modal.modal-backdrop overrides align-items/padding on the base
-     .modal-backdrop for the desktop "float beside triangle" layout — reset to
-     the same scrollable, centered mobile behavior as every other modal. */
-  #result-modal.modal-backdrop {
-    align-items: flex-start;
-    padding: 10px;
-  }
-
   .ce-canvas-wrapper {
     max-width: 100%;
   }
 
   #ce-canvas {
-    height: 130px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 440 / 220;
+    max-height: 140px;
   }
+
+  .gameover-actions {
+    flex-direction: column;
+  }
+
+  .gameover-actions .btn-modal-action {
+    width: 100%;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+  .header-stat-badge:nth-child(4) {
+    display: none; /* hide "최고 기록" to free space */
+  }
+
+  .stat-badge-val {
+    font-size: 0.82rem;
+  }
+
+  .btn-submit-action {
+    font-size: 0.98rem;
+    padding: 12px 10px;
+  }
+}
+
+/* Landscape phones: keep side-by-side canvas usable */
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-subtitle {
+    display: none;
+  }
+
+  .game-header {
+    padding: 6px 10px;
+  }
+
+  #geometry-canvas,
+  .game-container.is-stack-layout #geometry-canvas {
+    aspect-ratio: 900 / 420;
+    max-height: 52vh;
+  }
+
+  .decision-buttons {
+    flex-direction: row;
+  }
+
+  .btn-submit-action {
+    font-size: 0.9rem;
+    padding: 10px 6px;
+    min-height: 42px;
+  }
+
+  .label-full { display: none; }
+  .label-short { display: inline; }
 }
