@@ -178,6 +178,7 @@ function initCongruenceGame() {
   let correctCount = 0;
   let perfectCount = 0;
   let ceCount = 0;
+  let roundScores = [0, 0, 0, 0, 0];
   let roundTimeLeft = 60;
   let timerInterval = null;
   let activeTool = 'ruler'; // 'ruler' | 'protractor'
@@ -189,7 +190,6 @@ function initCongruenceGame() {
   let trueTheorem = 'SSS'; // 'SSS' | 'SAS' | 'ASA'
   let measuredSet = new Set(); // e.g. "L_side_AB", "R_angle_E"
   let userClickSet = new Set(); // Tracks direct user measurements for scoring efficiency
-  let bonusAngleKeys = new Set(); // angle keys that were auto-revealed for free (see registerMeasurement)
   let hoverTarget = null; // { type: 'side'|'angle', key: 'AB', sideIndex: 0, triangle: 'L'|'R' }
   let successAnimReqId = null;
   let failureAnimReqId = null;
@@ -227,7 +227,10 @@ function initCongruenceGame() {
   const clueEfficiencyTag = document.getElementById('clue-efficiency-tag');
   const cluesContainer = document.getElementById('clues-tags-container');
 
-  const btnSubmitDecision = document.getElementById('btn-submit-decision');
+  const submitBtns = document.querySelectorAll('.btn-submit-action');
+  const btnSSS = document.getElementById('btn-sss');
+  const btnSAS = document.getElementById('btn-sas');
+  const btnASA = document.getElementById('btn-asa');
 
   // Modals
   const resultModal = document.getElementById('result-modal');
@@ -244,7 +247,8 @@ function initCongruenceGame() {
   const btnViewInitial = document.getElementById('btn-view-initial');
   const btnViewCounter = document.getElementById('btn-view-counter');
   let activeResultView = 'counter'; // 'initial' or 'counter'
-  let lastJudgmentResult = 'SUCCESS'; // 'SUCCESS' | 'FAILURE'
+  let lastJudgmentResult = 'SUCCESS'; // 'SUCCESS' | 'OPTIMAL' | 'WARNING' | 'FAILURE'
+  let lastFailureArgs = null;
 
   if (btnViewInitial) {
     btnViewInitial.addEventListener('click', () => {
@@ -254,6 +258,19 @@ function initCongruenceGame() {
       if (toolProtractor) toolProtractor.classList.remove('active');
       btnViewInitial.classList.add('active');
       if (btnViewCounter) btnViewCounter.classList.remove('active');
+
+      if (failureAnimReqId) cancelAnimationFrame(failureAnimReqId);
+      if (successAnimReqId) cancelAnimationFrame(successAnimReqId);
+      failureAnimReqId = null;
+      successAnimReqId = null;
+
+      if (savedOriginalLeftPts && triangleLeft) {
+        triangleLeft.pts = savedOriginalLeftPts.map(p => ({ x: p.x, y: p.y }));
+      }
+      if (savedOriginalRightPts && triangleRight) {
+        triangleRight.pts = savedOriginalRightPts.map(p => ({ x: p.x, y: p.y }));
+      }
+
       renderCanvas();
     });
   }
@@ -266,8 +283,17 @@ function initCongruenceGame() {
       btnViewCounter.classList.add('active');
       if (btnViewInitial) btnViewInitial.classList.remove('active');
 
-      if (lastJudgmentResult === 'SUCCESS') {
+      if (lastJudgmentResult === 'SUCCESS' || lastJudgmentResult === 'OPTIMAL' || lastJudgmentResult === 'WARNING') {
         playSuccessAnimation();
+      } else if (lastJudgmentResult === 'FAILURE' && lastFailureArgs) {
+        playFailureAnimation(
+          lastFailureArgs.ceType,
+          lastFailureArgs.msg,
+          lastFailureArgs.sideKnownL,
+          lastFailureArgs.angleKnownL,
+          lastFailureArgs.sideKnownR,
+          lastFailureArgs.angleKnownR
+        );
       }
     });
   }
@@ -343,6 +369,7 @@ function initCongruenceGame() {
     correctCount = 0;
     perfectCount = 0;
     ceCount = 0;
+    roundScores = [0, 0, 0, 0, 0];
     hudScore.textContent = '0점';
     fetchLeaderboard();
     startRound(currentRound);
@@ -357,12 +384,15 @@ function initCongruenceGame() {
 
     hudRound.textContent = `${roundNum} / ${maxRounds}`;
     measuredSet.clear();
-    bonusAngleKeys.clear();
     userClickSet.clear();
     hoverTarget = null; // Clear any stale hover/selection highlight left over from the previous round
     uncheckRadios();
 
-    // Re-enable measurement tools for active round play
+    // Re-enable measurement tools & submit buttons for active round play
+    if (btnSSS) btnSSS.disabled = false;
+    if (btnSAS) btnSAS.disabled = false;
+    if (btnASA) btnASA.disabled = false;
+
     const floatingToolPalette = document.querySelector('.floating-tool-palette');
     if (floatingToolPalette) {
       floatingToolPalette.style.opacity = '1.0';
@@ -862,7 +892,6 @@ function initCongruenceGame() {
         measuredSet.add(key);
         userClickSet.add(key);
         sounds.playMeasure();
-        registerMeasurement(target, key);
       }
 
       updateCluesUI();
@@ -898,31 +927,6 @@ function initCongruenceGame() {
     }
     renderCanvas();
   });
-
-  // ----------------------------------------------------
-  // Auto-reveal the 3rd angle once 2 angles of the same triangle are known
-  // ("삼각형의 세 내각의 합은 180˚" — this is prior knowledge, not a new fact,
-  // so it should never cost a separate measurement or read as a new/ambiguous
-  // situation. This also means a player who measures two angles + one side
-  // always ends up with all three angles known, so there's never a case where
-  // it matters *which* side they picked — it always behaves like "한 변과
-  // 그 양 끝각" (ASA), and the AAS distinction never needs to come up.)
-  // ----------------------------------------------------
-  function registerMeasurement(target, key) {
-    if (target.type !== 'angle') return;
-    const triangleTag = target.triangle;
-    const angleNames = triangleTag === 'L' ? ['A', 'B', 'C'] : ['D', 'E', 'F'];
-    const angleKeys = angleNames.map(n => `${triangleTag}_angle_${n}`);
-    const measuredCount = angleKeys.filter(k => measuredSet.has(k)).length;
-
-    if (measuredCount === 2) {
-      const missingKey = angleKeys.find(k => !measuredSet.has(k));
-      if (missingKey && !measuredSet.has(missingKey)) {
-        measuredSet.add(missingKey);
-        bonusAngleKeys.add(missingKey);
-      }
-    }
-  }
 
   function findTargetAt(mx, my) {
     if (resultModal && !resultModal.classList.contains('hidden')) return null;
@@ -996,28 +1000,43 @@ function initCongruenceGame() {
     measuredSet.forEach(key => {
       const parts = key.split('_'); // e.g. ["L", "side", "AB"]
       const isAngle = parts[1] === 'angle';
-      const isBonus = bonusAngleKeys.has(key);
-      const icon = isBonus ? '🎁' : (isAngle ? '📐' : '📏');
+      const icon = isAngle ? '📐' : '📏';
       const labelHtml = isAngle
         ? `${icon} ∠${parts[2]}`
         : `${icon} <span style="text-decoration: overline; border-top: 1.5px solid currentColor; padding-top: 1px;">${parts[2]}</span>`;
       const tagSpan = document.createElement('span');
-      tagSpan.className = `clue-tag ${isAngle ? 'angle-tag' : ''} ${isBonus ? 'bonus-tag' : ''}`;
+      tagSpan.className = `clue-tag ${isAngle ? 'angle-tag' : ''}`;
       tagSpan.innerHTML = labelHtml;
-      if (isBonus) tagSpan.title = '나머지 각은 삼각형의 세 내각의 합(180˚)으로 자동으로 알 수 있어요!';
       cluesContainer.appendChild(tagSpan);
     });
   }
 
-  // ----------------------------------------------------
   // Judgment Submission & Scoring Logic
   // ----------------------------------------------------
-  btnSubmitDecision.addEventListener('click', () => {
-    evaluateDecision('SUBMIT');
-  });
+  if (btnSSS) btnSSS.addEventListener('click', () => evaluateDecision('SSS'));
+  if (btnSAS) btnSAS.addEventListener('click', () => evaluateDecision('SAS'));
+  if (btnASA) btnASA.addEventListener('click', () => evaluateDecision('ASA'));
+
+  // Vertex/side adjacency helpers (side i connects vertex i and vertex (i+1)%3)
+  function sharedVertexOfSides(s1, s2) {
+    const e1 = [s1, (s1 + 1) % 3];
+    const e2 = [s2, (s2 + 1) % 3];
+    return e1.find(v => e2.includes(v));
+  }
+  function sideBetweenVertices(v1, v2) {
+    for (let s = 0; s < 3; s++) {
+      const ends = [s, (s + 1) % 3];
+      if (ends.includes(v1) && ends.includes(v2)) return s;
+    }
+    return -1;
+  }
 
   function evaluateDecision(claim) {
     if (timerInterval) clearInterval(timerInterval);
+
+    if (btnSSS) btnSSS.disabled = true;
+    if (btnSAS) btnSAS.disabled = true;
+    if (btnASA) btnASA.disabled = true;
 
     const measuredCount = measuredSet.size;
 
@@ -1026,52 +1045,47 @@ function initCongruenceGame() {
     const sideNamesR = ['DE', 'EF', 'FD'];
     const angleNamesR = ['D', 'E', 'F'];
 
-    // Vertex/side adjacency helpers (side i connects vertex i and vertex (i+1)%3)
-    function sharedVertexOfSides(s1, s2) {
-      const e1 = [s1, (s1 + 1) % 3];
-      const e2 = [s2, (s2 + 1) % 3];
-      return e1.find(v => e2.includes(v));
-    }
-    function sideBetweenVertices(v1, v2) {
-      for (let s = 0; s < 3; s++) {
-        const ends = [s, (s + 1) % 3];
-        if (ends.includes(v1) && ends.includes(v2)) return s;
-      }
-      return -1;
-    }
+    // Build known arrays from measuredSet
+    const sideKnownL = sideNamesL.map(n => measuredSet.has(`L_side_${n}`));
+    const angleKnownL = angleNamesL.map(n => measuredSet.has(`L_angle_${n}`));
+    const sideKnownR = sideNamesR.map(n => measuredSet.has(`R_side_${n}`));
+    const angleKnownR = angleNamesR.map(n => measuredSet.has(`R_angle_${n}`));
 
-    // Helper to check if a single triangle is mathematically 100% determined (Rigid)
-    function checkTriangleDetermined(sidePrefix, anglePrefix, sNames, aNames) {
-      const sides = [0, 1, 2].map(i => measuredSet.has(`${sidePrefix}_${sNames[i]}`));
-      const angles = [0, 1, 2].map(i => measuredSet.has(`${anglePrefix}_${aNames[i]}`));
-      const nSides = sides.filter(Boolean).length;
-      const nAngles = angles.filter(Boolean).length;
+    function checkTriangleCondition(sKnown, aKnown) {
+      const nS = sKnown.filter(Boolean).length;
+      const nA = aKnown.filter(Boolean).length;
 
-      const hasSSS = nSides === 3;
+      const hasSSS = (nS === 3);
+
       let hasSAS = false;
-      if (nSides >= 2 && nAngles >= 1) {
-        for (let a = 0; a < 3; a++) {
-          for (let b = a + 1; b < 3; b++) {
-            if (sides[a] && sides[b]) {
-              const v = sharedVertexOfSides(a, b);
-              if (angles[v]) hasSAS = true;
-            }
+      if (nS >= 2) {
+        const sideIdx = [0, 1, 2].filter(i => sKnown[i]);
+        for (let a = 0; a < sideIdx.length && !hasSAS; a++) {
+          for (let b = a + 1; b < sideIdx.length && !hasSAS; b++) {
+            const v = sharedVertexOfSides(sideIdx[a], sideIdx[b]);
+            if (aKnown[v]) hasSAS = true;
           }
         }
       }
-      const hasASA = (nAngles >= 2 && nSides >= 1) || (nAngles === 3 && nSides >= 1);
-      return hasSSS || hasSAS || hasASA;
+
+      let hasASA = false;
+      if (nA >= 2) {
+        const angleIdx = [0, 1, 2].filter(i => aKnown[i]);
+        for (let a = 0; a < angleIdx.length && !hasASA; a++) {
+          for (let b = a + 1; b < angleIdx.length && !hasASA; b++) {
+            const s = sideBetweenVertices(angleIdx[a], angleIdx[b]);
+            if (s !== -1 && sKnown[s]) hasASA = true;
+          }
+        }
+      }
+      if (nA === 3 && nS >= 1) hasASA = true;
+
+      const isRigid = hasSSS || hasSAS || hasASA;
+      return { hasSSS, hasSAS, hasASA, isRigid };
     }
 
-    const isDeterminedL = checkTriangleDetermined('L_side', 'L_angle', sideNamesL, angleNamesL);
-    const isDeterminedR = checkTriangleDetermined('R_side', 'R_angle', sideNamesR, angleNamesR);
-
-    // Known elements for Left and Right (either directly measured OR derived from a fully determined triangle)
-    const sideKnownL = [0, 1, 2].map(i => measuredSet.has(`L_side_${sideNamesL[i]}`) || isDeterminedL);
-    const sideKnownR = [0, 1, 2].map(i => measuredSet.has(`R_side_${sideNamesR[i]}`) || isDeterminedR);
-
-    const angleKnownL = [0, 1, 2].map(i => measuredSet.has(`L_angle_${angleNamesL[i]}`) || isDeterminedL);
-    const angleKnownR = [0, 1, 2].map(i => measuredSet.has(`R_angle_${angleNamesR[i]}`) || isDeterminedR);
+    const condL = checkTriangleCondition(sideKnownL, angleKnownL);
+    const condR = checkTriangleCondition(sideKnownR, angleKnownR);
 
     const pairedSides = [0, 1, 2].map(i => sideKnownL[i] && sideKnownR[i]);
     const pairedAngles = [0, 1, 2].map(i => angleKnownL[i] && angleKnownR[i]);
@@ -1079,33 +1093,41 @@ function initCongruenceGame() {
     const pairedSideIdx = [0, 1, 2].filter(i => pairedSides[i]);
     const pairedAngleIdx = [0, 1, 2].filter(i => pairedAngles[i]);
 
-    const hasSSS = pairedSideIdx.length === 3;
+    const hasSSS_paired = pairedSideIdx.length === 3;
 
-    let hasSAS = false;
-    for (let a = 0; a < pairedSideIdx.length && !hasSAS; a++) {
-      for (let b = a + 1; b < pairedSideIdx.length && !hasSAS; b++) {
+    let hasSAS_paired = false;
+    for (let a = 0; a < pairedSideIdx.length && !hasSAS_paired; a++) {
+      for (let b = a + 1; b < pairedSideIdx.length && !hasSAS_paired; b++) {
         const v = sharedVertexOfSides(pairedSideIdx[a], pairedSideIdx[b]);
-        if (pairedAngleIdx.includes(v)) hasSAS = true;
+        if (pairedAngleIdx.includes(v)) hasSAS_paired = true;
       }
     }
 
-    let hasASA = false;
+    let hasASA_paired = false;
     if (pairedAngleIdx.length === 3 && pairedSideIdx.length >= 1) {
-      hasASA = true;
+      hasASA_paired = true;
     } else {
-      for (let a = 0; a < pairedAngleIdx.length && !hasASA; a++) {
-        for (let b = a + 1; b < pairedAngleIdx.length && !hasASA; b++) {
+      for (let a = 0; a < pairedAngleIdx.length && !hasASA_paired; a++) {
+        for (let b = a + 1; b < pairedAngleIdx.length && !hasASA_paired; b++) {
           const s = sideBetweenVertices(pairedAngleIdx[a], pairedAngleIdx[b]);
-          if (s !== -1 && pairedSideIdx.includes(s)) hasASA = true;
+          if (s !== -1 && pairedSideIdx.includes(s)) hasASA_paired = true;
         }
       }
     }
 
-    const isValidProof = hasSSS || hasSAS || hasASA;
+    const isPairedCongruent = hasSSS_paired || hasSAS_paired || hasASA_paired;
+    const isBothRigid = condL.isRigid && condR.isRigid;
+    const isCongruentProven = isPairedCongruent || isBothRigid;
 
-    if (!isValidProof) {
+    const claimMatchedPaired = (claim === 'SSS' && hasSSS_paired) || (claim === 'SAS' && hasSAS_paired) || (claim === 'ASA' && hasASA_paired);
+    const claimMatchedSingle = (claim === 'SSS' && (condL.hasSSS || condR.hasSSS)) || (claim === 'SAS' && (condL.hasSAS || condR.hasSAS)) || (claim === 'ASA' && (condL.hasASA || condR.hasASA));
+
+    // Congruence is ONLY accepted if both triangles are proven rigid/congruent together!
+    // (If one triangle is under-measured and not rigid, it can still change shape -> Failure!)
+    if (!isCongruentProven) {
       lastJudgmentResult = 'FAILURE';
       ceCount++;
+      roundScores[currentRound - 1] = 0;
       sounds.playCounterExample();
       let ceType = 'UNDER_MEASURED';
       let msg = '🚨 두 삼각형이 완전히 포개지는 지 확신하려면 더 많은 측정값이 필요합니다.';
@@ -1118,94 +1140,79 @@ function initCongruenceGame() {
         msg = '🚨 지금 잰 치수만으로는 두 삼각형이 합동인 것을 장담할 수 없습니다! 다른 변이나 각을 측정해보세요.';
       }
 
-      playFailureAnimation(ceType, msg, pairedSides, pairedAngles, () => {
+      playFailureAnimation(ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR, () => {
         showResultModal(false, '0점', msg, ceType, getMathNoteText(ceType));
       });
     } else {
-      // SUCCESSFUL CONGRUENCE PROOF!
-      lastJudgmentResult = 'SUCCESS';
-      let utilizedPresetAngle = true;
-      if (currentPresetType === 'SIDE_AND_ANGLE' || currentPresetType === 'SIDE_AND_TWO_ANGLES') {
-        let angleUsed = false;
-        presetAngleKeys.forEach(k => {
-          const targetLeftKey = k.replace('R_angle_D', 'L_angle_A').replace('R_angle_E', 'L_angle_B').replace('R_angle_F', 'L_angle_C');
-          if (measuredSet.has(targetLeftKey) || measuredSet.has(k)) {
-            angleUsed = true;
-          }
-        });
-        utilizedPresetAngle = angleUsed;
-      }
-
-      let isOptimalRoute = false;
-      let routeName = '';
-
-      if (currentPresetType === 'TWO_SIDES') {
-        if (hasSSS) {
-          isOptimalRoute = true;
-          routeName = '세 변의 길이가 같음';
-        } else if (hasSAS) {
-          isOptimalRoute = true;
-          routeName = '두 변과 그 사이 끼인각이 같음';
-        }
-      } else if (currentPresetType === 'SIDE_AND_ANGLE') {
-        if (hasSAS && utilizedPresetAngle) {
-          isOptimalRoute = true;
-          routeName = '두 변과 그 사이 끼인각이 같음';
-        } else if (hasASA && utilizedPresetAngle) {
-          isOptimalRoute = true;
-          routeName = '한 변과 그 양 끝각이 같음';
-        }
-      } else if (currentPresetType === 'SIDE_AND_TWO_ANGLES') {
-        if (hasASA && utilizedPresetAngle) {
-          isOptimalRoute = true;
-          routeName = '한 변과 그 양 끝각이 같음';
-        }
-      }
-
-      // Dynamic scoring based on timeBonus (0-30 pts) and extra student clicks penalty (15 pts per click)
-      const userClickCount = userClickSet.size; // Direct clicks by student
+      // Both triangles are confirmed congruent & rigid!
+      const userClickCount = userClickSet.size;
       const presetClueCount = currentPresetCount || 2;
       const minRequiredUserClicks = Math.max(1, 6 - Math.min(5, presetClueCount));
       const extraClicks = Math.max(0, userClickCount - minRequiredUserClicks);
-      const timeBonus = Math.min(30, Math.floor((Math.max(0, roundTimeLeft) / 60) * 30));
+      
+      const inefficiencyPenalty = 10 * extraClicks;
 
-      if (extraClicks === 0) {
-        const points = 70 + timeBonus; // Max 100 pts!
-        totalScore += points;
-        correctCount++;
+      const baseScore = 50; // Base score for proving congruence!
+      let conditionBonus = 0;
+      if (claimMatchedPaired) {
+        conditionBonus = 50; // Full condition bonus when paired claim matches
+      } else if (claimMatchedSingle) {
+        conditionBonus = 20; // Partial condition bonus when single triangle condition matches
+      }
+
+      const rawScore = baseScore + conditionBonus - inefficiencyPenalty;
+      const points = Math.max(0, rawScore);
+
+      roundScores[currentRound - 1] = points;
+      totalScore += points;
+      correctCount++;
+      hudScore.textContent = `${totalScore}점`;
+
+      if (claimMatchedPaired && extraClicks === 0) {
         perfectCount++;
-        hudScore.textContent = `${totalScore}점`;
-
+        lastJudgmentResult = 'OPTIMAL';
         playSuccessAnimation(() => {
           sounds.playSuccess();
           showResultModal(
             true,
-            points === 100 ? '🌟 100점 만점!' : `🌟 +${points}점`,
-            '🎯 군더더기 없는 최적의 측정으로 합동 입증 성공!',
+            points >= 100 ? '🌟 100점 만점!' : `🌟 +${points}점`,
+            `🎯 군더더기 없는 최적의 측정으로 ${claim} 합동 입증 성공!`,
             null,
-            `주어진 힌트를 활용해 '${routeName || '합동'}' 조건으로 깔끔하게 입증했습니다.`,
+            `정확히 ${claim} 합동 조건을 완벽하게 대칭으로 증명했습니다!`,
+            '완벽한 판정!'
+          );
+        });
+      } else if (claimMatchedPaired) {
+        lastJudgmentResult = 'SUCCESS';
+        playSuccessAnimation(() => {
+          sounds.playSuccess();
+          if (extraClicks > 0) highlightInefficientClues();
+          showResultModal(
+            true,
+            `+${points}점`,
+            `🎯 ${claim} 조건으로 두 삼각형의 대응/합동 증명 성공!`,
+            null,
+            extraClicks > 0 ? `불필요한 측정이 포함되어 감점되었습니다(-${inefficiencyPenalty}점).` : `합동 입증 성공!`,
             '판정 성공!'
           );
         });
       } else {
-        const inefficiencyPenalty = 15 * extraClicks;
-        const baseScore = Math.max(10, 70 - inefficiencyPenalty);
-        const points = Math.min(100, Math.max(10, baseScore + timeBonus));
-
-        totalScore += points;
-        correctCount++;
-        hudScore.textContent = `${totalScore}점`;
+        lastJudgmentResult = 'WARNING';
+        let subtitleMsg = `⚠️ 두 삼각형은 합동이지만, 선택한 조건(${claim}) 대신 실제 측정된 조건으로 제출하면 더 높은 점수를 받을 수 있습니다! (+${points}점)`;
+        if (claimMatchedSingle) {
+          subtitleMsg = `💡 두 삼각형의 모양 고정/합동이 확인되었으며, 한쪽 삼각형에서 ${claim} 조건을 잘 파악하여 조건 보너스 점수가 추가되었습니다! (+${points}점)`;
+        }
 
         playSuccessAnimation(() => {
           sounds.playSuccess();
-          highlightInefficientClues();
+          if (extraClicks > 0) highlightInefficientClues();
           showResultModal(
             true,
-            `+${points}점 (불필요한 측정 -${inefficiencyPenalty}점)`,
-            '두 삼각형의 합동은 확인됐지만 측정데이터를 모으는 데 에너지가 너무 소비됐습니다.',
+            `+${points}점`,
+            subtitleMsg,
             null,
-            '필수 치수만으로 최소 입증 시 100점 만점을 받을 수 있습니다.',
-            '판정은 성공했으나...'
+            `양쪽 모두를 동일한 조건으로 대칭 측정해 제출하면 최대 100점까지 획득할 수 있습니다.`,
+            '합동은 맞지만...'
           );
         });
       }
@@ -1231,6 +1238,7 @@ function initCongruenceGame() {
 
   function handleTimeOut() {
     ceCount++;
+    roundScores[currentRound - 1] = 0;
     sounds.playCounterExample();
     showResultModal(
       false,
@@ -1265,10 +1273,10 @@ function initCongruenceGame() {
     if (btnViewInitial) btnViewInitial.classList.remove('active');
 
     if (isSuccess) {
-      if (customTitle === '판정은 성공했으나...') {
+      if (customTitle === '판정은 성공했으나...' || customTitle === '합동은 맞지만...') {
         resultHeader.style.color = '#f59e0b';
         resultIcon.textContent = '⚠️';
-        resultTitle.textContent = '판정은 성공했으나...';
+        resultTitle.textContent = customTitle;
       } else {
         resultHeader.style.color = '#10b981';
         resultIcon.textContent = '🌟';
@@ -1342,30 +1350,50 @@ function initCongruenceGame() {
   }
 
   // Failure Animation Logic on Main Canvas
-  function playFailureAnimation(ceType, msg, pairedSides, pairedAngles, onComplete) {
+  function playFailureAnimation(ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR, onComplete) {
+    lastFailureArgs = { ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR };
     if (failureAnimReqId) cancelAnimationFrame(failureAnimReqId);
     let startTime = null;
     const oldHover = hoverTarget;
     hoverTarget = null;
     
     const originalRightPts = triangleRight.pts.map(p => ({x: p.x, y: p.y}));
+    const originalLeftPts = triangleLeft.pts.map(p => ({x: p.x, y: p.y}));
+    
+    function isTriangleRigid(sKnown, aKnown) {
+      const nS = sKnown.filter(Boolean).length;
+      if (nS === 3) return true;
+      let hasSAS = false;
+      for (let a=0; a<3; a++) {
+        for (let b=a+1; b<3; b++) {
+          if (sKnown[a] && sKnown[b]) {
+            const v = sharedVertexOfSides(a, b);
+            if (aKnown[v]) hasSAS = true;
+          }
+        }
+      }
+      if (hasSAS) return true;
+      const nA = aKnown.filter(Boolean).length;
+      if (nA >= 2 && nS >= 1) return true;
+      return false;
+    }
+    
+    const isRigidL = isTriangleRigid(sideKnownL, angleKnownL);
+    const isRigidR = isTriangleRigid(sideKnownR, angleKnownR);
+    
+    const countL = sideKnownL.filter(Boolean).length + angleKnownL.filter(Boolean).length;
+    const countR = sideKnownR.filter(Boolean).length + angleKnownR.filter(Boolean).length;
+    
+    let wiggleTarget = 'R';
+    if (isRigidR && !isRigidL) {
+      wiggleTarget = 'L';
+    } else if (!isRigidR && isRigidL) {
+      wiggleTarget = 'R';
+    } else if (!isRigidR && !isRigidL) {
+      if (countL < countR) wiggleTarget = 'L';
+    }
     
     let notified = false;
-    
-    const isMeasuredSideL = [measuredSet.has('L_side_AB'), measuredSet.has('L_side_BC'), measuredSet.has('L_side_CA')];
-    const isMeasuredAngleL = [measuredSet.has('L_angle_A'), measuredSet.has('L_angle_B'), measuredSet.has('L_angle_C')];
-    const numMeasuredSidesL = (isMeasuredSideL[0]?1:0) + (isMeasuredSideL[1]?1:0) + (isMeasuredSideL[2]?1:0);
-    const numMeasuredAnglesL = (isMeasuredAngleL[0]?1:0) + (isMeasuredAngleL[1]?1:0) + (isMeasuredAngleL[2]?1:0);
-    const isRigidL = (numMeasuredSidesL === 3) || (numMeasuredSidesL === 2 && numMeasuredAnglesL >= 1 && ceType !== 'SSA_TRAP') || (numMeasuredSidesL === 1 && numMeasuredAnglesL >= 2);
-
-    const isMeasuredSideR = [measuredSet.has('R_side_DE'), measuredSet.has('R_side_EF'), measuredSet.has('R_side_FD')];
-    const isMeasuredAngleR = [measuredSet.has('R_angle_D'), measuredSet.has('R_angle_E'), measuredSet.has('R_angle_F')];
-    const numMeasuredSidesR = (isMeasuredSideR[0]?1:0) + (isMeasuredSideR[1]?1:0) + (isMeasuredSideR[2]?1:0);
-    const numMeasuredAnglesR = (isMeasuredAngleR[0]?1:0) + (isMeasuredAngleR[1]?1:0) + (isMeasuredAngleR[2]?1:0);
-    const isRigidR = (numMeasuredSidesR === 3) || (numMeasuredSidesR === 2 && numMeasuredAnglesR >= 1 && ceType !== 'SSA_TRAP') || (numMeasuredSidesR === 1 && numMeasuredAnglesR >= 2);
-
-    let wiggleTarget = 'R';
-    if (isRigidR && !isRigidL) wiggleTarget = 'L';
     
     function animateFailure(timestamp) {
       if (!startTime) startTime = timestamp;
@@ -1379,35 +1407,40 @@ function initCongruenceGame() {
       let p1_R = {x: originalRightPts[1].x, y: originalRightPts[1].y};
       let p2_R = {x: originalRightPts[2].x, y: originalRightPts[2].y};
       
-      let p0_L = {x: triangleLeft.pts[0].x, y: triangleLeft.pts[0].y};
-      let p1_L = {x: triangleLeft.pts[1].x, y: triangleLeft.pts[1].y};
-      let p2_L = {x: triangleLeft.pts[2].x, y: triangleLeft.pts[2].y};
+      let p0_L = {x: originalLeftPts[0].x, y: originalLeftPts[0].y};
+      let p1_L = {x: originalLeftPts[1].x, y: originalLeftPts[1].y};
+      let p2_L = {x: originalLeftPts[2].x, y: originalLeftPts[2].y};
       
       // Phase 1: Overlap target triangle
-      p0_R.x += (p0_L.x - p0_R.x) * easeOverlap;
-      p0_R.y += (p0_L.y - p0_R.y) * easeOverlap;
-      p1_R.x += (p1_L.x - p1_R.x) * easeOverlap;
-      p1_R.y += (p1_L.y - p1_R.y) * easeOverlap;
-      p2_R.x += (p2_L.x - p2_R.x) * easeOverlap;
-      p2_R.y += (p2_L.y - p2_R.y) * easeOverlap;
+      if (wiggleTarget === 'R') {
+        p0_R.x += (p0_L.x - p0_R.x) * easeOverlap;
+        p0_R.y += (p0_L.y - p0_R.y) * easeOverlap;
+        p1_R.x += (p1_L.x - p1_R.x) * easeOverlap;
+        p1_R.y += (p1_L.y - p1_R.y) * easeOverlap;
+        p2_R.x += (p2_L.x - p2_R.x) * easeOverlap;
+        p2_R.y += (p2_L.y - p2_R.y) * easeOverlap;
+      } else {
+        p0_L.x += (p0_R.x - p0_L.x) * easeOverlap;
+        p0_L.y += (p0_R.y - p0_L.y) * easeOverlap;
+        p1_L.x += (p1_R.x - p1_L.x) * easeOverlap;
+        p1_L.y += (p1_R.y - p1_L.y) * easeOverlap;
+        p2_L.x += (p2_R.x - p2_L.x) * easeOverlap;
+        p2_L.y += (p2_R.y - p2_L.y) * easeOverlap;
+      }
       
       // Phase 2: Wiggle with 100% invariant measured lengths and angles
       if (progressWiggling > 0) {
         const t = Math.sin(progressWiggling * Math.PI * 2);
         
-        let p0, p1, p2, isMeasuredSide, isMeasuredAngle, numMeasuredSides, numMeasuredAngles, isRigid;
+        let p0 = wiggleTarget === 'R' ? p0_R : p0_L;
+        let p1 = wiggleTarget === 'R' ? p1_R : p1_L;
+        let p2 = wiggleTarget === 'R' ? p2_R : p2_L;
         
-        if (wiggleTarget === 'L') {
-          p0 = p0_L; p1 = p1_L; p2 = p2_L;
-          isMeasuredSide = isMeasuredSideL; isMeasuredAngle = isMeasuredAngleL;
-          numMeasuredSides = numMeasuredSidesL; numMeasuredAngles = numMeasuredAnglesL;
-          isRigid = isRigidL;
-        } else {
-          p0 = p0_R; p1 = p1_R; p2 = p2_R;
-          isMeasuredSide = isMeasuredSideR; isMeasuredAngle = isMeasuredAngleR;
-          numMeasuredSides = numMeasuredSidesR; numMeasuredAngles = numMeasuredAnglesR;
-          isRigid = isRigidR;
-        }
+        const isMeasuredSide = wiggleTarget === 'R' ? sideKnownR : sideKnownL;
+        const isMeasuredAngle = wiggleTarget === 'R' ? angleKnownR : angleKnownL;
+        
+        const numMeasuredSides = (isMeasuredSide[0]?1:0) + (isMeasuredSide[1]?1:0) + (isMeasuredSide[2]?1:0);
+        const numMeasuredAngles = (isMeasuredAngle[0]?1:0) + (isMeasuredAngle[1]?1:0) + (isMeasuredAngle[2]?1:0);
 
         const slideLadder = (pFixed, pSlide1, pSlide2, tOffset) => {
           const ux = pSlide1.x - pFixed.x, uy = pSlide1.y - pFixed.y;
@@ -1441,20 +1474,10 @@ function initCongruenceGame() {
           ];
         };
 
-        if (isRigid) {
-          if (isRigidR && isRigidL) {
-            // Both triangles are 100% rigid and fixed! Do NOT rock or wiggle ("껄떡껄떡" 금지).
-            // They stay completely static at the overlapped position.
-          } else {
-            const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
-            const rotatePt = (pt, center, angle) => {
-              const dx = pt.x - center.x, dy = pt.y - center.y;
-              return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
-            };
-            p0 = rotatePt(p0, centroid, t * 0.15);
-            p1 = rotatePt(p1, centroid, t * 0.15);
-            p2 = rotatePt(p2, centroid, t * 0.15);
-          }
+        if (ceType === 'MISMATCHED_PROOF' || (isRigidL && isRigidR)) {
+          // Both triangles are fully rigid on their own! Do NOT wiggle ("껄떡껄떡" 금지).
+          // They stay completely static at the overlapped position to show they DO match, 
+          // but the proof was invalid because the measurements were mismatched.
         } else if (numMeasuredSides === 0) {
           if (numMeasuredAngles >= 2) {
             // AAA: Scale relative to centroid. All interior angles are 100% invariant! No side length badges exist.
@@ -1602,10 +1625,10 @@ function initCongruenceGame() {
             }
           }
         }
-        if (wiggleTarget === 'L') {
-          p0_L = p0; p1_L = p1; p2_L = p2;
-        } else {
+        if (wiggleTarget === 'R') {
           p0_R = p0; p1_R = p1; p2_R = p2;
+        } else {
+          p0_L = p0; p1_L = p1; p2_L = p2;
         }
       }
       
@@ -1748,9 +1771,22 @@ function initCongruenceGame() {
   // ----------------------------------------------------
   function showGameOverModal() {
     finalTotalScore.textContent = totalScore;
-    finalCorrectCount.textContent = `${correctCount} / ${maxRounds}`;
-    finalPerfectCount.textContent = `${perfectCount} 회`;
-    finalCeCount.textContent = `${ceCount} 회`;
+    
+    const roundGrid = document.getElementById('round-scores-grid');
+    if (roundGrid) {
+      roundGrid.innerHTML = roundScores.map((score, idx) => {
+        const isPerfect = score >= 100;
+        const isSuccess = score > 0;
+        const colorClass = isPerfect ? 'perfect-card' : (isSuccess ? 'success-card' : 'fail-card');
+        const scoreText = isSuccess ? `+${score}점` : '0점';
+        return `
+          <div class="round-score-item ${colorClass}">
+            <span class="round-item-label">${idx + 1}라운드</span>
+            <span class="round-item-score">${scoreText}</span>
+          </div>
+        `;
+      }).join('');
+    }
 
     if (totalScore > highScore && totalScore > 0) {
       highScore = totalScore;

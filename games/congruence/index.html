@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>📐 삼각형의 비밀: 합동 판정 작전! - HaloMath Arcade</title>
+  <title>📐 삼각형 합동 수사대 - HaloMath Arcade</title>
 
   <!-- Security & Meta Tags -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:;">
   <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta name="description" content="중1 수학 삼각형의 합동 조건(SSS, SAS, ASA)을 직접 측정하고 증명하는 미니게임! 최소 측정으로 완벽한 합동을 증명하세요!">
+  <meta name="description" content="합동 조건에 맞춰서 변의 길이와 각의 크기를 측정해서 합동을 증명하세요!">
 
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,8 +27,8 @@
     <header class="game-header">
       <div class="header-left">
         <div class="game-title-group">
-          <h1>📐 삼각형의 비밀: 합동 판정 작전</h1>
-          <p class="game-subtitle">필요한 만큼 변과 각을 측정하여 두 삼각형이 합동인지 확인하세요!</p>
+          <h1>📐 삼각형 합동 수사대</h1>
+          <p class="game-subtitle">합동 조건에 맞춰서 변의 길이와 각의 크기를 측정해서 합동을 증명하세요!</p>
         </div>
       </div>
 
@@ -99,9 +99,15 @@
 
       <!-- Decision Submission Panel (Bottom Action) -->
       <section class="decision-section">
-        <div class="decision-container">
-          <button id="btn-submit-decision" class="btn-submit-action">
-            🚀 측정 데이터 제출
+        <div class="decision-buttons">
+          <button id="btn-sss" class="btn-submit-action btn-sss" data-claim="SSS">
+            🚀 SSS 조건으로 제출
+          </button>
+          <button id="btn-sas" class="btn-submit-action btn-sas" data-claim="SAS">
+            🚀 SAS 조건으로 제출
+          </button>
+          <button id="btn-asa" class="btn-submit-action btn-asa" data-claim="ASA">
+            🚀 ASA 조건으로 제출
           </button>
         </div>
       </section>
@@ -161,7 +167,7 @@
       <div class="modal-card gameover-card">
         <div class="gameover-header">
           <span class="trophy-anim">🏆</span>
-          <h2>합동 수사대 작전 완료!</h2>
+          <h2>삼각형 합동 수사대 작전 완료!</h2>
           <p class="gameover-subtitle">모든 라운드를 마쳤습니다. 결과를 확인하세요!</p>
         </div>
 
@@ -170,19 +176,8 @@
             <span class="score-num" id="final-total-score">0</span>
             <span class="score-unit">점</span>
           </div>
-          <div class="final-stats-grid">
-            <div class="stat-item">
-              <span class="stat-label">🎯 정확 판정</span>
-              <span class="stat-val" id="final-correct-count">0 / 5</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">🌟 완벽(최적) 판정</span>
-              <span class="stat-val" id="final-perfect-count">0 회</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">🚨 반례 폭파</span>
-              <span class="stat-val" id="final-ce-count">0 회</span>
-            </div>
+          <div class="round-scores-grid" id="round-scores-grid">
+            <!-- Dynamically populated from JS for Rounds 1~5 -->
           </div>
         </div>
 
@@ -302,8 +297,8 @@
 
         <!-- Game Purpose Banner -->
         <div class="game-guide-box short-banner">
-          <div class="guide-title">📐 삼각형의 비밀: 합동 판정 작전!</div>
-          <p class="guide-desc">필요한 만큼 변과 각을 측정하여 두 삼각형이 합동인지 확인하세요!</p>
+          <div class="guide-title">📐 삼각형 합동 수사대</div>
+          <p class="guide-desc">합동 조건에 맞춰서 변의 길이와 각의 크기를 측정해서 합동을 증명하세요!</p>
         </div>
 
         <form id="profile-form">
