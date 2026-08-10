@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>Syntax Check</title></head>
+<body>
+<pre id="log"></pre>
+<script>
+window.onerror = function(msg, url, line, col, err) {
+  document.getElementById('log').textContent += `Error: ${msg}\nLine: ${line}, Col: ${col}\n\n`;
+  return true;
+};
+</script>
+<script src="game.js"></script>
+<script>
+  setTimeout(() => {
+    if (!document.getElementById('log').textContent) {
+      document.getElementById('log').textContent = 'No syntax errors in game.js!';
+    }
+  }, 1000);
+</script>
+</body>
+</html>

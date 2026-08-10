@@ -310,7 +310,7 @@
             <label for="input-student-id">학번 (숫자/문자 10자 이내):</label>
             <input type="text" id="input-student-id" maxlength="10" placeholder="예: 10301">
           </div>
-          <button type="submit" class="btn-modal-action btn-sparkle">
+          <button type="button" id="btn-start-game" class="btn-modal-action btn-sparkle" onclick="window.__startGame && window.__startGame()">
             ⚡ 챔피언에 도전하기 (게임 시작)
           </button>
         </form>

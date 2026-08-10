@@ -321,14 +321,16 @@ function initCongruenceGame() {
   hudHighScore.textContent = `${highScore}점`;
 
   // Sound Toggle Listener
-  btnSoundToggle.addEventListener('click', () => {
-    sounds.muted = !sounds.muted;
-    btnSoundToggle.textContent = sounds.muted ? '🔇' : '🔊';
-  });
+  if (btnSoundToggle) {
+    btnSoundToggle.addEventListener('click', () => {
+      sounds.muted = !sounds.muted;
+      btnSoundToggle.textContent = sounds.muted ? '🔇' : '🔊';
+    });
+  }
 
   // Tool Switching
-  toolRuler.addEventListener('click', () => setTool('ruler'));
-  toolProtractor.addEventListener('click', () => setTool('protractor'));
+  if (toolRuler) toolRuler.addEventListener('click', () => setTool('ruler'));
+  if (toolProtractor) toolProtractor.addEventListener('click', () => setTool('protractor'));
 
   function setTool(tool) {
     activeTool = tool;
@@ -358,9 +360,56 @@ function initCongruenceGame() {
 
   let isTimerPaused = true;
 
+  // Wire start button BEFORE initGame — if round setup throws, the opening
+  // modal must still respond (otherwise the whole UI looks frozen).
+  function handleStartGame(e) {
+    if (e) e.preventDefault();
+    const modalEl = document.getElementById('profile-modal');
+    const nameInput = document.getElementById('input-player-name');
+    const idInput = document.getElementById('input-student-id');
+
+    let cleanName = sanitizeInput(nameInput ? nameInput.value : '', 12);
+    if (!cleanName) {
+      cleanName = '도전자';
+      if (nameInput) nameInput.value = '도전자';
+    }
+
+    if (activeMode === 'school' && idInput) {
+      let cleanId = sanitizeInput(idInput.value, 10);
+      studentId = cleanId || '미입력';
+      safeSetStorage(idStorageKey, studentId);
+    }
+
+    playerName = cleanName;
+    safeSetStorage(nameStorageKey, playerName);
+
+    updateProfileDisplay();
+
+    if (modalEl) {
+      modalEl.classList.add('hidden');
+      modalEl.style.display = 'none';
+      modalEl.style.visibility = 'hidden';
+      modalEl.style.pointerEvents = 'none';
+    }
+    isTimerPaused = false;
+  }
+
+  window.__startGame = handleStartGame;
+  if (profileForm) profileForm.onsubmit = handleStartGame;
+  const btnStartGameEarly = document.getElementById('btn-start-game');
+  if (btnStartGameEarly) btnStartGameEarly.onclick = handleStartGame;
+
   // Always show Opening Modal on page load & pre-render Round 1 Triangles
-  initGame();
-  fetchLeaderboard();
+  try {
+    initGame();
+  } catch (err) {
+    console.error('initGame failed:', err);
+  }
+  try {
+    fetchLeaderboard();
+  } catch (err) {
+    console.error('fetchLeaderboard failed:', err);
+  }
   if (profileModal) profileModal.classList.remove('hidden');
 
   function initGame() {
@@ -422,8 +471,11 @@ function initCongruenceGame() {
   }
 
   function uncheckRadios() {
+    // getElementsByName returns HTMLCollection (no forEach) — use a plain loop
     const radios = document.getElementsByName('congruence-cond');
-    radios.forEach(r => r.checked = false);
+    for (let i = 0; i < radios.length; i++) {
+      radios[i].checked = false;
+    }
   }
 
   function updateTimerUI() {
@@ -454,22 +506,11 @@ function initCongruenceGame() {
     // Round 5: Congruent (Rotated & Mirrored, challenging SSS/SAS/ASA)
 
     isTrulyCongruent = true;
-    if (round === 1) {
-      trueTheorem = 'SSS';
-    } else if (round === 2) {
-      trueTheorem = 'SAS';
-    } else if (round === 3) {
-      trueTheorem = 'ASA';
-    } else if (round === 4) {
-      trueTheorem = 'SAS';
-    } else {
-      trueTheorem = 'ASA';
-    }
 
-    // Base Triangle Parameters: Base = b, Side2 = a, Angle between = C (Larger size for better mobile readability!)
-    const b = 175 + Math.floor(Math.random() * 40); // 175~215 px
-    const a = 160 + Math.floor(Math.random() * 40); // 160~200 px
-    const angleC_deg = 45 + Math.floor(Math.random() * 50); // 45~95 deg
+    // Base Triangle Parameters: Base = b, Side2 = a, Angle between = C
+    const b = 125 + Math.floor(Math.random() * 35); // 125~160 px
+    const a = 115 + Math.floor(Math.random() * 35); // 115~150 px
+    const angleC_deg = 40 + Math.floor(Math.random() * 55); // 40~95 deg
     const radC = (angleC_deg * Math.PI) / 180;
 
     // Compute 3rd side c and angles A, B
@@ -480,18 +521,33 @@ function initCongruenceGame() {
     // Scale Factor for cm display (25px = 1cm)
     const pxPerCm = 25;
 
-    // Left Triangle Vertices (A, B, C)
-    const centerL = { x: 230, y: 230 };
-    const pC_L = { x: centerL.x - b / 2, y: centerL.y + 60 };
-    const pA_L = { x: centerL.x + b / 2, y: centerL.y + 60 };
-    const pB_L = {
-      x: pC_L.x + a * Math.cos(radC),
-      y: pC_L.y - a * Math.sin(radC)
-    };
+    // Helper to center and clamp points inside bounding box
+    function centerAndFitPts(rawPts, center, minX, maxX, minY, maxY) {
+      const cx = (rawPts[0].x + rawPts[1].x + rawPts[2].x) / 3;
+      const cy = (rawPts[0].y + rawPts[1].y + rawPts[2].y) / 3;
+      let dx = center.x - cx;
+      let dy = center.y - cy;
+      let shifted = rawPts.map(p => ({ x: p.x + dx, y: p.y + dy }));
+
+      let clampX = 0, clampY = 0;
+      shifted.forEach(p => {
+        if (p.x < minX) clampX = Math.max(clampX, minX - p.x);
+        if (p.x > maxX) clampX = Math.min(clampX, maxX - p.x);
+        if (p.y < minY) clampY = Math.max(clampY, minY - p.y);
+        if (p.y > maxY) clampY = Math.min(clampY, maxY - p.y);
+      });
+      return shifted.map(p => ({ x: p.x + clampX, y: p.y + clampY }));
+    }
+
+    // Unrotated Left Triangle Vertices (A, B, C)
+    const pC_L_raw = { x: 0, y: 0 };
+    const pA_L_raw = { x: b, y: 0 };
+    const pB_L_raw = { x: a * Math.cos(radC), y: -a * Math.sin(radC) };
+    const ptsL_fitted = centerAndFitPts([pA_L_raw, pB_L_raw, pC_L_raw], { x: 225, y: 190 }, 40, 410, 50, 310);
 
     triangleLeft = {
       labels: ['A', 'B', 'C'],
-      pts: [pA_L, pB_L, pC_L],
+      pts: ptsL_fitted,
       sidesCm: [
         parseFloat((c / pxPerCm).toFixed(1)), // AB (side 0)
         parseFloat((a / pxPerCm).toFixed(1)), // BC (side 1)
@@ -504,77 +560,84 @@ function initCongruenceGame() {
       ]
     };
 
-    // Right Triangle Vertices (D, E, F)
-    const centerR = { x: 670, y: 230 };
-    let rot = (round === 5 || round === 1) ? Math.PI / 4 : (Math.random() * 0.3 - 0.15); // Rotation angle
+    // Right Triangle Vertices (D, E, F) with random 360-degree rotation
+    const rot = Math.random() * Math.PI * 2;
+    const pF_R_raw = { x: 0, y: 0 };
+    const pD_R_raw = { x: b, y: 0 };
+    const pE_R_raw = { x: a * Math.cos(radC), y: -a * Math.sin(radC) };
 
-    let rightA = angleA_deg, rightB = angleB_deg, rightC = angleC_deg;
-    let right_a = a, right_b = b, right_c = c;
-
-    const radC_R = (rightC * Math.PI) / 180;
-    const pF_R = { x: 0, y: 0 };
-    const pD_R = { x: right_b, y: 0 };
-    const pE_R = { x: right_a * Math.cos(radC_R), y: -right_a * Math.sin(radC_R) };
-
-    // Apply Rotation & Offset to Right Triangle
-    const rawPts = [pD_R, pE_R, pF_R];
-    const rotatedPts = rawPts.map(pt => ({
-      x: centerR.x + (pt.x - right_b / 2) * Math.cos(rot) - (pt.y + 20) * Math.sin(rot),
-      y: centerR.y + (pt.x - right_b / 2) * Math.sin(rot) + (pt.y + 20) * Math.cos(rot)
+    const rawRightPts = [pD_R_raw, pE_R_raw, pF_R_raw];
+    const rotatedRightPts = rawRightPts.map(pt => ({
+      x: pt.x * Math.cos(rot) - pt.y * Math.sin(rot),
+      y: pt.x * Math.sin(rot) + pt.y * Math.cos(rot)
     }));
 
-    const right_c_calc = Math.sqrt(right_a * right_a + right_b * right_b - 2 * right_a * right_b * Math.cos(radC_R));
+    const ptsR_fitted = centerAndFitPts(rotatedRightPts, { x: 675, y: 190 }, 490, 860, 50, 310);
 
     triangleRight = {
       labels: ['D', 'E', 'F'],
-      pts: rotatedPts,
+      pts: ptsR_fitted,
       sidesCm: [
-        parseFloat((right_c_calc / pxPerCm).toFixed(1)), // DE (side 0)
-        parseFloat((right_a / pxPerCm).toFixed(1)),      // EF (side 1)
-        parseFloat((right_b / pxPerCm).toFixed(1))       // FD (side 2)
+        parseFloat((c / pxPerCm).toFixed(1)), // DE (side 0)
+        parseFloat((a / pxPerCm).toFixed(1)), // EF (side 1)
+        parseFloat((b / pxPerCm).toFixed(1))  // FD (side 2)
       ],
       anglesDeg: [
-        Math.round(rightA),
-        Math.round(rightB),
-        Math.round(rightC)
+        Math.round(angleA_deg),
+        Math.round(angleB_deg),
+        Math.round(angleC_deg)
       ]
     };
 
     savedOriginalLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
     savedOriginalRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
 
-    // Pre-measure 1 or 2 clues on Right Triangle automatically as puzzle starting hints!
+    // Fully randomized starting preset clues (Random target triangle & random element combinations!)
     presetAngleKeys = [];
-    if (round === 1) {
-      currentPresetType = 'TWO_SIDES';
-      currentPresetCount = 2;
-      measuredSet.add('R_side_DE');
-      measuredSet.add('R_side_EF');
-    } else if (round === 2) {
-      currentPresetType = 'SIDE_AND_ANGLE';
-      currentPresetCount = 2;
-      measuredSet.add('R_side_DE');
-      measuredSet.add('R_angle_E');
-      presetAngleKeys.push('R_angle_E');
-    } else if (round === 3) {
-      currentPresetType = 'SIDE_AND_ANGLE';
-      currentPresetCount = 2;
-      measuredSet.add('R_side_EF');
-      measuredSet.add('R_angle_F');
-      presetAngleKeys.push('R_angle_F');
-    } else if (round === 4) {
-      currentPresetType = 'SIDE_AND_ANGLE';
-      currentPresetCount = 2;
-      measuredSet.add('R_side_FD');
-      measuredSet.add('R_angle_D');
-      presetAngleKeys.push('R_angle_D');
+    measuredSet.clear();
+
+    const targetTriTag = Math.random() < 0.6 ? 'R' : 'L'; // 60% Right, 40% Left
+    const sideList = targetTriTag === 'R' ? ['DE', 'EF', 'FD'] : ['AB', 'BC', 'CA'];
+    const angleList = targetTriTag === 'R' ? ['D', 'E', 'F'] : ['A', 'B', 'C'];
+
+    // Preset types progressive pool:
+    // Round 1-2: TWO_SIDES or SIDE_AND_ANGLE
+    // Round 3-4: SIDE_AND_ANGLE or TWO_SIDES
+    // Round 5: SIDE_AND_TWO_ANGLES
+    let presetType = 'TWO_SIDES';
+    if (round === 1 || round === 2) {
+      presetType = Math.random() < 0.5 ? 'TWO_SIDES' : 'SIDE_AND_ANGLE';
+    } else if (round === 3 || round === 4) {
+      presetType = Math.random() < 0.5 ? 'SIDE_AND_ANGLE' : 'TWO_SIDES';
     } else {
-      currentPresetType = 'SIDE_AND_TWO_ANGLES';
+      presetType = 'SIDE_AND_TWO_ANGLES';
+    }
+
+    currentPresetType = presetType;
+
+    if (presetType === 'TWO_SIDES') {
+      currentPresetCount = 2;
+      const shuffled = [...sideList].sort(() => Math.random() - 0.5);
+      measuredSet.add(`${targetTriTag}_side_${shuffled[0]}`);
+      measuredSet.add(`${targetTriTag}_side_${shuffled[1]}`);
+    } else if (presetType === 'SIDE_AND_ANGLE') {
+      // 변 + 그 변의 끝점 각만 (대변·대각 조합 금지)
+      currentPresetCount = 2;
+      const sideIdx = Math.floor(Math.random() * 3);
+      const adjAngleIdx = Math.random() < 0.5 ? sideIdx : (sideIdx + 1) % 3;
+      measuredSet.add(`${targetTriTag}_side_${sideList[sideIdx]}`);
+      measuredSet.add(`${targetTriTag}_angle_${angleList[adjAngleIdx]}`);
+      presetAngleKeys.push(`${targetTriTag}_angle_${angleList[adjAngleIdx]}`);
+    } else {
+      // 진짜 ASA: 두 각과 그 끼인변
       currentPresetCount = 3;
-      measuredSet.add('R_side_DE');
-      measuredSet.add('R_angle_D');
-      measuredSet.add('R_angle_E');
-      presetAngleKeys.push('R_angle_D', 'R_angle_E');
+      const sideIdx = Math.floor(Math.random() * 3);
+      const a1 = sideIdx;
+      const a2 = (sideIdx + 1) % 3;
+      measuredSet.add(`${targetTriTag}_side_${sideList[sideIdx]}`);
+      measuredSet.add(`${targetTriTag}_angle_${angleList[a1]}`);
+      measuredSet.add(`${targetTriTag}_angle_${angleList[a2]}`);
+      presetAngleKeys.push(`${targetTriTag}_angle_${angleList[a1]}`, `${targetTriTag}_angle_${angleList[a2]}`);
     }
   }
 
@@ -698,7 +761,13 @@ function initCongruenceGame() {
         const norm = getOutwardNormal(p1, p2, centroid);
         const badgeX = midX + norm.x * 32;
         const badgeY = midY + norm.y * 32;
-        drawBadge(badgeX, badgeY, `${sideNames[i]} = ${tri.sidesCm[i]}`, '#f59e0b', true, sideNames[i]);
+        const pxLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const pxPerCm = 25;
+        const liveCm = (pxLen / pxPerCm).toFixed(1);
+        const labelText = failureAnimReqId
+          ? `${sideNames[i]} = ${liveCm}`
+          : `${sideNames[i]} = ${tri.sidesCm[i]}`;
+        drawBadge(badgeX, badgeY, labelText, '#f59e0b', true, sideNames[i]);
       }
     }
 
@@ -725,7 +794,16 @@ function initCongruenceGame() {
 
       // Draw Angle Arc if Measured
       if (isMeasured) {
-        drawAngleArc(pt, prevPt, nextPt, `∠${angleNames[i]} = ${tri.anglesDeg[i]}°`, '#8b5cf6', centroid);
+        let angLabel = tri.anglesDeg[i];
+        if (failureAnimReqId) {
+          const v1x = prevPt.x - pt.x, v1y = prevPt.y - pt.y;
+          const v2x = nextPt.x - pt.x, v2y = nextPt.y - pt.y;
+          const d1 = Math.hypot(v1x, v1y) || 1;
+          const d2 = Math.hypot(v2x, v2y) || 1;
+          const cosA = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (d1 * d2)));
+          angLabel = Math.round((Math.acos(cosA) * 180) / Math.PI);
+        }
+        drawAngleArc(pt, prevPt, nextPt, `∠${angleNames[i]} = ${angLabel}°`, '#8b5cf6', centroid);
       }
     }
   }
@@ -1031,6 +1109,137 @@ function initCongruenceGame() {
     return -1;
   }
 
+  // Side i is opposite vertex (i+2)%3 — equivalently vertex v's opposite side is (v+1)%3
+  function oppositeSideOfAngle(angleIdx) {
+    return (angleIdx + 1) % 3;
+  }
+  function isAngleAdjacentToSide(angleIdx, sideIdx) {
+    return angleIdx === sideIdx || angleIdx === (sideIdx + 1) % 3;
+  }
+
+  // Exactly 2 sides + 1 non-included angle (not a curriculum congruence condition)
+  function getNonIncludedSideAngleConfig(sKnown, aKnown) {
+    let sideA = -1, sideB = -1;
+    if (sKnown[0] && sKnown[1]) { sideA = 0; sideB = 1; }
+    else if (sKnown[1] && sKnown[2]) { sideA = 1; sideB = 2; }
+    else if (sKnown[2] && sKnown[0]) { sideA = 2; sideB = 0; }
+    else return null;
+    const angleCount = (aKnown[0] ? 1 : 0) + (aKnown[1] ? 1 : 0) + (aKnown[2] ? 1 : 0);
+    if (angleCount !== 1) return null;
+    const angleAt = aKnown[0] ? 0 : (aKnown[1] ? 1 : 2);
+    const shared = sharedVertexOfSides(sideA, sideB);
+    if (angleAt === shared) return null; // included angle → SAS
+    return { sideA, sideB, angleAt, shared };
+  }
+
+  // 2nd geometric root along the measured-angle ray (null ⇒ unique / determined)
+  function computeAlternateRoot(pts, cfg) {
+    if (!cfg || !pts) return null;
+    const { sideA, sideB, angleAt } = cfg;
+    const iDrop = sharedVertexOfSides(sideA, sideB);
+    const iBase = angleAt;
+    const iMove = [0, 1, 2].find(i => i !== iBase && i !== iDrop);
+    if (iMove === undefined) return null;
+
+    const base = pts[iBase], drop = pts[iDrop], move = pts[iMove];
+    const ux0 = move.x - base.x, uy0 = move.y - base.y;
+    const sCurrent = Math.hypot(ux0, uy0);
+    if (sCurrent < 0.0001) return null;
+    const ux = ux0 / sCurrent, uy = uy0 / sCurrent;
+    // Side between shared vertex and sliding vertex (one measured side)
+    const L = Math.hypot(drop.x - move.x, drop.y - move.y);
+    const vx = drop.x - base.x, vy = drop.y - base.y;
+    const vDotU = vx * ux + vy * uy;
+    const disc = vDotU * vDotU - (vx * vx + vy * vy - L * L);
+    if (disc < 0) return null;
+    const sqrtDisc = Math.sqrt(disc);
+    const candidates = [vDotU + sqrtDisc, vDotU - sqrtDisc].filter(s => s > 0.01);
+    let sAlt = null;
+    let bestDiff = 0;
+    candidates.forEach(s => {
+      const d = Math.abs(s - sCurrent);
+      if (d > 1.0 && d > bestDiff) { bestDiff = d; sAlt = s; }
+    });
+    if (sAlt === null) return null;
+    return { iBase, iDrop, iMove, sCurrent, sAlt, ux, uy, L };
+  }
+
+  function buildAmbiguousMorphState(pts, cfg) {
+    const alt = computeAlternateRoot(pts, cfg);
+    if (!alt) return null;
+    const base = pts[alt.iBase];
+    const drop = pts[alt.iDrop];
+    const move = pts[alt.iMove];
+    // Freeze both measured side lengths in pixels
+    const lenBaseDrop = Math.hypot(drop.x - base.x, drop.y - base.y);
+    const lenDropMove = Math.hypot(move.x - drop.x, move.y - drop.y);
+    // Unit direction of fixed side base→drop (locks one side of the angle)
+    const bdx = (drop.x - base.x) / (lenBaseDrop || 1);
+    const bdy = (drop.y - base.y) / (lenBaseDrop || 1);
+    // Signed angle from base→drop to base→move (locks measured angle size)
+    const angDrop = Math.atan2(drop.y - base.y, drop.x - base.x);
+    const angMove = Math.atan2(move.y - base.y, move.x - base.x);
+    let angSigned = angMove - angDrop;
+    while (angSigned > Math.PI) angSigned -= Math.PI * 2;
+    while (angSigned < -Math.PI) angSigned += Math.PI * 2;
+    return {
+      iBase: alt.iBase,
+      iDrop: alt.iDrop,
+      iMove: alt.iMove,
+      base: { x: base.x, y: base.y },
+      lenBaseDrop,
+      lenDropMove,
+      bdx, bdy,
+      angSigned,
+      sCurrent: alt.sCurrent,
+      sAlt: alt.sAlt
+    };
+  }
+
+  // Angle vertex + shared vertex fixed; free vertex slides on the measured-angle ray.
+  // Both measured side lengths and the measured angle are preserved exactly.
+  function applyAmbiguousMorph(origPts, state, blend01) {
+    const t = (1 - Math.cos(Math.max(0, Math.min(1, blend01)) * Math.PI)) / 2;
+    const sNow = state.sCurrent + (state.sAlt - state.sCurrent) * t;
+    const base = { x: state.base.x, y: state.base.y };
+    const drop = {
+      x: base.x + state.bdx * state.lenBaseDrop,
+      y: base.y + state.bdy * state.lenBaseDrop
+    };
+    const ux = Math.cos(Math.atan2(state.bdy, state.bdx) + state.angSigned);
+    const uy = Math.sin(Math.atan2(state.bdy, state.bdx) + state.angSigned);
+    // Project onto the ray at distance sNow, then snap to exact |move-drop| = lenDropMove
+    // Prefer the intersection of ray and circle(drop, lenDropMove) nearest to sNow.
+    const vx = drop.x - base.x, vy = drop.y - base.y;
+    const vDotU = vx * ux + vy * uy;
+    const disc = vDotU * vDotU - (vx * vx + vy * vy - state.lenDropMove * state.lenDropMove);
+    let sUse = sNow;
+    if (disc >= 0) {
+      const sqrtDisc = Math.sqrt(disc);
+      const c1 = vDotU + sqrtDisc;
+      const c2 = vDotU - sqrtDisc;
+      const opts = [c1, c2].filter(s => s > 0.01);
+      if (opts.length) {
+        sUse = opts.reduce((best, s) => Math.abs(s - sNow) < Math.abs(best - sNow) ? s : best, opts[0]);
+      }
+    }
+    const move = { x: base.x + ux * sUse, y: base.y + uy * sUse };
+    return origPts.map((p, i) => {
+      if (i === state.iBase) return base;
+      if (i === state.iDrop) return drop;
+      if (i === state.iMove) return move;
+      return { x: p.x, y: p.y };
+    });
+  }
+
+  function rigidTransformPts(pts, cx, cy, origCx, origCy, rot) {
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    return pts.map(p => ({
+      x: cx + (p.x - origCx) * cos - (p.y - origCy) * sin,
+      y: cy + (p.x - origCx) * sin + (p.y - origCy) * cos
+    }));
+  }
+
   function evaluateDecision(claim) {
     if (timerInterval) clearInterval(timerInterval);
 
@@ -1051,7 +1260,7 @@ function initCongruenceGame() {
     const sideKnownR = sideNamesR.map(n => measuredSet.has(`R_side_${n}`));
     const angleKnownR = angleNamesR.map(n => measuredSet.has(`R_angle_${n}`));
 
-    function checkTriangleCondition(sKnown, aKnown) {
+    function checkTriangleCondition(sKnown, aKnown, pts) {
       const nS = sKnown.filter(Boolean).length;
       const nA = aKnown.filter(Boolean).length;
 
@@ -1068,24 +1277,27 @@ function initCongruenceGame() {
         }
       }
 
+      // ASA = 두 각과 한 변 (끼인변·비끼인변 모두 모양 확정)
       let hasASA = false;
-      if (nA >= 2) {
-        const angleIdx = [0, 1, 2].filter(i => aKnown[i]);
-        for (let a = 0; a < angleIdx.length && !hasASA; a++) {
-          for (let b = a + 1; b < angleIdx.length && !hasASA; b++) {
-            const s = sideBetweenVertices(angleIdx[a], angleIdx[b]);
-            if (s !== -1 && sKnown[s]) hasASA = true;
-          }
+      if (nA >= 2 && nS >= 1) {
+        hasASA = true;
+      }
+
+      // 두 변 + 끼인각이 아닌 각이지만, 기하적으로 해가 유일하면 모양 확정
+      let isUniquelyDetermined = false;
+      if (!hasSSS && !hasSAS && !hasASA && pts) {
+        const cfg = getNonIncludedSideAngleConfig(sKnown, aKnown);
+        if (cfg && !computeAlternateRoot(pts, cfg)) {
+          isUniquelyDetermined = true;
         }
       }
-      if (nA === 3 && nS >= 1) hasASA = true;
 
-      const isRigid = hasSSS || hasSAS || hasASA;
-      return { hasSSS, hasSAS, hasASA, isRigid };
+      const isRigid = hasSSS || hasSAS || hasASA || isUniquelyDetermined;
+      return { hasSSS, hasSAS, hasASA, isUniquelyDetermined, isRigid };
     }
 
-    const condL = checkTriangleCondition(sideKnownL, angleKnownL);
-    const condR = checkTriangleCondition(sideKnownR, angleKnownR);
+    const condL = checkTriangleCondition(sideKnownL, angleKnownL, triangleLeft && triangleLeft.pts);
+    const condR = checkTriangleCondition(sideKnownR, angleKnownR, triangleRight && triangleRight.pts);
 
     const pairedSides = [0, 1, 2].map(i => sideKnownL[i] && sideKnownR[i]);
     const pairedAngles = [0, 1, 2].map(i => angleKnownL[i] && angleKnownR[i]);
@@ -1103,21 +1315,14 @@ function initCongruenceGame() {
       }
     }
 
-    let hasASA_paired = false;
-    if (pairedAngleIdx.length === 3 && pairedSideIdx.length >= 1) {
-      hasASA_paired = true;
-    } else {
-      for (let a = 0; a < pairedAngleIdx.length && !hasASA_paired; a++) {
-        for (let b = a + 1; b < pairedAngleIdx.length && !hasASA_paired; b++) {
-          const s = sideBetweenVertices(pairedAngleIdx[a], pairedAngleIdx[b]);
-          if (s !== -1 && pairedSideIdx.includes(s)) hasASA_paired = true;
-        }
-      }
-    }
+    // 대응되는 두 각 + 대응되는 한 변이면 ASA(또는 AAS)로 합동
+    const hasASA_paired = pairedAngleIdx.length >= 2 && pairedSideIdx.length >= 1;
 
     const isPairedCongruent = hasSSS_paired || hasSAS_paired || hasASA_paired;
     const isBothRigid = condL.isRigid && condR.isRigid;
-    const isCongruentProven = isPairedCongruent || isBothRigid;
+    // 한쪽이라도 모양이 유일하게 확정되면(다른 해가 없으면) 합동으로 인정
+    const isCongruentProven = isPairedCongruent || isBothRigid
+      || condL.isUniquelyDetermined || condR.isUniquelyDetermined;
 
     const claimMatchedPaired = (claim === 'SSS' && hasSSS_paired) || (claim === 'SAS' && hasSAS_paired) || (claim === 'ASA' && hasASA_paired);
     const claimMatchedSingle = (claim === 'SSS' && (condL.hasSSS || condR.hasSSS)) || (claim === 'SAS' && (condL.hasSAS || condR.hasSAS)) || (claim === 'ASA' && (condL.hasASA || condR.hasASA));
@@ -1132,12 +1337,21 @@ function initCongruenceGame() {
       let ceType = 'UNDER_MEASURED';
       let msg = '🚨 두 삼각형이 완전히 포개지는 지 확신하려면 더 많은 측정값이 필요합니다.';
 
+      const ambL = (() => {
+        const cfg = getNonIncludedSideAngleConfig(sideKnownL, angleKnownL);
+        return cfg ? computeAlternateRoot(triangleLeft && triangleLeft.pts, cfg) : null;
+      })();
+      const ambR = (() => {
+        const cfg = getNonIncludedSideAngleConfig(sideKnownR, angleKnownR);
+        return cfg ? computeAlternateRoot(triangleRight && triangleRight.pts, cfg) : null;
+      })();
+
       if (pairedAngleIdx.length >= 2 && pairedSideIdx.length === 0) {
         ceType = 'AAA_TRAP';
         msg = '🚨 각도만 측정하면 모양은 같아도 크기가 다른 삼각형이 만들어질 수 있습니다! 변도 측정해보세요.';
-      } else if (pairedSideIdx.length === 2 && pairedAngleIdx.length >= 1) {
-        ceType = 'SSA_TRAP';
-        msg = '🚨 지금 잰 치수만으로는 두 삼각형이 합동인 것을 장담할 수 없습니다! 다른 변이나 각을 측정해보세요.';
+      } else if (ambL || ambR) {
+        ceType = 'AMBIGUOUS_TRAP';
+        msg = '🚨 지금 잰 치수만으로는 모양이 하나로 정해지지 않습니다! 같은 측정값으로 다른 삼각형이 생길 수 있어요.';
       }
 
       playFailureAnimation(ceType, msg, sideKnownL, angleKnownL, sideKnownR, angleKnownR, () => {
@@ -1202,9 +1416,11 @@ function initCongruenceGame() {
         });
       } else {
         lastJudgmentResult = 'WARNING';
-        let subtitleMsg = `⚠️ 두 삼각형은 합동이지만, 선택한 조건(${claim}) 대신 실제 측정된 조건으로 제출하면 더 높은 점수를 받을 수 있습니다! (+${points}점)`;
+        let subtitleMsg = `⚠️ 두 삼각형은 합동이지만, 선택한 조건(${claim})과 측정 구성이 정확히 일치하지 않아 조건 보너스가 줄었습니다. (+${points}점)`;
         if (claimMatchedSingle) {
-          subtitleMsg = `💡 두 삼각형의 모양 고정/합동이 확인되었으며, 한쪽 삼각형에서 ${claim} 조건을 잘 파악하여 조건 보너스 점수가 추가되었습니다! (+${points}점)`;
+          subtitleMsg = `💡 합동은 확인되었고, 한쪽에서 ${claim} 조건이 맞아 조건 보너스가 일부 추가되었습니다! (+${points}점)`;
+        } else if (condL.isUniquelyDetermined || condR.isUniquelyDetermined) {
+          subtitleMsg = `⚠️ 측정으로 모양이 하나로 확정되어 합동은 맞지만, SSS·SAS·ASA 중 맞는 조건으로 제출하면 더 높은 점수를 받을 수 있습니다! (+${points}점)`;
         }
 
         playSuccessAnimation(() => {
@@ -1232,8 +1448,8 @@ function initCongruenceGame() {
     switch (ceType) {
       case 'AAA_TRAP':
         return '세 각의 크기가 모두 같아도, 변의 길이가 다르면 크기가 자유롭게 변할 수 있습니다.';
-      case 'SSA_TRAP':
-        return '두 변이 같을 때, 그 사이의 각(끼인각)이 아니면 삼각형의 모양이 달라질 수 있습니다.';
+      case 'AMBIGUOUS_TRAP':
+        return '측정값이 부족하거나 조건이 맞지 않으면, 같은 치수로도 다른 모양의 삼각형이 나올 수 있습니다. SSS·SAS·ASA로 증명하세요.';
       case 'UNDER_MEASURED':
       default:
         return '두 삼각형이 완전히 포개지는 지 확신하려면 더 많은 측정값이 필요합니다.';
@@ -1291,29 +1507,33 @@ function initCongruenceGame() {
       resultHeader.style.color = '#ef4444';
       resultIcon.textContent = '🚨';
       resultTitle.textContent = '판정 실패';
-      counterExampleBox.style.display = 'none'; // We now do CE on main canvas, so hide this in modal
+      counterExampleBox.style.display = 'none';
     }
 
-    if (currentRound >= maxRounds) {
-      btnNextRound.textContent = '🏆 최종 결과 확인하기 ➔';
-    } else {
-      btnNextRound.textContent = '다음 라운드로 진입 ➔';
+    if (btnNextRound) {
+      if (currentRound >= maxRounds) {
+        btnNextRound.textContent = '🏆 최종 결과 확인하기 ➔';
+      } else {
+        btnNextRound.textContent = '다음 라운드로 진입 ➔';
+      }
     }
 
-    resultModal.classList.remove('hidden');
+    if (resultModal) resultModal.classList.remove('hidden');
   }
 
-  btnNextRound.addEventListener('click', () => {
-    resultModal.classList.add('hidden');
-    if (currentRound < maxRounds) {
-      currentRound++;
-      startRound(currentRound);
-    } else {
-      showGameOverModal();
-    }
-  });
+  if (btnNextRound) {
+    btnNextRound.onclick = () => {
+      if (resultModal) resultModal.classList.add('hidden');
+      if (currentRound < maxRounds) {
+        currentRound++;
+        startRound(currentRound);
+      } else {
+        showGameOverModal();
+      }
+    };
+  }
 
-  // Success Animation Logic
+  // Success Animation Logic (Rigid Body Translation & Rotation -> 0% Size Warping!)
   function playSuccessAnimation(onComplete) {
     if (successAnimReqId) cancelAnimationFrame(successAnimReqId);
     let startTime = null;
@@ -1323,20 +1543,41 @@ function initCongruenceGame() {
     hoverTarget = null;
     
     const baseRightPts = savedOriginalRightPts || triangleRight.pts.map(p => ({x: p.x, y: p.y}));
-    
+    const leftPts = triangleLeft.pts;
+
+    const cR = {
+      x: (baseRightPts[0].x + baseRightPts[1].x + baseRightPts[2].x) / 3,
+      y: (baseRightPts[0].y + baseRightPts[1].y + baseRightPts[2].y) / 3
+    };
+    const cL = {
+      x: (leftPts[0].x + leftPts[1].x + leftPts[2].x) / 3,
+      y: (leftPts[0].y + leftPts[1].y + leftPts[2].y) / 3
+    };
+
+    const angR = Math.atan2(baseRightPts[1].y - baseRightPts[0].y, baseRightPts[1].x - baseRightPts[0].x);
+    const angL = Math.atan2(leftPts[1].y - leftPts[0].y, leftPts[1].x - leftPts[0].x);
+    let dAng = angL - angR;
+    while (dAng > Math.PI) dAng -= Math.PI * 2;
+    while (dAng < -Math.PI) dAng += Math.PI * 2;
+
     function animateSuccess(timestamp) {
       if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / 1500, 1.0); // 1.5 second animation
-      
-      // Easing function (easeInOutCubic)
+      const progress = Math.min((timestamp - startTime) / 1500, 1.0);
       const ease = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
       
-      // Interpolate right points towards left points
-      triangleRight.pts = baseRightPts.map((pt, i) => {
-        const targetPt = triangleLeft.pts[i];
+      const curCX = cR.x + (cL.x - cR.x) * ease;
+      const curCY = cR.y + (cL.y - cR.y) * ease;
+      const curRot = dAng * ease;
+
+      // Transform baseRightPts 100% rigidly (size never warps!)
+      triangleRight.pts = baseRightPts.map(pt => {
+        const dx = pt.x - cR.x;
+        const dy = pt.y - cR.y;
+        const rx = dx * Math.cos(curRot) - dy * Math.sin(curRot);
+        const ry = dx * Math.sin(curRot) + dy * Math.cos(curRot);
         return {
-          x: pt.x + (targetPt.x - pt.x) * ease,
-          y: pt.y + (targetPt.y - pt.y) * ease
+          x: curCX + rx,
+          y: curCY + ry
         };
       });
       
@@ -1345,6 +1586,8 @@ function initCongruenceGame() {
       if (progress < 1.0) {
         successAnimReqId = requestAnimationFrame(animateSuccess);
       } else {
+        triangleRight.pts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
+        renderCanvas();
         hoverTarget = oldHover;
         if (onComplete) onComplete();
       }
@@ -1364,7 +1607,7 @@ function initCongruenceGame() {
     const originalRightPts = triangleRight.pts.map(p => ({x: p.x, y: p.y}));
     const originalLeftPts = triangleLeft.pts.map(p => ({x: p.x, y: p.y}));
     
-    function isTriangleRigid(sKnown, aKnown) {
+    function isTriangleRigid(sKnown, aKnown, pts) {
       const nS = sKnown.filter(Boolean).length;
       if (nS === 3) return true;
       let hasSAS = false;
@@ -1379,24 +1622,64 @@ function initCongruenceGame() {
       if (hasSAS) return true;
       const nA = aKnown.filter(Boolean).length;
       if (nA >= 2 && nS >= 1) return true;
+      const cfg = getNonIncludedSideAngleConfig(sKnown, aKnown);
+      if (cfg && pts && !computeAlternateRoot(pts, cfg)) return true;
       return false;
     }
     
-    const isRigidL = isTriangleRigid(sideKnownL, angleKnownL);
-    const isRigidR = isTriangleRigid(sideKnownR, angleKnownR);
+    const isRigidL = isTriangleRigid(sideKnownL, angleKnownL, originalLeftPts);
+    const isRigidR = isTriangleRigid(sideKnownR, angleKnownR, originalRightPts);
     
     const countL = sideKnownL.filter(Boolean).length + angleKnownL.filter(Boolean).length;
     const countR = sideKnownR.filter(Boolean).length + angleKnownR.filter(Boolean).length;
-    
+
+    const cfgL = getNonIncludedSideAngleConfig(sideKnownL, angleKnownL);
+    const cfgR = getNonIncludedSideAngleConfig(sideKnownR, angleKnownR);
+    const ambStateL = cfgL ? buildAmbiguousMorphState(originalLeftPts, cfgL) : null;
+    const ambStateR = cfgR ? buildAmbiguousMorphState(originalRightPts, cfgR) : null;
+
     let wiggleTarget = 'R';
-    if (isRigidR && !isRigidL) {
+    let ambState = null;
+    if (ambStateL || ambStateR) {
+      // Prefer the triangle that actually has the ambiguous counterexample
+      if (ambStateR && !ambStateL) {
+        wiggleTarget = 'R';
+        ambState = ambStateR;
+      } else if (ambStateL && !ambStateR) {
+        wiggleTarget = 'L';
+        ambState = ambStateL;
+      } else {
+        wiggleTarget = countR >= countL ? 'R' : 'L';
+        ambState = wiggleTarget === 'R' ? ambStateR : ambStateL;
+      }
+    } else if (isRigidR && !isRigidL) {
       wiggleTarget = 'L';
     } else if (!isRigidR && isRigidL) {
       wiggleTarget = 'R';
     } else if (!isRigidR && !isRigidL) {
       if (countL < countR) wiggleTarget = 'L';
     }
+
+    const cR = {
+      x: (originalRightPts[0].x + originalRightPts[1].x + originalRightPts[2].x) / 3,
+      y: (originalRightPts[0].y + originalRightPts[1].y + originalRightPts[2].y) / 3
+    };
+    const cL = {
+      x: (originalLeftPts[0].x + originalLeftPts[1].x + originalLeftPts[2].x) / 3,
+      y: (originalLeftPts[0].y + originalLeftPts[1].y + originalLeftPts[2].y) / 3
+    };
+
+    const angR = Math.atan2(originalRightPts[1].y - originalRightPts[0].y, originalRightPts[1].x - originalRightPts[0].x);
+    const angL = Math.atan2(originalLeftPts[1].y - originalLeftPts[0].y, originalLeftPts[1].x - originalLeftPts[0].x);
     
+    let dAngRtoL = angL - angR;
+    while (dAngRtoL > Math.PI) dAngRtoL -= Math.PI * 2;
+    while (dAngRtoL < -Math.PI) dAngRtoL += Math.PI * 2;
+
+    let dAngLtoR = angR - angL;
+    while (dAngLtoR > Math.PI) dAngLtoR -= Math.PI * 2;
+    while (dAngLtoR < -Math.PI) dAngLtoR += Math.PI * 2;
+
     let notified = false;
     
     function animateFailure(timestamp) {
@@ -1406,7 +1689,7 @@ function initCongruenceGame() {
       const progressWiggling = Math.max(0, (elapsed - 1500) / 1000); // 1.5s+: wiggle infinitely
       
       const easeOverlap = progressOverlaping < 0.5 ? 4 * progressOverlaping * Math.pow(progressOverlaping, 2) : 1 - Math.pow(-2 * progressOverlaping + 2, 3) / 2;
-      
+
       let p0_R = {x: originalRightPts[0].x, y: originalRightPts[0].y};
       let p1_R = {x: originalRightPts[1].x, y: originalRightPts[1].y};
       let p2_R = {x: originalRightPts[2].x, y: originalRightPts[2].y};
@@ -1414,26 +1697,72 @@ function initCongruenceGame() {
       let p0_L = {x: originalLeftPts[0].x, y: originalLeftPts[0].y};
       let p1_L = {x: originalLeftPts[1].x, y: originalLeftPts[1].y};
       let p2_L = {x: originalLeftPts[2].x, y: originalLeftPts[2].y};
-      
-      // Phase 1: Overlap target triangle
-      if (wiggleTarget === 'R') {
-        p0_R.x += (p0_L.x - p0_R.x) * easeOverlap;
-        p0_R.y += (p0_L.y - p0_R.y) * easeOverlap;
-        p1_R.x += (p1_L.x - p1_R.x) * easeOverlap;
-        p1_R.y += (p1_L.y - p1_R.y) * easeOverlap;
-        p2_R.x += (p2_L.x - p2_R.x) * easeOverlap;
-        p2_R.y += (p2_L.y - p2_R.y) * easeOverlap;
+
+      if (ambState) {
+        // 1) Morph locally (measured sides + angle locked, free vertex slides)
+        // 2) Rigidly stack onto the other triangle so both shapes are compared overlapped
+        const origPts = wiggleTarget === 'R' ? originalRightPts : originalLeftPts;
+        const origC = wiggleTarget === 'R' ? cR : cL;
+        const targetC = wiggleTarget === 'R' ? cL : cR;
+        const dAng = wiggleTarget === 'R' ? dAngRtoL : dAngLtoR;
+
+        const cycleT = (elapsed % 2400) / 1200;
+        const morphBlend = cycleT <= 1 ? cycleT : 2 - cycleT;
+        const morphedLocal = applyAmbiguousMorph(origPts, ambState, morphBlend);
+
+        const curCX = origC.x + (targetC.x - origC.x) * easeOverlap;
+        const curCY = origC.y + (targetC.y - origC.y) * easeOverlap;
+        const curRot = dAng * easeOverlap;
+        const finalPts = rigidTransformPts(morphedLocal, curCX, curCY, origC.x, origC.y, curRot);
+
+        if (wiggleTarget === 'R') {
+          p0_R = finalPts[0]; p1_R = finalPts[1]; p2_R = finalPts[2];
+        } else {
+          p0_L = finalPts[0]; p1_L = finalPts[1]; p2_L = finalPts[2];
+        }
       } else {
-        p0_L.x += (p0_R.x - p0_L.x) * easeOverlap;
-        p0_L.y += (p0_R.y - p0_L.y) * easeOverlap;
-        p1_L.x += (p1_R.x - p1_L.x) * easeOverlap;
-        p1_L.y += (p1_R.y - p1_L.y) * easeOverlap;
-        p2_L.x += (p2_R.x - p2_L.x) * easeOverlap;
-        p2_L.y += (p2_R.y - p2_L.y) * easeOverlap;
+      // Phase 1: Overlap target triangle rigidly (size never warps!)
+      const easeMove = easeOverlap;
+      
+      if (wiggleTarget === 'R') {
+        const curCX = cR.x + (cL.x - cR.x) * easeMove;
+        const curCY = cR.y + (cL.y - cR.y) * easeMove;
+        const curRot = dAngRtoL * easeMove;
+
+        p0_R = {
+          x: curCX + (originalRightPts[0].x - cR.x) * Math.cos(curRot) - (originalRightPts[0].y - cR.y) * Math.sin(curRot),
+          y: curCY + (originalRightPts[0].x - cR.x) * Math.sin(curRot) + (originalRightPts[0].y - cR.y) * Math.cos(curRot)
+        };
+        p1_R = {
+          x: curCX + (originalRightPts[1].x - cR.x) * Math.cos(curRot) - (originalRightPts[1].y - cR.y) * Math.sin(curRot),
+          y: curCY + (originalRightPts[1].x - cR.x) * Math.sin(curRot) + (originalRightPts[1].y - cR.y) * Math.cos(curRot)
+        };
+        p2_R = {
+          x: curCX + (originalRightPts[2].x - cR.x) * Math.cos(curRot) - (originalRightPts[2].y - cR.y) * Math.sin(curRot),
+          y: curCY + (originalRightPts[2].x - cR.x) * Math.sin(curRot) + (originalRightPts[2].y - cR.y) * Math.cos(curRot)
+        };
+      } else {
+        const curCX = cL.x + (cR.x - cL.x) * easeMove;
+        const curCY = cL.y + (cR.y - cL.y) * easeMove;
+        const curRot = dAngLtoR * easeMove;
+
+        p0_L = {
+          x: curCX + (originalLeftPts[0].x - cL.x) * Math.cos(curRot) - (originalLeftPts[0].y - cL.y) * Math.sin(curRot),
+          y: curCY + (originalLeftPts[0].x - cL.x) * Math.sin(curRot) + (originalLeftPts[0].y - cL.y) * Math.cos(curRot)
+        };
+        p1_L = {
+          x: curCX + (originalLeftPts[1].x - cL.x) * Math.cos(curRot) - (originalLeftPts[1].y - cL.y) * Math.sin(curRot),
+          y: curCY + (originalLeftPts[1].x - cL.x) * Math.sin(curRot) + (originalLeftPts[1].y - cL.y) * Math.cos(curRot)
+        };
+        p2_L = {
+          x: curCX + (originalLeftPts[2].x - cL.x) * Math.cos(curRot) - (originalLeftPts[2].y - cL.y) * Math.sin(curRot),
+          y: curCY + (originalLeftPts[2].x - cL.x) * Math.sin(curRot) + (originalLeftPts[2].y - cL.y) * Math.cos(curRot)
+        };
+      }
       }
       
       // Phase 2: Wiggle with 100% invariant measured lengths and angles
-      if (progressWiggling > 0) {
+      if (progressWiggling > 0 && !ambState) {
         const t = Math.sin(progressWiggling * Math.PI * 2);
         
         let p0 = wiggleTarget === 'R' ? p0_R : p0_L;
@@ -1479,19 +1808,15 @@ function initCongruenceGame() {
         };
 
         if (ceType === 'MISMATCHED_PROOF' || (isRigidL && isRigidR)) {
-          // Both triangles are fully rigid on their own! Do NOT wiggle ("껄떡껄떡" 금지).
-          // They stay completely static at the overlapped position to show they DO match, 
-          // but the proof was invalid because the measurements were mismatched.
+          // Both triangles are fully rigid on their own! Do NOT wiggle.
         } else if (numMeasuredSides === 0) {
           if (numMeasuredAngles >= 2) {
-            // AAA: Scale relative to centroid. All interior angles are 100% invariant! No side length badges exist.
             const centroid = { x: (p0.x+p1.x+p2.x)/3, y: (p0.y+p1.y+p2.y)/3 };
             const scale = 1.0 + 0.3 * t;
             p0 = { x: centroid.x + (p0.x - centroid.x) * scale, y: centroid.y + (p0.y - centroid.y) * scale };
             p1 = { x: centroid.x + (p1.x - centroid.x) * scale, y: centroid.y + (p1.y - centroid.y) * scale };
             p2 = { x: centroid.x + (p2.x - centroid.x) * scale, y: centroid.y + (p2.y - centroid.y) * scale };
           } else if (numMeasuredAngles === 1) {
-            // 1 Angle measured, 0 sides. The angle's vertex is fixed, and the two sides forming it scale independently!
             if (isMeasuredAngle[0]) {
               const dx1 = p1.x - p0.x, dy1 = p1.y - p0.y; const len1 = Math.hypot(dx1, dy1) || 1;
               const dx2 = p2.x - p0.x, dy2 = p2.y - p0.y; const len2 = Math.hypot(dx2, dy2) || 1;
@@ -1512,77 +1837,22 @@ function initCongruenceGame() {
             p2.x += t * 30;
             p2.y += Math.cos(progressWiggling * Math.PI * 4) * 20;
           }
-        } else if (numMeasuredSides === 2 && numMeasuredAngles >= 1 && ceType === 'SSA_TRAP') {
-          // SSA TRAP: Smoothly oscillate to the other valid root!
-          let refBase, refDrop, refMove;
-          if (isMeasuredSide[0] && isMeasuredSide[1]) {
-             if (isMeasuredAngle[0]) { refBase = p0; refDrop = p1; refMove = p2; }
-             else if (isMeasuredAngle[2]) { refBase = p2; refDrop = p1; refMove = p0; }
-          } else if (isMeasuredSide[1] && isMeasuredSide[2]) {
-             if (isMeasuredAngle[1]) { refBase = p1; refDrop = p2; refMove = p0; }
-             else if (isMeasuredAngle[0]) { refBase = p0; refDrop = p2; refMove = p1; }
-          } else if (isMeasuredSide[2] && isMeasuredSide[0]) {
-             if (isMeasuredAngle[2]) { refBase = p2; refDrop = p0; refMove = p1; }
-             else if (isMeasuredAngle[1]) { refBase = p1; refDrop = p0; refMove = p2; }
-          }
-          if (refBase && refDrop && refMove) {
-            const ux0 = refMove.x - refBase.x, uy0 = refMove.y - refBase.y;
-            const uLen = Math.hypot(ux0, uy0);
-            if (uLen > 0.0001) {
-              const ux = ux0 / uLen, uy = uy0 / uLen; // fixed ray direction — this IS the measured angle
-              const L = Math.hypot(refDrop.x - refMove.x, refDrop.y - refMove.y); // fixed side length to preserve
-              const vx = refDrop.x - refBase.x, vy = refDrop.y - refBase.y;
-              const vDotU = vx * ux + vy * uy;
-              const vLen2 = vx * vx + vy * vy;
-              const disc = vDotU * vDotU - (vLen2 - L * L);
-              if (disc >= 0) {
-                const sqrtDisc = Math.sqrt(disc);
-                const sCurrent = uLen;
-                const sA = vDotU + sqrtDisc;
-                const sB = vDotU - sqrtDisc;
-                let sTarget = null;
-                if (Math.abs(sA - sCurrent) > 0.5 && sA > 0.01) sTarget = sA;
-                else if (Math.abs(sB - sCurrent) > 0.5 && sB > 0.01) sTarget = sB;
-
-                if (sTarget !== null) {
-                  const blend = (1 - Math.cos(progressWiggling * Math.PI * 2)) / 2;
-                  const sNow = sCurrent + (sTarget - sCurrent) * blend;
-                  refMove.x = refBase.x + ux * sNow;
-                  refMove.y = refBase.y + uy * sNow;
-                } else {
-                  // Fallback: Hinge refMove around refDrop to visibly swing the unmeasured angle into different shapes!
-                  const rotatePt = (pt, center, angle) => {
-                    const dx = pt.x - center.x, dy = pt.y - center.y;
-                    return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
-                  };
-                  const shifted = rotatePt(refMove, refDrop, t * 0.25);
-                  refMove.x = shifted.x;
-                  refMove.y = shifted.y;
-                }
-              } else {
-                const rotatePt = (pt, center, angle) => {
-                  const dx = pt.x - center.x, dy = pt.y - center.y;
-                  return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
-                };
-                const shifted = rotatePt(refMove, refDrop, t * 0.25);
-                refMove.x = shifted.x;
-                refMove.y = shifted.y;
-              }
-            }
-          }
         } else if (numMeasuredSides === 2) {
-          // 2 sides measured. Hinge around the shared vertex! Both side lengths are 100% INVARIANT!
-          const rotatePt = (pt, center, angle) => {
-            const dx = pt.x - center.x, dy = pt.y - center.y;
-            return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
-          };
-          
-          if (isMeasuredSide[0] && isMeasuredSide[1]) {
-            p2 = rotatePt(p2, p1, t * 0.4);
-          } else if (isMeasuredSide[1] && isMeasuredSide[2]) {
-            p0 = rotatePt(p0, p2, t * 0.4);
-          } else if (isMeasuredSide[2] && isMeasuredSide[0]) {
-            p1 = rotatePt(p1, p0, t * 0.4);
+          let sideA = -1, sideB = -1;
+          if (isMeasuredSide[0] && isMeasuredSide[1]) { sideA = 0; sideB = 1; }
+          else if (isMeasuredSide[1] && isMeasuredSide[2]) { sideA = 1; sideB = 2; }
+          else if (isMeasuredSide[2] && isMeasuredSide[0]) { sideA = 2; sideB = 0; }
+          const shared = (sideA >= 0) ? sharedVertexOfSides(sideA, sideB) : -1;
+          const measuredAngleAt = isMeasuredAngle[0] ? 0 : (isMeasuredAngle[1] ? 1 : (isMeasuredAngle[2] ? 2 : -1));
+
+          if (shared >= 0 && measuredAngleAt < 0) {
+            const rotatePt = (pt, center, angle) => {
+              const dx = pt.x - center.x, dy = pt.y - center.y;
+              return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
+            };
+            if (sideA === 0 && sideB === 1) p2 = rotatePt(p2, p1, t * 0.4);
+            else if (sideA === 1 && sideB === 2) p0 = rotatePt(p0, p2, t * 0.4);
+            else if (sideA === 2 && sideB === 0) p1 = rotatePt(p1, p0, t * 0.4);
           }
         } else if (numMeasuredSides === 1) {
           // 1 side measured. Pin both endpoints of the measured side! Length is 100% INVARIANT!
@@ -1730,15 +2000,14 @@ function initCongruenceGame() {
         const scale = 1.0 + 0.4 * sinWave;
         cPts = cPts.map(p => ({ x: p.x * scale, y: p.y * scale }));
         ceExplanation.textContent = '🎬 세 각은 똑같지만, 변의 길이가 이렇게 커지거나 작아질 수 있어 완전히 포개어지지 않습니다!';
-      } else if (ceType === 'SSA_TRAP') {
-        // SSA: Point C swings along a circle centered at B, passing through original C
-        // We'll approximate this by swinging C relative to A and B
+      } else if (ceType === 'AMBIGUOUS_TRAP') {
+        // Alternate shape with same locked measurements: swing free vertex
         const swingAngle = sinWave * 0.4;
         const dx = cPts[2].x - cPts[1].x;
         const dy = cPts[2].y - cPts[1].y;
         cPts[2].x = cPts[1].x + dx * Math.cos(swingAngle) - dy * Math.sin(swingAngle);
         cPts[2].y = cPts[1].y + dx * Math.sin(swingAngle) + dy * Math.cos(swingAngle);
-        ceExplanation.textContent = '🎬 두 변과 끼인각이 아닌 각이 주어지면, 남은 변이 이렇게 꺾이면서 전혀 다른 모양이 됩니다!';
+        ceExplanation.textContent = '🎬 지금 잰 치수만으로는 남은 부분이 이렇게 변하면서 전혀 다른 모양이 될 수 있습니다!';
       } else if (ceType === 'UNDER_MEASURED') {
         // General under-measured: distort point C wildly
         cPts[2].x += sinWave * 30;
@@ -1762,7 +2031,7 @@ function initCongruenceGame() {
 
       ceCtx.fillStyle = '#fca5a5';
       ceCtx.font = 'bold 12px Pretendard';
-      ceCtx.fillText('🚨 반례 △A"B"C"', centerCE.x - 30, centerCE.y + 70);
+      ceCtx.fillText('\uD83D\uDEA8 \uBC18\uB808 \u25B3ABC', centerCE.x - 30, centerCE.y + 70);
 
       animReqId = requestAnimationFrame(animateFrame);
     }
@@ -1811,14 +2080,16 @@ function initCongruenceGame() {
     }
     if (apiStatusMsg) apiStatusMsg.textContent = '';
 
-    gameoverModal.classList.remove('hidden');
+    if (gameoverModal) gameoverModal.classList.remove('hidden');
     fetchLeaderboard();
   }
 
-  btnRestartGame.addEventListener('click', () => {
-    gameoverModal.classList.add('hidden');
-    initGame();
-  });
+  if (btnRestartGame) {
+    btnRestartGame.onclick = () => {
+      if (gameoverModal) gameoverModal.classList.add('hidden');
+      initGame();
+    };
+  }
 
   // ----------------------------------------------------
   // Leaderboard & Firebase Realtime Database
@@ -1948,7 +2219,7 @@ function initCongruenceGame() {
 
         if (item.name) {
           const valGameId = String(item.gameId || '').trim();
-          if (valGameId !== 'congruence') return;
+          if (valGameId && valGameId !== 'congruence' && valGameId !== 'triangle' && valGameId !== 'congruence_game') return;
 
           const valName = sanitizeInput(item.name, 12);
           const valStudentId = String(item.studentId || '').trim();
@@ -2202,40 +2473,6 @@ function initCongruenceGame() {
   if (profileModal) {
     profileModal.classList.remove('hidden');
     profileModal.style.display = 'flex';
-  }
-
-  const btnStartGame = profileForm ? profileForm.querySelector('button[type="submit"]') : null;
-
-  function handleStartGame(e) {
-    if (e) e.preventDefault();
-    let cleanName = sanitizeInput(inputPlayerName ? inputPlayerName.value : '', 12);
-    if (!cleanName) {
-      cleanName = '도전자';
-      if (inputPlayerName) inputPlayerName.value = '도전자';
-    }
-
-    if (activeMode === 'school' && inputStudentId) {
-      let cleanId = sanitizeInput(inputStudentId.value, 10);
-      studentId = cleanId || '미입력';
-      safeSetStorage(idStorageKey, studentId);
-    }
-
-    playerName = cleanName;
-    safeSetStorage(nameStorageKey, playerName);
-
-    updateProfileDisplay();
-    if (profileModal) {
-      profileModal.classList.add('hidden');
-      profileModal.style.display = 'none';
-    }
-    isTimerPaused = false;
-  }
-
-  if (profileForm) {
-    profileForm.addEventListener('submit', handleStartGame);
-  }
-  if (btnStartGame) {
-    btnStartGame.addEventListener('click', handleStartGame);
   }
 }
 
