@@ -2206,6 +2206,13 @@ function initCongruenceGame() {
     }
   }
 
+  // Only this game's records (reject missing gameId — those belong to other/legacy shared dumps)
+  const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
+  function isCongruenceScore(entry) {
+    const id = String((entry && entry.gameId) || '').trim();
+    return CONGRUENCE_GAME_IDS.has(id);
+  }
+
   function processLeaderboardData(dataObj) {
     if (!dataObj) return;
     const userBestMap = new Map();
@@ -2218,8 +2225,7 @@ function initCongruenceGame() {
         if (!item || typeof item !== 'object') return;
 
         if (item.name) {
-          const valGameId = String(item.gameId || '').trim();
-          if (valGameId && valGameId !== 'congruence' && valGameId !== 'triangle' && valGameId !== 'congruence_game') return;
+          if (!isCongruenceScore(item)) return;
 
           const valName = sanitizeInput(item.name, 12);
           const valStudentId = String(item.studentId || '').trim();
@@ -2375,8 +2381,7 @@ function initCongruenceGame() {
         snapshot.forEach(child => {
           const val = child.val();
           if (val && String(val.name).trim() === String(payload.name).trim()) {
-            const valGameId = String(val.gameId || '').trim();
-            if (valGameId !== 'congruence') return;
+            if (!isCongruenceScore(val)) return;
 
             const valStudentId = String(val.studentId || '').trim();
             const valChannel = String(val.channel || '').trim();
