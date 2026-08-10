@@ -28,18 +28,11 @@
       <div class="header-left">
         <div class="game-title-group">
           <h1>📐 삼각형의 비밀: 합동 판정 작전</h1>
+          <p class="game-subtitle">필요한 만큼 변과 각을 측정하여 두 삼각형이 합동인지 확인하세요!</p>
         </div>
       </div>
 
       <div class="header-right">
-        <!-- Hall of Fame Leaderboard Button -->
-        <button id="btn-open-leaderboard" class="btn-leaderboard" title="명예의 전당 (랭킹)">
-          🏆 <span>명예의 전당</span>
-        </button>
-        <!-- Sound Toggle -->
-        <button id="btn-sound-toggle" class="btn-sound" title="음소거/음소거 해제">
-          🔊
-        </button>
         <!-- User Profile Card -->
         <div class="user-profile-card">
           <span class="profile-avatar">👤</span>
@@ -49,33 +42,34 @@
           </div>
           <button id="btn-edit-profile" class="btn-small-edit">✏️</button>
         </div>
+
+        <!-- Header Stat Badges (Reference Style) -->
+        <div class="header-stat-badge">
+          <span class="stat-badge-label">라운드</span>
+          <span class="stat-badge-val highlight-cyan" id="hud-round">1 / 5</span>
+        </div>
+        <div class="header-stat-badge">
+          <span class="stat-badge-label">총점</span>
+          <span class="stat-badge-val highlight-gold" id="hud-score">0점</span>
+        </div>
+        <div class="header-stat-badge">
+          <span class="stat-badge-label">최고 기록</span>
+          <span class="stat-badge-val" id="hud-highscore">0점</span>
+        </div>
+
+        <!-- Sound Button -->
+        <button id="btn-sound-toggle" class="btn-sound" title="음소거/음소거 해제">
+          🔊
+        </button>
       </div>
     </header>
 
     <!-- Main Game Workspace -->
     <main class="game-main">
-      <!-- Status HUD Bar -->
-      <div class="status-hud-bar">
-        <div class="hud-item">
-          <span class="hud-label">STAGE</span>
-          <span class="hud-value highlight-cyan" id="hud-round">1 / 5</span>
-        </div>
-        <div class="hud-item">
-          <span class="hud-label">SCORE</span>
-          <span class="hud-value highlight-gold" id="hud-score">0</span>
-        </div>
-        <div class="hud-item">
-          <span class="hud-label">HIGH SCORE</span>
-          <span class="hud-value" id="hud-highscore">0</span>
-        </div>
-      </div>
-
       <!-- Geometry Canvas Stage -->
       <section class="canvas-section">
-        <div class="canvas-wrapper">
-          <canvas id="geometry-canvas" width="900" height="420"></canvas>
-          
-          <!-- Tool Selection Floating Palette -->
+        <div class="canvas-tool-bar">
+          <!-- Tool Selection Palette -->
           <div class="floating-tool-palette">
             <span class="tool-guide-text">🛠️ 측정 도구:</span>
             <button id="tool-ruler" class="tool-btn active" data-tool="ruler">
@@ -85,6 +79,10 @@
               📐 각도기 (내각의 크기)
             </button>
           </div>
+        </div>
+
+        <div class="canvas-wrapper">
+          <canvas id="geometry-canvas" width="900" height="420"></canvas>
 
           <!-- Interactive Hint & Clues Overlay -->
           <div class="clues-panel" id="clues-panel">
@@ -99,16 +97,11 @@
         </div>
       </section>
 
-      <!-- Decision Submission Panel -->
+      <!-- Decision Submission Panel (Bottom Action) -->
       <section class="decision-section">
         <div class="decision-container">
-          <div class="decision-prompt-box">
-            <h3 class="decision-title">💡 이미 측정된 값을 참고해서 변의 길이나 각의 크기를 더 측정해야합니다.</h3>
-            <p class="decision-subtext">두 삼각형이 완벽히 똑같다고(합동이라고) 확신할 수 있는 치수를 모두 측정했다면 제출하세요!</p>
-          </div>
-
           <button id="btn-submit-decision" class="btn-submit-action">
-            🚀 "측정 데이터가 충분합니다!"
+            🚀 측정 데이터 제출
           </button>
         </div>
       </section>
@@ -140,6 +133,18 @@
           <!-- Educational Theorem Note -->
           <div class="math-note-box" id="math-note-box">
             💡 <strong>도움말 힌트:</strong> <span id="math-note-text">양쪽 삼각형에서 대응하는 요소들을 충분히 측정해보세요.</span>
+          </div>
+
+          <!-- Interactive View Comparison Control -->
+          <div class="view-toggle-container" id="view-toggle-container">
+            <div class="view-toggle-buttons">
+              <button type="button" id="btn-view-initial" class="btn-view-toggle">
+                👈 이전으로
+              </button>
+              <button type="button" id="btn-view-counter" class="btn-view-toggle active">
+                🔄 확인하기
+              </button>
+            </div>
           </div>
         </div>
 
@@ -298,7 +303,7 @@
         <!-- Game Purpose Banner -->
         <div class="game-guide-box short-banner">
           <div class="guide-title">📐 삼각형의 비밀: 합동 판정 작전!</div>
-          <p class="guide-desc">최소한의 측정으로 두 삼각형이 완벽히 똑같은지 증명하세요!</p>
+          <p class="guide-desc">필요한 만큼 변과 각을 측정하여 두 삼각형이 합동인지 확인하세요!</p>
         </div>
 
         <form id="profile-form">

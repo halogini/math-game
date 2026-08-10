@@ -101,15 +101,21 @@ body {
 
 .game-title-group {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .game-title-group h1 {
   font-family: var(--font-heading);
-  font-size: 1.3rem;
-  color: #ffffff;
+  font-size: 1.35rem;
+  color: #06b6d4;
   letter-spacing: -0.5px;
+}
+
+.game-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .channel-badge {
@@ -125,7 +131,34 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+/* Header Stat Badges (Reference Image Style) */
+.header-stat-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid rgba(6, 182, 212, 0.3);
+  border-radius: 12px;
+  padding: 4px 12px;
+  min-width: 68px;
+  line-height: 1.15;
+}
+
+.stat-badge-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.stat-badge-val {
+  font-family: var(--font-digit);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
 }
 
 .btn-sound {
@@ -194,7 +227,7 @@ body {
    ---------------------------------------------------- */
 .status-hud-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 2fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -293,20 +326,26 @@ body {
   cursor: crosshair;
 }
 
-/* Floating Tool Palette */
-.floating-tool-palette {
-  position: absolute;
-  top: 12px;
-  left: 12px;
+.canvas-tool-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+/* Tool Palette */
+.floating-tool-palette {
+  position: static;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.85);
+  background: var(--panel-bg);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 6px 12px;
+  border: 1px solid var(--panel-border);
+  padding: 6px 14px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .tool-guide-text {
@@ -528,33 +567,42 @@ body {
 .badge-asa { background: #db2777; color: #fff; }
 .badge-none { background: #475569; color: #fff; }
 
-.cond-desc {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  line-height: 1.3;
+.decision-section {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.decision-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .btn-submit-action {
-  width: 100%;
-  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  width: auto;
+  min-width: 280px;
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
   border: none;
   color: #fff;
   font-family: var(--font-heading);
-  font-size: 1.25rem;
-  padding: 14px;
-  border-radius: 12px;
+  font-size: 1.2rem;
+  padding: 12px 32px;
+  border-radius: 30px;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.4);
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .btn-submit-action:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.6);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 26px rgba(6, 182, 212, 0.65);
 }
 
 .btn-submit-action:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(1.0);
 }
 
 /* ----------------------------------------------------
@@ -589,21 +637,25 @@ body {
 }
 
 #result-modal.modal-backdrop {
-  background: rgba(0, 0, 0, 0.15);
+  background: transparent;
   backdrop-filter: none;
   justify-content: center;
-  align-items: center;
-  padding: 0;
+  align-items: flex-end;
+  padding: 10px;
+  padding-bottom: 72px; /* Positions right above the bottom submit button */
+  pointer-events: none;
 }
 
 #result-modal .modal-card {
+  pointer-events: auto;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(12px);
   border: 1.5px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
-  width: 440px;
-  margin-left: 440px; /* Shifts exactly 220px right of center (right triangle spot) */
-  margin-bottom: 80px; /* Shifts slightly up to avoid bottom clues panel */
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 16px 20px;
 }
 
 .modal-card {
@@ -700,8 +752,56 @@ body {
   padding: 10px 14px;
   font-size: 0.85rem;
   color: #a5f3fc;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   line-height: 1.4;
+}
+
+/* Classroom Discussion View Toggle Bar */
+.view-toggle-container {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-toggle-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary-cyan);
+}
+
+.view-toggle-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-view-toggle {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-view-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.btn-view-toggle.active {
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  border-color: #06b6d4;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
 }
 
 .btn-modal-action {
@@ -1176,11 +1276,24 @@ body {
   }
 
   .status-hud-bar {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .canvas-tool-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .btn-submit-action {
+    width: 100%;
+    font-size: 1rem;
+    padding: 10px;
   }
 
   #geometry-canvas {
-    height: 320px;
+    height: 350px;
   }
 
   .condition-options {

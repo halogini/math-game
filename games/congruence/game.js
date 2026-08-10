@@ -193,6 +193,8 @@ function initCongruenceGame() {
   let hoverTarget = null; // { type: 'side'|'angle', key: 'AB', sideIndex: 0, triangle: 'L'|'R' }
   let successAnimReqId = null;
   let failureAnimReqId = null;
+  let savedOriginalLeftPts = null;
+  let savedOriginalRightPts = null;
 
   // Preset Clue State
   let currentPresetType = 'TWO_SIDES'; // 'TWO_SIDES' | 'SIDE_AND_ANGLE' | 'SIDE_AND_TWO_ANGLES'
@@ -239,6 +241,37 @@ function initCongruenceGame() {
   const mathNoteText = document.getElementById('math-note-text');
   const btnNextRound = document.getElementById('btn-next-round');
 
+  const btnViewInitial = document.getElementById('btn-view-initial');
+  const btnViewCounter = document.getElementById('btn-view-counter');
+  let activeResultView = 'counter'; // 'initial' or 'counter'
+  let lastJudgmentResult = 'SUCCESS'; // 'SUCCESS' | 'FAILURE'
+
+  if (btnViewInitial) {
+    btnViewInitial.addEventListener('click', () => {
+      activeResultView = 'initial';
+      activeTool = null;
+      if (toolRuler) toolRuler.classList.remove('active');
+      if (toolProtractor) toolProtractor.classList.remove('active');
+      btnViewInitial.classList.add('active');
+      if (btnViewCounter) btnViewCounter.classList.remove('active');
+      renderCanvas();
+    });
+  }
+  if (btnViewCounter) {
+    btnViewCounter.addEventListener('click', () => {
+      activeResultView = 'counter';
+      activeTool = null;
+      if (toolRuler) toolRuler.classList.remove('active');
+      if (toolProtractor) toolProtractor.classList.remove('active');
+      btnViewCounter.classList.add('active');
+      if (btnViewInitial) btnViewInitial.classList.remove('active');
+
+      if (lastJudgmentResult === 'SUCCESS') {
+        playSuccessAnimation();
+      }
+    });
+  }
+
   const gameoverModal = document.getElementById('gameover-modal');
   const finalTotalScore = document.getElementById('final-total-score');
   const finalCorrectCount = document.getElementById('final-correct-count');
@@ -259,7 +292,7 @@ function initCongruenceGame() {
   }
 
   updateProfileDisplay();
-  hudHighScore.textContent = highScore;
+  hudHighScore.textContent = `${highScore}점`;
 
   // Sound Toggle Listener
   btnSoundToggle.addEventListener('click', () => {
@@ -310,7 +343,7 @@ function initCongruenceGame() {
     correctCount = 0;
     perfectCount = 0;
     ceCount = 0;
-    hudScore.textContent = '0';
+    hudScore.textContent = '0점';
     fetchLeaderboard();
     startRound(currentRound);
   }
@@ -328,6 +361,14 @@ function initCongruenceGame() {
     userClickSet.clear();
     hoverTarget = null; // Clear any stale hover/selection highlight left over from the previous round
     uncheckRadios();
+
+    // Re-enable measurement tools for active round play
+    const floatingToolPalette = document.querySelector('.floating-tool-palette');
+    if (floatingToolPalette) {
+      floatingToolPalette.style.opacity = '1.0';
+      floatingToolPalette.style.pointerEvents = 'auto';
+    }
+    setTool('ruler');
 
     // Generate Triangle Data based on Round Preset
     generateRoundData(roundNum);
@@ -395,9 +436,9 @@ function initCongruenceGame() {
       trueTheorem = 'ASA';
     }
 
-    // Base Triangle Parameters: Base = b, Side2 = a, Angle between = C
-    const b = 120 + Math.floor(Math.random() * 40); // 120~160 px
-    const a = 110 + Math.floor(Math.random() * 40); // 110~150 px
+    // Base Triangle Parameters: Base = b, Side2 = a, Angle between = C (Larger size for better mobile readability!)
+    const b = 175 + Math.floor(Math.random() * 40); // 175~215 px
+    const a = 160 + Math.floor(Math.random() * 40); // 160~200 px
     const angleC_deg = 45 + Math.floor(Math.random() * 50); // 45~95 deg
     const radC = (angleC_deg * Math.PI) / 180;
 
@@ -406,13 +447,13 @@ function initCongruenceGame() {
     const angleA_deg = (Math.acos((b * b + c * c - a * a) / (2 * b * c)) * 180) / Math.PI;
     const angleB_deg = 180 - angleC_deg - angleA_deg;
 
-    // Scale Factor for cm display (e.g. 20px = 1cm)
-    const pxPerCm = 20;
+    // Scale Factor for cm display (25px = 1cm)
+    const pxPerCm = 25;
 
     // Left Triangle Vertices (A, B, C)
-    const centerL = { x: 230, y: 220 };
-    const pC_L = { x: centerL.x - b / 2, y: centerL.y + 40 };
-    const pA_L = { x: centerL.x + b / 2, y: centerL.y + 40 };
+    const centerL = { x: 230, y: 230 };
+    const pC_L = { x: centerL.x - b / 2, y: centerL.y + 60 };
+    const pA_L = { x: centerL.x + b / 2, y: centerL.y + 60 };
     const pB_L = {
       x: pC_L.x + a * Math.cos(radC),
       y: pC_L.y - a * Math.sin(radC)
@@ -434,7 +475,7 @@ function initCongruenceGame() {
     };
 
     // Right Triangle Vertices (D, E, F)
-    const centerR = { x: 670, y: 220 };
+    const centerR = { x: 670, y: 230 };
     let rot = (round === 5 || round === 1) ? Math.PI / 4 : (Math.random() * 0.3 - 0.15); // Rotation angle
 
     let rightA = angleA_deg, rightB = angleB_deg, rightC = angleC_deg;
@@ -468,6 +509,9 @@ function initCongruenceGame() {
         Math.round(rightC)
       ]
     };
+
+    savedOriginalLeftPts = triangleLeft.pts.map(p => ({ x: p.x, y: p.y }));
+    savedOriginalRightPts = triangleRight.pts.map(p => ({ x: p.x, y: p.y }));
 
     // Pre-measure 1 or 2 clues on Right Triangle automatically as puzzle starting hints!
     presetAngleKeys = [];
@@ -531,11 +575,24 @@ function initCongruenceGame() {
     ctx.beginPath(); ctx.moveTo(450, 20); ctx.lineTo(450, 400); ctx.stroke();
 
     // Draw Triangles
+    const prevLeftPts = triangleLeft ? triangleLeft.pts : null;
+    const prevRightPts = triangleRight ? triangleRight.pts : null;
+
+    if (activeResultView === 'initial' && savedOriginalLeftPts && savedOriginalRightPts && triangleLeft && triangleRight) {
+      triangleLeft.pts = savedOriginalLeftPts;
+      triangleRight.pts = savedOriginalRightPts;
+    }
+
     drawSingleTriangle(triangleLeft, 'L');
     drawSingleTriangle(triangleRight, 'R');
 
+    if (prevLeftPts && prevRightPts && triangleLeft && triangleRight) {
+      triangleLeft.pts = prevLeftPts;
+      triangleRight.pts = prevRightPts;
+    }
+
     // Draw Tool Hover Overlay
-    if (hoverTarget) {
+    if (hoverTarget && (!resultModal || resultModal.classList.contains('hidden'))) {
       drawHoverOverlay(hoverTarget);
     }
   }
@@ -868,6 +925,7 @@ function initCongruenceGame() {
   }
 
   function findTargetAt(mx, my) {
+    if (resultModal && !resultModal.classList.contains('hidden')) return null;
     // Check Triangle Left
     const targetL = checkTriangleTarget(triangleLeft, 'L', mx, my);
     if (targetL) return targetL;
@@ -878,11 +936,15 @@ function initCongruenceGame() {
   function checkTriangleTarget(tri, sideTag, mx, my) {
     if (!tri) return null;
 
+    const isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const angleRadius = isTouch ? 36 : 28;
+    const sideRadius = isTouch ? 26 : 18;
+
     // Check Angles (Vertices) first
     for (let i = 0; i < 3; i++) {
       const pt = tri.pts[i];
       const dist = Math.hypot(mx - pt.x, my - pt.y);
-      if (dist < 20 && activeTool === 'protractor') {
+      if (dist < angleRadius && activeTool === 'protractor') {
         const angleNames = sideTag === 'L' ? ['A', 'B', 'C'] : ['D', 'E', 'F'];
         const key = `${sideTag}_angle_${angleNames[i]}`;
         if (measuredSet.has(key)) continue; // Already measured, ignore hover
@@ -895,7 +957,7 @@ function initCongruenceGame() {
       const p1 = tri.pts[i];
       const p2 = tri.pts[(i + 1) % 3];
       const dist = distToSegment({ x: mx, y: my }, p1, p2);
-      if (dist < 12 && activeTool === 'ruler') {
+      if (dist < sideRadius && activeTool === 'ruler') {
         const sideNames = sideTag === 'L' ? ['AB', 'BC', 'CA'] : ['DE', 'EF', 'FD'];
         const key = `${sideTag}_side_${sideNames[i]}`;
         if (measuredSet.has(key)) continue; // Already measured, ignore hover
@@ -1042,6 +1104,7 @@ function initCongruenceGame() {
     const isValidProof = hasSSS || hasSAS || hasASA;
 
     if (!isValidProof) {
+      lastJudgmentResult = 'FAILURE';
       ceCount++;
       sounds.playCounterExample();
       let ceType = 'UNDER_MEASURED';
@@ -1052,14 +1115,15 @@ function initCongruenceGame() {
         msg = '🚨 각도만 측정하면 모양은 같아도 크기가 다른 삼각형이 만들어질 수 있습니다! 변도 측정해보세요.';
       } else if (pairedSideIdx.length === 2 && pairedAngleIdx.length >= 1) {
         ceType = 'SSA_TRAP';
-        msg = '🚨 지금 잰 치수만으로는 모양이 두 가지로 나올 수 있어요. 다른 변이나 각을 측정해보세요.';
+        msg = '🚨 지금 잰 치수만으로는 두 삼각형이 합동인 것을 장담할 수 없습니다! 다른 변이나 각을 측정해보세요.';
       }
 
       playFailureAnimation(ceType, msg, pairedSides, pairedAngles, () => {
         showResultModal(false, '0점', msg, ceType, getMathNoteText(ceType));
       });
     } else {
-      // SUCCESSFUL CONGRUENCE PROOF! Check multiple valid optimal routes
+      // SUCCESSFUL CONGRUENCE PROOF!
+      lastJudgmentResult = 'SUCCESS';
       let utilizedPresetAngle = true;
       if (currentPresetType === 'SIDE_AND_ANGLE' || currentPresetType === 'SIDE_AND_TWO_ANGLES') {
         let angleUsed = false;
@@ -1099,7 +1163,6 @@ function initCongruenceGame() {
       }
 
       // Dynamic scoring based on timeBonus (0-30 pts) and extra student clicks penalty (15 pts per click)
-      // Note: bonusAngleKeys (180-deg auto-revealed 3rd angle) are FREE deductions and NOT student clicks!
       const userClickCount = userClickSet.size; // Direct clicks by student
       const presetClueCount = currentPresetCount || 2;
       const minRequiredUserClicks = Math.max(1, 6 - Math.min(5, presetClueCount));
@@ -1111,16 +1174,17 @@ function initCongruenceGame() {
         totalScore += points;
         correctCount++;
         perfectCount++;
-        hudScore.textContent = totalScore;
+        hudScore.textContent = `${totalScore}점`;
 
         playSuccessAnimation(() => {
           sounds.playSuccess();
           showResultModal(
             true,
             points === 100 ? '🌟 100점 만점!' : `🌟 +${points}점`,
-            `🎯 군더더기 없는 최적의 측정(${userClickCount}회)으로 합동 입증 성공!`,
+            '🎯 군더더기 없는 최적의 측정으로 합동 입증 성공!',
             null,
-            `주어진 힌트를 활용해 '${routeName || '합동'}' 조건으로 깔끔하게 입증했습니다.`
+            `주어진 힌트를 활용해 '${routeName || '합동'}' 조건으로 깔끔하게 입증했습니다.`,
+            '판정 성공!'
           );
         });
       } else {
@@ -1130,7 +1194,7 @@ function initCongruenceGame() {
 
         totalScore += points;
         correctCount++;
-        hudScore.textContent = totalScore;
+        hudScore.textContent = `${totalScore}점`;
 
         playSuccessAnimation(() => {
           sounds.playSuccess();
@@ -1138,9 +1202,10 @@ function initCongruenceGame() {
           showResultModal(
             true,
             `+${points}점 (불필요한 측정 -${inefficiencyPenalty}점)`,
-            `⚠️ 합동 입증은 성공했지만, 추가 측정(${extraClicks}회)이 포함되었습니다.`,
+            '두 삼각형의 합동은 확인됐지만 측정데이터를 모으는 데 에너지가 너무 소비됐습니다.',
             null,
-            `필수 치수만으로 최소 입증 시 100점 만점을 받을 수 있습니다.`
+            '필수 치수만으로 최소 입증 시 100점 만점을 받을 수 있습니다.',
+            '판정은 성공했으나...'
           );
         });
       }
@@ -1179,15 +1244,36 @@ function initCongruenceGame() {
   // ----------------------------------------------------
   // Result Modal & Counter-Example Visual Renderer
   // ----------------------------------------------------
-  function showResultModal(isSuccess, scoreBadgeText, subtitle, ceType, mathNote) {
+  function showResultModal(isSuccess, scoreBadgeText, subtitle, ceType, mathNote, customTitle) {
     resultScoreBadge.textContent = scoreBadgeText;
     resultSubtitle.textContent = subtitle;
     mathNoteText.textContent = mathNote;
 
+    activeTool = null;
+    if (toolRuler) toolRuler.classList.remove('active');
+    if (toolProtractor) toolProtractor.classList.remove('active');
+    hoverTarget = null;
+
+    const floatingToolPalette = document.querySelector('.floating-tool-palette');
+    if (floatingToolPalette) {
+      floatingToolPalette.style.opacity = '0.4';
+      floatingToolPalette.style.pointerEvents = 'none';
+    }
+
+    activeResultView = 'counter';
+    if (btnViewCounter) btnViewCounter.classList.add('active');
+    if (btnViewInitial) btnViewInitial.classList.remove('active');
+
     if (isSuccess) {
-      resultHeader.style.color = '#10b981';
-      resultIcon.textContent = '🌟';
-      resultTitle.textContent = '판정 성공!';
+      if (customTitle === '판정은 성공했으나...') {
+        resultHeader.style.color = '#f59e0b';
+        resultIcon.textContent = '⚠️';
+        resultTitle.textContent = '판정은 성공했으나...';
+      } else {
+        resultHeader.style.color = '#10b981';
+        resultIcon.textContent = '🌟';
+        resultTitle.textContent = customTitle || '판정 성공!';
+      }
       counterExampleBox.style.display = 'none';
     } else {
       resultHeader.style.color = '#ef4444';
@@ -1224,8 +1310,7 @@ function initCongruenceGame() {
     const oldHover = hoverTarget;
     hoverTarget = null;
     
-    // Store original right triangle points
-    const originalRightPts = triangleRight.pts.map(p => ({x: p.x, y: p.y}));
+    const baseRightPts = savedOriginalRightPts || triangleRight.pts.map(p => ({x: p.x, y: p.y}));
     
     function animateSuccess(timestamp) {
       if (!startTime) startTime = timestamp;
@@ -1235,7 +1320,7 @@ function initCongruenceGame() {
       const ease = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
       
       // Interpolate right points towards left points
-      triangleRight.pts = originalRightPts.map((pt, i) => {
+      triangleRight.pts = baseRightPts.map((pt, i) => {
         const targetPt = triangleLeft.pts[i];
         return {
           x: pt.x + (targetPt.x - pt.x) * ease,
@@ -1437,7 +1522,24 @@ function initCongruenceGame() {
                   const sNow = sCurrent + (sTarget - sCurrent) * blend;
                   refMove.x = refBase.x + ux * sNow;
                   refMove.y = refBase.y + uy * sNow;
+                } else {
+                  // Fallback: Hinge refMove around refDrop to visibly swing the unmeasured angle into different shapes!
+                  const rotatePt = (pt, center, angle) => {
+                    const dx = pt.x - center.x, dy = pt.y - center.y;
+                    return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
+                  };
+                  const shifted = rotatePt(refMove, refDrop, t * 0.25);
+                  refMove.x = shifted.x;
+                  refMove.y = shifted.y;
                 }
+              } else {
+                const rotatePt = (pt, center, angle) => {
+                  const dx = pt.x - center.x, dy = pt.y - center.y;
+                  return { x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle), y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle) };
+                };
+                const shifted = rotatePt(refMove, refDrop, t * 0.25);
+                refMove.x = shifted.x;
+                refMove.y = shifted.y;
               }
             }
           }
@@ -1508,10 +1610,16 @@ function initCongruenceGame() {
       }
       
       const prevLeftPts = triangleLeft.pts;
-      triangleLeft.pts = [p0_L, p1_L, p2_L];
-      triangleRight.pts = [p0_R, p1_R, p2_R];
-      renderCanvas();
-      triangleLeft.pts = prevLeftPts;
+      const prevRightPts = triangleRight.pts;
+      if (activeResultView === 'initial') {
+        renderCanvas();
+      } else {
+        triangleLeft.pts = [p0_L, p1_L, p2_L];
+        triangleRight.pts = [p0_R, p1_R, p2_R];
+        renderCanvas();
+        triangleLeft.pts = prevLeftPts;
+        triangleRight.pts = prevRightPts;
+      }
       
       // Trigger modal immediately when wiggling starts (1.5s) instead of waiting for an end
       if (elapsed >= 1500 && !notified) {
@@ -1647,7 +1755,7 @@ function initCongruenceGame() {
     if (totalScore > highScore && totalScore > 0) {
       highScore = totalScore;
       safeSetStorage(highScoreStorageKey, highScore);
-      hudHighScore.textContent = highScore;
+      hudHighScore.textContent = `${highScore}점`;
       newHighscoreBanner.classList.remove('hidden');
     } else {
       newHighscoreBanner.classList.add('hidden');
@@ -2029,21 +2137,31 @@ function initCongruenceGame() {
   }
 
   // Pre-fill profile inputs on load
-  if (inputPlayerName && !inputPlayerName.value) {
-    inputPlayerName.value = playerName || '도전자';
+  function openProfileModal() {
+    if (inputPlayerName) inputPlayerName.value = playerName || '도전자';
+    if (activeMode === 'school' && inputStudentId) inputStudentId.value = studentId || '미입력';
+    if (profileModal) {
+      profileModal.classList.remove('hidden');
+      profileModal.style.display = 'flex';
+    }
   }
 
+  const userProfileCard = document.querySelector('.user-profile-card');
+  if (userProfileCard) {
+    userProfileCard.style.cursor = 'pointer';
+    userProfileCard.addEventListener('click', openProfileModal);
+  }
   if (btnEditProfile) {
-    btnEditProfile.addEventListener('click', () => {
-      inputPlayerName.value = playerName || '도전자';
-      if (activeMode === 'school') inputStudentId.value = studentId || '미입력';
-      profileModal.classList.remove('hidden');
+    btnEditProfile.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openProfileModal();
     });
   }
 
   // Show profile modal on load
   if (profileModal) {
     profileModal.classList.remove('hidden');
+    profileModal.style.display = 'flex';
   }
 
   const btnStartGame = profileForm ? profileForm.querySelector('button[type="submit"]') : null;
