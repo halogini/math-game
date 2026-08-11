@@ -159,6 +159,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const sceneBadge = document.getElementById("scene-badge");
   const sceneHint = document.getElementById("scene-hint");
   const btnSceneAction = document.getElementById("btn-scene-action");
+  const playHud = document.getElementById("play-hud");
+  const headerHudSlot = document.getElementById("header-hud-slot");
+  const playHudSlot = document.getElementById("play-hud-slot");
+  const hudOverlayMq = window.matchMedia(
+    "(max-width: 720px), (orientation: landscape) and (max-height: 520px)"
+  );
+
+  function syncHudPlacement() {
+    if (!playHud || !headerHudSlot || !playHudSlot) return;
+    const overlay = hudOverlayMq.matches;
+    document.body.classList.toggle("hud-overlay-mobile", overlay);
+    const host = overlay ? playHudSlot : headerHudSlot;
+    if (playHud.parentElement !== host) host.appendChild(playHud);
+  }
+  syncHudPlacement();
+  if (typeof hudOverlayMq.addEventListener === "function") {
+    hudOverlayMq.addEventListener("change", syncHudPlacement);
+  } else if (typeof hudOverlayMq.addListener === "function") {
+    hudOverlayMq.addListener(syncHudPlacement);
+  }
+  window.addEventListener("orientationchange", () => setTimeout(syncHudPlacement, 50));
+  window.addEventListener("resize", () => {
+    clearTimeout(syncHudPlacement._t);
+    syncHudPlacement._t = setTimeout(syncHudPlacement, 80);
+  });
 
   const quizModal = document.getElementById("quiz-modal");
   const quizPrompt = document.getElementById("quiz-prompt");
@@ -4542,35 +4567,102 @@ document.addEventListener("DOMContentLoaded", () => {
     return activeMode === "dorms" ? isDormsEntry(v) : !isDormsEntry(v);
   }
 
+  function renderLeaderboardSkeleton(tbody, rowCount = 5) {
+    if (!tbody) return;
+    const widths = activeMode === "dorms"
+      ? ["w-xs", "w-md", "w-lg"]
+      : ["w-xs", "w-md", "w-sm", "w-lg"];
+    let html = "";
+    for (let i = 0; i < rowCount; i++) {
+      html += `<tr class="lb-skeleton-row" aria-hidden="true">${widths.map((w) =>
+        `<td><span class="lb-skeleton-bar ${w}"></span></td>`
+      ).join("")}</tr>`;
+    }
+    tbody.setAttribute("aria-busy", "true");
+    tbody.innerHTML = html;
+  }
+
+  function showChampSkeleton() {
+    if (openingChampName) {
+      openingChampName.innerHTML = '<span class="lb-skeleton-bar w-md" aria-hidden="true"></span>';
+    }
+    if (openingChampId) {
+      if (activeMode === "dorms") {
+        openingChampId.style.display = "none";
+      } else {
+        openingChampId.style.display = "";
+        openingChampId.innerHTML = '<span class="lb-skeleton-bar w-sm" aria-hidden="true"></span>';
+      }
+    }
+    if (openingChampScore) {
+      openingChampScore.innerHTML = '<span class="lb-skeleton-bar w-lg" aria-hidden="true"></span>';
+    }
+  }
+
   async function loadLeaderboard() {
     const gameoverTbody = document.getElementById("gameover-leaderboard-tbody");
     const colSpan = activeMode === "dorms" ? 3 : 4;
-    const loadingHtml = `<tr><td colspan='${colSpan}'>불러오는 중…</td></tr>`;
     const emptyHtml = `<tr><td colspan='${colSpan}'>아직 기록이 없습니다</td></tr>`;
     const failHtml = `<tr><td colspan='${colSpan}'>불러오기 실패</td></tr>`;
-    if (gameoverTbody) gameoverTbody.innerHTML = loadingHtml;
-    if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = loadingHtml;
+    showChampSkeleton();
+    renderLeaderboardSkeleton(gameoverTbody);
+    renderLeaderboardSkeleton(openingLeaderboardTbody);
 
-    if (!firebaseDb) {
-      if (gameoverTbody) gameoverTbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
-      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
-      updateOpeningChamp(null);
-      return;
-    }
+    const scoresUrl = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
+
+    const fetchScoresMap = async () => {
+      if (firebaseDb) {
+        try {
+          const snap = await Promise.race([
+            firebaseDb.ref(LB_PATH).once("value"),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("lb-timeout")), 2500))
+          ]);
+          return snap.val() || {};
+        } catch (err) {
+          console.warn("three-chances SDK leaderboard failed:", err);
+        }
+      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(scoresUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) return null;
+        return (await res.json()) || {};
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("three-chances REST leaderboard failed:", err);
+        return null;
+      }
+    };
+
     try {
-      const snap = await firebaseDb.ref(LB_PATH).once("value");
+      const data = await fetchScoresMap();
+      if (data == null) {
+        if (gameoverTbody) {
+          gameoverTbody.removeAttribute("aria-busy");
+          gameoverTbody.innerHTML = failHtml;
+        }
+        if (openingLeaderboardTbody) {
+          openingLeaderboardTbody.removeAttribute("aria-busy");
+          openingLeaderboardTbody.innerHTML = failHtml;
+        }
+        updateOpeningChamp(null);
+        return;
+      }
       const best = new Map();
-      snap.forEach((child) => {
-        const v = child.val();
-        if (!v || !isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
+      Object.keys(data).forEach((key) => {
+        const v = data[key];
+        if (!v || typeof v !== "object" || Array.isArray(v)) return;
+        if (!isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
         const name = sanitizeInput(v.name || "", 12);
         const sid = sanitizeInput(v.studentId || "", 10);
-        const key = activeMode === "dorms" ? name : `${name}_${sid}`;
+        const mapKey = activeMode === "dorms" ? name : `${name}_${sid}`;
         const clearMs = Number(v.clearTimeMs);
         if (!Number.isFinite(clearMs) || clearMs <= 0) return;
-        const prev = best.get(key);
+        const prev = best.get(mapKey);
         if (!prev || clearMs < prev.clearTimeMs) {
-          best.set(key, { name, studentId: sid, clearTimeMs: clearMs });
+          best.set(mapKey, { name, studentId: sid, clearTimeMs: clearMs });
         }
       });
       const top = Array.from(best.values())
@@ -4580,8 +4672,14 @@ document.addEventListener("DOMContentLoaded", () => {
       updateOpeningChamp(top[0] || null);
 
       if (!top.length) {
-        if (gameoverTbody) gameoverTbody.innerHTML = emptyHtml;
-        if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = emptyHtml;
+        if (gameoverTbody) {
+          gameoverTbody.removeAttribute("aria-busy");
+          gameoverTbody.innerHTML = emptyHtml;
+        }
+        if (openingLeaderboardTbody) {
+          openingLeaderboardTbody.removeAttribute("aria-busy");
+          openingLeaderboardTbody.innerHTML = emptyHtml;
+        }
         return;
       }
       const rowsHtml = top.map((r, i) => {
@@ -4590,11 +4688,23 @@ document.addEventListener("DOMContentLoaded", () => {
           : `<td>${escapeHtml(r.studentId || "-")}</td>`;
         return `<tr><td>${i + 1}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
       }).join("");
-      if (gameoverTbody) gameoverTbody.innerHTML = rowsHtml;
-      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = rowsHtml;
+      if (gameoverTbody) {
+        gameoverTbody.removeAttribute("aria-busy");
+        gameoverTbody.innerHTML = rowsHtml;
+      }
+      if (openingLeaderboardTbody) {
+        openingLeaderboardTbody.removeAttribute("aria-busy");
+        openingLeaderboardTbody.innerHTML = rowsHtml;
+      }
     } catch (e) {
-      if (gameoverTbody) gameoverTbody.innerHTML = failHtml;
-      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = failHtml;
+      if (gameoverTbody) {
+        gameoverTbody.removeAttribute("aria-busy");
+        gameoverTbody.innerHTML = failHtml;
+      }
+      if (openingLeaderboardTbody) {
+        openingLeaderboardTbody.removeAttribute("aria-busy");
+        openingLeaderboardTbody.innerHTML = failHtml;
+      }
       updateOpeningChamp(null);
     }
   }
@@ -4629,10 +4739,6 @@ document.addEventListener("DOMContentLoaded", () => {
       msg.textContent = "다섯 수조를 모두 고쳐야 등록할 수 있어요.";
       return;
     }
-    if (!firebaseDb) {
-      msg.textContent = "서버에 연결되지 않았습니다.";
-      return;
-    }
     const cleanName = sanitizeInput(playerName || "", 12);
     if (!cleanName) {
       msg.textContent = "이름을 먼저 등록해 주세요.";
@@ -4647,20 +4753,70 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     msg.textContent = "등록 중…";
     if (btn) btn.disabled = true;
+
+    const payload = {
+      name: cleanName,
+      studentId: activeMode === "dorms" ? "DORMS" : sanitizeInput(studentId || "", 10),
+      clearTimeMs: Number(clearTimeMs),
+      // Higher is better for shared scores ordering; derived from faster clear times.
+      score: Math.max(0, Math.min(500, Math.round(500 - Number(clearTimeMs) / 1000))),
+      channel: activeMode === "dorms" ? "dorms" : "school",
+      gameId: GAME_ID,
+      timestamp: Date.now()
+    };
+    const scoresUrl = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
+
+    const saveViaREST = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      try {
+        const restRes = await fetch(scoresUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (restRes.ok) return true;
+        const errText = await restRes.text().catch(() => "");
+        console.error("three-chances REST score save failed:", restRes.status, errText);
+        return false;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("three-chances REST score save error:", err);
+        return false;
+      }
+    };
+
     try {
-      const payload = {
-        name: cleanName,
-        studentId: activeMode === "dorms" ? "DORMS" : sanitizeInput(studentId || "", 10),
-        clearTimeMs: Number(clearTimeMs),
-        // Higher is better for shared scores ordering; derived from faster clear times.
-        score: Math.max(0, Math.min(500, Math.round(500 - Number(clearTimeMs) / 1000))),
-        channel: activeMode === "dorms" ? "dorms" : "school",
-        gameId: GAME_ID,
-        timestamp: Date.now()
-      };
-      await firebaseDb.ref(LB_PATH).push(payload);
-      msg.textContent = "클리어 시간이 등록되었습니다!";
-      loadLeaderboard();
+      let ok = false;
+      if (firebaseDb) {
+        const sdkSave = (async () => {
+          await firebaseDb.ref(LB_PATH).push(payload);
+          return true;
+        })();
+        const timedOut = await Promise.race([
+          sdkSave.then(() => false).catch((err) => {
+            console.warn("three-chances SDK push failed:", err);
+            return "fail";
+          }),
+          new Promise((resolve) => setTimeout(() => resolve("timeout"), 2500))
+        ]);
+        if (timedOut === false) {
+          ok = true;
+        } else {
+          ok = await saveViaREST();
+        }
+      } else {
+        ok = await saveViaREST();
+      }
+
+      if (ok) {
+        msg.textContent = "클리어 시간이 등록되었습니다!";
+        loadLeaderboard();
+      } else {
+        msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
+      }
     } catch (e) {
       console.error("three-chances score submit failed:", e);
       msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";

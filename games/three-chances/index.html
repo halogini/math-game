@@ -24,18 +24,20 @@
           <h1>기회는 세 번! 구멍을 메워라!</h1>
         </div>
       </div>
-      <div class="header-hud">
-        <div class="user-profile-card">
-          <span class="profile-avatar">👤</span>
-          <div class="profile-text">
-            <span class="profile-name" id="display-profile-name">도전자</span>
-            <span class="profile-id" id="display-profile-id">학번 미입력</span>
-          </div>
-          <button id="btn-edit-profile" class="btn-small-edit" type="button">✏️</button>
+      <div class="user-profile-card">
+        <span class="profile-avatar">👤</span>
+        <div class="profile-text">
+          <span class="profile-name" id="display-profile-name">도전자</span>
+          <span class="profile-id" id="display-profile-id">학번 미입력</span>
         </div>
-        <div class="tool-slots" id="tool-slots" aria-label="입에 문 도구"></div>
-        <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
-        <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
+        <button id="btn-edit-profile" class="btn-small-edit" type="button">✏️</button>
+      </div>
+      <div id="header-hud-slot" class="header-hud-slot">
+        <div id="play-hud" class="play-hud">
+          <div class="tool-slots" id="tool-slots" aria-label="입에 문 도구"></div>
+          <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
+          <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
+        </div>
       </div>
     </header>
 
@@ -63,6 +65,7 @@
               <button type="button" class="btn-scene btn-scene-primary hidden" id="btn-scene-action">챙겼어요!</button>
             </div>
           </div>
+          <div id="play-hud-slot" class="play-hud-slot"></div>
         </div>
       </section>
     </main>

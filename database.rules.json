@@ -2,6 +2,11 @@
   "rules": {
     ".read": true,
     "scores": {
+      ".indexOn": ["score", "gameId"],
+      "$score_id": {
+        ".write": "!data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val()))",
+        ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length() > 0 && newData.child('name').val().length() <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500 && (!newData.hasChild('studentId') || (newData.child('studentId').isString() && newData.child('studentId').val().length() > 0 && newData.child('studentId').val().length() <= 10)) && (!newData.hasChild('gameId') || newData.child('gameId').isString()) && (!newData.hasChild('clearTimeMs') || newData.child('clearTimeMs').isNumber()) && (!newData.hasChild('channel') || newData.child('channel').isString())"
+      },
       "school": {
         ".indexOn": ["score"],
         "$score_id": {

@@ -759,6 +759,8 @@ function initBingsooGame() {
   // ----------------------------------------------------
   let bingsooFirebaseRetryCount = 0;
   function listenRealtimeLeaderboard() {
+    showLeaderboardSkeletons();
+
     const fetchViaREST = () => {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 3500);
@@ -885,8 +887,47 @@ function initBingsooGame() {
     renderOpeningHallOfFame(top20);
   }
 
+  function renderLeaderboardSkeleton(tbody, rowCount = 5) {
+    if (!tbody) return;
+    const widths = activeMode === 'school'
+      ? ['w-xs', 'w-md', 'w-sm', 'w-lg']
+      : ['w-xs', 'w-md', 'w-lg'];
+    let html = '';
+    for (let i = 0; i < rowCount; i++) {
+      html += `<tr class="lb-skeleton-row" aria-hidden="true">${widths.map((w) =>
+        `<td><span class="lb-skeleton-bar ${w}"></span></td>`
+      ).join('')}</tr>`;
+    }
+    tbody.setAttribute('aria-busy', 'true');
+    tbody.innerHTML = html;
+  }
+
+  function showChampSkeleton() {
+    if (openingChampName) {
+      openingChampName.innerHTML = '<span class="lb-skeleton-bar w-md" aria-hidden="true"></span>';
+    }
+    if (openingChampId) {
+      if (activeMode === 'school') {
+        openingChampId.style.display = '';
+        openingChampId.innerHTML = '<span class="lb-skeleton-bar w-sm" aria-hidden="true"></span>';
+      } else {
+        openingChampId.style.display = 'none';
+      }
+    }
+    if (openingChampScore) {
+      openingChampScore.innerHTML = '<span class="lb-skeleton-bar w-lg" aria-hidden="true"></span>';
+    }
+  }
+
+  function showLeaderboardSkeletons() {
+    showChampSkeleton();
+    renderLeaderboardSkeleton(openingLeaderboardTbody);
+    renderLeaderboardSkeleton(leaderboardTbody);
+  }
+
   function renderOpeningHallOfFame(list) {
     if (!openingLeaderboardTbody) return;
+    openingLeaderboardTbody.removeAttribute('aria-busy');
     openingLeaderboardTbody.innerHTML = '';
 
     const colSpan = activeMode === 'school' ? 4 : 3;
@@ -920,6 +961,7 @@ function initBingsooGame() {
 
   function renderHallOfFame(list) {
     if (!leaderboardTbody) return;
+    leaderboardTbody.removeAttribute('aria-busy');
     leaderboardTbody.innerHTML = '';
 
     const colSpan = activeMode === 'school' ? 4 : 3;

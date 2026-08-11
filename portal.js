@@ -250,6 +250,22 @@ document.addEventListener('DOMContentLoaded', () => {
       activeLeaderboardGame === 'three-chances' ? '클리어 시간' : '최고 점수';
   }
 
+  function renderLeaderboardSkeleton(tbody, rowCount = 6) {
+    if (!tbody) return;
+    const showId = activeMode === 'school';
+    const widths = showId
+      ? ['w-xs', 'w-md', 'w-sm', 'w-lg']
+      : ['w-xs', 'w-md', 'w-lg'];
+    let html = '';
+    for (let i = 0; i < rowCount; i++) {
+      html += `<tr class="lb-skeleton-row" aria-hidden="true">${widths.map((w) =>
+        `<td><span class="lb-skeleton-bar ${w}"></span></td>`
+      ).join('')}</tr>`;
+    }
+    tbody.setAttribute('aria-busy', 'true');
+    tbody.innerHTML = html;
+  }
+
   if (leaderboardTabs) {
     leaderboardTabs.addEventListener('click', (e) => {
       const btn = e.target.closest('.lb-tab');
@@ -281,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function listenRealtimeLeaderboard() {
     stopLeaderboardListeners();
+    renderLeaderboardSkeleton(leaderboardTbody);
     if (!firebaseDb) {
       renderLeaderboardTable([]);
       return;
@@ -296,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const scoresRef = firebaseDb.ref('scores');
     const onScores = scoresRef.on('value', (snap) => process(snap.val()), (err) => {
       console.error('Leaderboard fetch error:', err);
+      renderLeaderboardTable([]);
     });
     scoresUnsub = () => scoresRef.off('value', onScores);
   }
@@ -373,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderLeaderboardTable(list) {
     if (!leaderboardTbody) return;
+    leaderboardTbody.removeAttribute('aria-busy');
     leaderboardTbody.innerHTML = '';
 
     const colSpan = activeMode === 'school' ? 4 : 3;

@@ -868,6 +868,40 @@ body {
   color: #0369a1;
 }
 
+@keyframes lb-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.lb-skeleton-row td {
+  vertical-align: middle;
+}
+
+.lb-skeleton-bar {
+  display: block;
+  height: 0.85em;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.28) 25%,
+    rgba(148, 163, 184, 0.5) 37%,
+    rgba(148, 163, 184, 0.28) 63%
+  );
+  background-size: 400% 100%;
+  animation: lb-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.lb-skeleton-bar.w-xs { width: 22%; }
+.lb-skeleton-bar.w-sm { width: 36%; }
+.lb-skeleton-bar.w-md { width: 58%; }
+.lb-skeleton-bar.w-lg { width: 44%; }
+
+.champ-name .lb-skeleton-bar,
+.champ-id .lb-skeleton-bar,
+.champ-score .lb-skeleton-bar {
+  margin: 0.15em 0;
+}
+
 .rank-1 { color: #d97706; font-weight: 800; }
 .rank-2 { color: #475569; font-weight: 800; }
 .rank-3 { color: #b45309; font-weight: 800; }
