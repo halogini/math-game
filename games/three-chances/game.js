@@ -156,14 +156,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const toolSlots = document.getElementById("tool-slots");
   const tankPips = document.getElementById("tank-pips");
   const sceneChrome = document.getElementById("scene-chrome");
-  const sceneBadge = document.getElementById("scene-badge");
-  const sceneHint = document.getElementById("scene-hint");
   const btnSceneAction = document.getElementById("btn-scene-action");
   const playHud = document.getElementById("play-hud");
   const headerHudSlot = document.getElementById("header-hud-slot");
   const playHudSlot = document.getElementById("play-hud-slot");
   const hudOverlayMq = window.matchMedia(
-    "(max-width: 720px), (orientation: landscape) and (max-height: 520px)"
+    "(orientation: landscape) and (max-height: 520px)"
   );
 
   function syncHudPlacement() {
@@ -228,6 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let pendingStartAfterIntro = false;
   let pendingGameOverAfterSuccess = false;
   let pendingGameOverAfterTimeout = false;
+  let endedByTimeout = false;
   let timeLeftMs = TIME_LIMIT_MS;
   let lastTs = 0;
 
@@ -1205,7 +1204,7 @@ document.addEventListener("DOMContentLoaded", () => {
       refreshUI();
       return;
     }
-    // 닫힌 삼각형이면 완성 — 구멍과 달라도 패치로 가져가 설치(안 맞으면 튕김)
+    // 닫힌 삼각형이면 완성 — 구멍과 달라도 삼각형 조각으로 가져가 설치(안 맞으면 튕김)
     buildOk = constructionMatchesHole();
     if (buildOk) {
       plankDesign = hole.designPts.map((p) => ({ ...p }));
@@ -1308,7 +1307,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return false;
   }
 
-  /** 패치 조립: 마지막 작도 단계 되돌리기 */
+  /** 삼각형 조각 조립: 마지막 작도 단계 되돌리기 */
   function undoAssembleStep() {
     if (!canUndoAssembleStep()) {
       if (asm && (asm.pendingHinge || phase === "quiz")) {
@@ -1758,7 +1757,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const need = assembleNeeded();
       const done = isAssembleComplete();
       missionText.textContent = done
-        ? "작업대: 패치가 완성됐어요. 챙기세요!"
+        ? "작업대: 삼각형 조각이 완성됐어요. 챙기세요!"
         : isFreeConstructBuild()
           ? (asm && asm.phase === "pick_first"
             ? "작업대: 변 또는 각을 가운데로 끌어 놓으세요"
@@ -1780,16 +1779,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (scene === "tank" && tankMode === "install") {
       missionText.textContent = dockAnim
-        ? (dockAnim.ok ? "패치를 끼우는 중…" : "모양이 안 맞아요…")
-        : (patchDrag ? "구멍 위로 끌어다 놓으세요" : "수조: 패치를 드래그해서 구멍에 붙이세요");
+        ? (dockAnim.ok ? "삼각형 조각을 끼우는 중…" : "모양이 안 맞아요…")
+        : (patchDrag ? "구멍 위로 끌어다 놓으세요" : "수조: 삼각형 조각을 드래그해서 구멍에 붙이세요");
       return;
     }
     const map = {
       idle: "수리를 시작해 주세요",
       need_tools: "작업대로 가서 도구를 챙기세요!",
       go_measure: `수조 ${tankIndex + 1}로 가서 구멍을 재세요`,
-      go_build: "작업대로 돌아가 패치를 조립하세요",
-      go_install: `수조 ${tankIndex + 1}로 가서 패치를 설치하세요`,
+      go_build: "작업대로 돌아가 삼각형 조각을 조립하세요",
+      go_install: `수조 ${tankIndex + 1}로 가서 삼각형 조각을 설치하세요`,
       result: "결과 확인 중…",
       gameover: "실험실 수리 종료"
     };
@@ -1802,36 +1801,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!inScene) return;
 
     if (scene === "bench" && benchMode === "pick") {
-      sceneBadge.textContent = "작업대 · 도구";
-      sceneHint.textContent = tankIndex === 0
-        ? "탁자 위 자를 탭해서 챙기세요. 다시 탭하면 내려놓아요."
-        : "자·각도기를 탭해 입에 물리세요 (다시 탭하면 취소). 최대 3개.";
       btnSceneAction.classList.remove("hidden");
       btnSceneAction.textContent = "챙겼어요!";
       btnSceneAction.disabled = bag.length !== 3;
       if (btnMeasureRef) btnMeasureRef.classList.add("hidden");
       if (btnAssembleUndo) btnAssembleUndo.classList.add("hidden");
     } else if (scene === "bench" && benchMode === "build") {
-      const need = assembleNeeded();
       const done = isAssembleComplete();
-      sceneBadge.textContent = "작업대 · 조립";
-      sceneHint.textContent = done
-        ? (buildOk ? "유리 패치가 완성됐어요!" : "이 모양은 구멍과 다를 수 있어요…")
-        : isFreeConstructBuild()
-          ? (asm && asm.phase === "pick_first"
-            ? "왼쪽 조각을 가운데로 끌어 놓으세요."
-            : isAsaFreeBuild()
-              ? (asm && asm.baseSide && (!asm.endAngleP0 || !asm.endAngleP1)
-                ? "변의 양끝에 각을 붙이면 반직선이 만나요."
-                : "변의 양끝에 각을 붙이면 반직선이 만나 삼각형이 돼요.")
-              : "끝점에 각을 붙이거나, 변을 붙이면 각도를 물어요.")
-          : (asmMysteryIndex >= 0 && !asm.mysterySolved
-            ? "빨간 ? 끝각은 직접 계산해 보세요."
-            : isSssBuild()
-              ? "변을 이어 붙여 삼각형을 만드세요."
-              : "원하는 조각부터 드래그해 붙이세요.");
       btnSceneAction.classList.remove("hidden");
-      btnSceneAction.textContent = done ? "패치 챙기기" : `조립 (${assembleTaps}/${need})`;
+      btnSceneAction.textContent = done ? "삼각형 조각 챙기기" : `조립 (${assembleTaps}/${assembleNeeded()})`;
       btnSceneAction.disabled = !done;
       if (btnMeasureRef) btnMeasureRef.classList.remove("hidden");
       if (btnAssembleUndo) {
@@ -1839,14 +1817,10 @@ document.addEventListener("DOMContentLoaded", () => {
         btnAssembleUndo.disabled = !canUndoAssembleStep();
       }
     } else if (scene === "tank" && tankMode === "measure") {
-      sceneBadge.textContent = `수조 ${tankIndex + 1} · 측정`;
-      sceneHint.textContent = "구멍의 변/각을 원하는 순서로 재세요. 세 번 재면 작업대로 갑니다.";
       btnSceneAction.classList.add("hidden");
       if (btnMeasureRef) btnMeasureRef.classList.add("hidden");
       if (btnAssembleUndo) btnAssembleUndo.classList.add("hidden");
     } else if (scene === "tank" && tankMode === "install") {
-      sceneBadge.textContent = `수조 ${tankIndex + 1} · 설치`;
-      sceneHint.textContent = "패치를 드래그해 구멍 위에 놓으면 끼워집니다.";
       btnSceneAction.classList.add("hidden");
       if (btnMeasureRef) btnMeasureRef.classList.add("hidden");
       if (btnAssembleUndo) btnAssembleUndo.classList.add("hidden");
@@ -2158,7 +2132,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enterTankInstall() {
     if (!hasTriangle || !plankDesign) {
-      showFlash("패치가 없어요!");
+      showFlash("삼각형 조각이 없어요!");
       return;
     }
     scene = "tank";
@@ -2200,7 +2174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bag = [];
     updateCarrySprite();
     sound.success();
-    exitToWorld("go_install", "패치를 수조 구멍에 끼우러 가세요!");
+    exitToWorld("go_install", "삼각형 조각을 수조 구멍에 끼우러 가세요!");
   }
 
   function pickBenchTool(tool) {
@@ -2429,7 +2403,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tankMode = null;
         dockAnim = null;
         patchDrag = null;
-        endTank(true, pts, `수조 ${tankIndex + 1} 수리 완료!`, "패치가 구멍에 딱 맞았어요.");
+        endTank(true, pts, `수조 ${tankIndex + 1} 수리 완료!`, "삼각형 조각이 구멍에 딱 맞았어요.");
       }, 500);
     } else {
       const settled = rigidLerpPts(dockAnim.from, dockAnim.to, 1);
@@ -2493,7 +2467,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("result-score-badge").textContent = ok ? "수리 완료" : "실패";
     document.getElementById("result-subtitle").textContent = ok
       ? `${TOTAL_TANKS - tanksFixed.filter(Boolean).length}개 남음`
-      : "패치가 구멍에 맞지 않았어요";
+      : "삼각형 조각이 구멍에 맞지 않았어요";
     document.getElementById("result-hint").textContent = hint;
     document.getElementById("btn-next-round").textContent =
       tankIndex >= TOTAL_TANKS - 1 || tanksFixed.every(Boolean) ? "결과 보기 ➔" : "다음 수조 ➔";
@@ -2552,6 +2526,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function playTimeoutThenGameOver() {
     pendingGameOverAfterTimeout = true;
+    endedByTimeout = true;
     if (timeoutOverlay) {
       timeoutOverlay.classList.remove("hidden");
       timeoutOverlay.setAttribute("aria-hidden", "false");
@@ -2587,9 +2562,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const allFixed = tanksFixed.every(Boolean);
     clearTimeMs = allFixed ? elapsedMs() : null;
 
+    const titleEl = document.getElementById("gameover-title");
+    const subtitleEl = document.getElementById("gameover-subtitle");
+    const trophyEl = document.getElementById("gameover-trophy");
     const finalEl = document.getElementById("final-total-score");
     const unitEl = document.getElementById("final-score-unit");
     if (clearTimeMs != null) {
+      if (titleEl) titleEl.textContent = "실험실 수리 완료!";
+      if (subtitleEl) subtitleEl.textContent = "다섯 수조 미션을 마쳤습니다";
+      if (trophyEl) trophyEl.textContent = "🏆";
       finalEl.textContent = formatClearTime(clearTimeMs);
       unitEl.textContent = "클리어";
       if (!bestClearTimeMs || clearTimeMs < bestClearTimeMs) {
@@ -2603,8 +2584,19 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("new-highscore-banner").classList.add("hidden");
       }
     } else {
-      finalEl.textContent = "미완";
-      unitEl.textContent = "클리어";
+      if (endedByTimeout) {
+        if (titleEl) titleEl.textContent = "타임오버!";
+        if (subtitleEl) subtitleEl.textContent = "시간이 끝나 수리를 마치지 못했어요";
+        if (trophyEl) trophyEl.textContent = "⏰";
+        finalEl.textContent = "타임오버!";
+        unitEl.textContent = "";
+      } else {
+        if (titleEl) titleEl.textContent = "수리 미완료";
+        if (subtitleEl) subtitleEl.textContent = "다섯 수조를 모두 고치지 못했어요";
+        if (trophyEl) trophyEl.textContent = "💧";
+        finalEl.textContent = "미완";
+        unitEl.textContent = "";
+      }
       document.getElementById("new-highscore-banner").classList.add("hidden");
     }
 
@@ -2645,6 +2637,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tankIndex = 0;
     tanksFixed = [false, false, false, false, false];
     timeLeftMs = TIME_LIMIT_MS;
+    endedByTimeout = false;
     cat.x = zoneById("tank0").x;
     cat.targetX = cat.x;
     cat.walking = false;
@@ -3369,7 +3362,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillStyle = "#e8f4ff";
       ctx.font = "800 18px Oxanium, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("패치 조립", VIEW_W / 2, 58);
+      ctx.fillText("삼각형 조각 조립", VIEW_W / 2, 58);
       ctx.fillStyle = "#8fb4d4";
       ctx.font = "600 13px Outfit, sans-serif";
       let sub = "조각을 드래그해 붙이세요";
@@ -3581,7 +3574,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.fillStyle = "#5dffb0";
           ctx.font = "700 13px Outfit, sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText("삼각형이 완성됐어요! 패치 챙기기", VIEW_W / 2, 448);
+          ctx.fillText("삼각형이 완성됐어요! 삼각형 조각 챙기기", VIEW_W / 2, 448);
         }
       } else {
         ctx.fillStyle = "#8fb4d4";
@@ -3654,7 +3647,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#e8f4ff";
     ctx.font = "800 18px Oxanium, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("패치 조립", VIEW_W / 2, 58);
+    ctx.fillText("삼각형 조각 조립", VIEW_W / 2, 58);
     ctx.fillStyle = "#8fb4d4";
     ctx.font = "600 13px Outfit, sans-serif";
     let sub = "각 조각 또는 변을 먼저 놓으세요";
@@ -3821,7 +3814,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.font = "700 13px Outfit, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
-        buildOk ? "삼각형이 완성됐어요! 패치 챙기기" : "구멍과 다른 삼각형이에요",
+        buildOk ? "삼각형이 완성됐어요! 삼각형 조각 챙기기" : "구멍과 다른 삼각형이에요",
         VIEW_W / 2,
         448
       );
@@ -3884,7 +3877,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#e8f4ff";
     ctx.font = "800 18px Oxanium, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("패치 조립", VIEW_W / 2, 58);
+    ctx.fillText("삼각형 조각 조립", VIEW_W / 2, 58);
     ctx.fillStyle = "#8fb4d4";
     ctx.font = "600 13px Outfit, sans-serif";
     let sub = "각 조각 또는 변을 먼저 놓으세요";
@@ -4024,7 +4017,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.font = "700 13px Outfit, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
-        buildOk ? "삼각형이 완성됐어요! 패치 챙기기" : "구멍과 다른 삼각형이에요",
+        buildOk ? "삼각형이 완성됐어요! 삼각형 조각 챙기기" : "구멍과 다른 삼각형이에요",
         VIEW_W / 2,
         448
       );
@@ -4356,7 +4349,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sound.measure();
         revealMysteryIfNeeded();
         if (isAssembleComplete()) {
-          showFlash(buildOk ? "삼각형 패치 완성!" : "이상한 삼각형이 만들어졌어요…");
+          showFlash(buildOk ? "삼각형 조각 완성!" : "이상한 삼각형이 만들어졌어요…");
           sound.success();
         } else if (asaMode) {
           showFlash("이제 양끝 각을 붙이세요");
@@ -4399,7 +4392,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showFlash("반직선이 만나 삼각형이 생겨요!");
         sound.success();
       } else if (isAssembleComplete()) {
-        showFlash(buildOk ? "삼각형 패치 완성!" : "이상한 삼각형이 만들어졌어요…");
+        showFlash(buildOk ? "삼각형 조각 완성!" : "이상한 삼각형이 만들어졌어요…");
         sound.success();
       } else {
         showFlash("각을 붙였어요");
@@ -4486,7 +4479,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.fillStyle = patchDrag ? "#ffd56a" : "#5dffb0";
         ctx.font = "700 14px Outfit, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(patchDrag ? "구멍 위에 놓으세요" : "패치를 드래그해서 구멍에 붙이세요", VIEW_W / 2, 90);
+        ctx.fillText(patchDrag ? "구멍 위에 놓으세요" : "삼각형 조각을 드래그해서 구멍에 붙이세요", VIEW_W / 2, 90);
       }
 
       if (patchPts) {
@@ -4852,6 +4845,7 @@ document.addEventListener("DOMContentLoaded", () => {
     totalScore = 0;
     roundScores = [];
     clearTimeMs = null;
+    endedByTimeout = false;
     cat.x = zoneById("tank0").x;
     cameraX = Math.max(0, cat.x - VIEW_W * 0.42);
     beginTank();

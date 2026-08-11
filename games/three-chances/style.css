@@ -243,32 +243,9 @@ html, body {
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 12px;
   z-index: 5;
-}
-.scene-chrome-top {
-  align-self: flex-start;
-  max-width: min(420px, 90%);
-  background: rgba(6, 22, 36, 0.88);
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  padding: 10px 14px;
-  pointer-events: none;
-  margin-top: 36px;
-}
-.scene-badge {
-  display: inline-block;
-  font-family: var(--font-display);
-  font-weight: 800;
-  color: var(--cyan);
-  font-size: 0.95rem;
-  margin-bottom: 4px;
-}
-.scene-hint {
-  font-size: 0.82rem;
-  color: var(--ink-dim);
-  line-height: 1.4;
 }
 .scene-chrome-actions {
   display: flex;
@@ -793,7 +770,8 @@ html, body {
   .game-container { padding: 6px 8px 12px; }
 }
 
-/* Mobile / short landscape: header chrome off, play HUD overlays the canvas bottom. */
+/* Short landscape only: header chrome off, play HUD overlays the canvas bottom.
+   Portrait keeps the desktop header/footer layout. */
 body.hud-overlay-mobile .game-header {
   display: none;
 }
@@ -821,7 +799,7 @@ body.hud-overlay-mobile .play-hud {
   justify-content: space-between;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 12px;
   background: rgba(4, 14, 24, 0.82);
   border: 1px solid rgba(61, 232, 255, 0.35);
@@ -832,21 +810,15 @@ body.hud-overlay-mobile .tool-slot {
   padding: 4px 6px;
   font-size: 0.7rem;
 }
+body.hud-overlay-mobile .mission-toast {
+  padding: 8px 12px;
+}
 body.hud-overlay-mobile .mission-toast.in-scene {
   bottom: 68px;
 }
+body.hud-overlay-mobile .mission-text {
+  font-size: 0.9rem;
+}
 body.hud-overlay-mobile .scene-chrome-actions {
   margin-bottom: 52px;
-}
-
-@media (orientation: landscape) and (max-height: 520px) {
-  body.hud-overlay-mobile .play-hud {
-    padding: 6px 8px;
-  }
-  body.hud-overlay-mobile .mission-toast {
-    padding: 8px 12px;
-  }
-  body.hud-overlay-mobile .mission-text {
-    font-size: 0.9rem;
-  }
 }

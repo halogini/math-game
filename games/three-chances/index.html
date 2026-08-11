@@ -55,10 +55,6 @@
             <div class="mission-text" id="mission-text">작업대로 가서 도구를 챙기세요!</div>
           </div>
           <div id="scene-chrome" class="scene-chrome hidden">
-            <div class="scene-chrome-top">
-              <span class="scene-badge" id="scene-badge">작업대</span>
-              <p class="scene-hint" id="scene-hint"></p>
-            </div>
             <div class="scene-chrome-actions">
               <button type="button" class="btn-scene hidden" id="btn-assemble-undo">이전으로</button>
               <button type="button" class="btn-scene hidden" id="btn-measure-ref">측정 다시 보기</button>
@@ -151,9 +147,9 @@
   <div id="gameover-modal" class="modal-backdrop hidden">
     <div class="modal-card gameover-card">
       <div class="gameover-header">
-        <span class="trophy-anim">🏆</span>
-        <h2>실험실 수리 완료!</h2>
-        <p class="gameover-subtitle">다섯 수조 미션을 마쳤습니다</p>
+        <span class="trophy-anim" id="gameover-trophy">🏆</span>
+        <h2 id="gameover-title">실험실 수리 완료!</h2>
+        <p class="gameover-subtitle" id="gameover-subtitle">다섯 수조 미션을 마쳤습니다</p>
       </div>
       <div class="final-score-display">
         <div class="score-circle">
@@ -224,7 +220,7 @@
 
       <div class="game-guide-box short-banner">
         <div class="guide-title">🐱 기회는 세 번! 구멍을 메워라!</div>
-        <p class="guide-desc">수조 다섯 개를 재고 삼각형 패치로 고치세요. 측정은 세 번뿐!</p>
+        <p class="guide-desc">수조 다섯 개를 재고 삼각형 조각으로 고치세요. 측정은 세 번뿐!</p>
       </div>
 
       <form id="profile-form" class="profile-form">
