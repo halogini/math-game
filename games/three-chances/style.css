@@ -42,30 +42,27 @@ html, body {
 .game-header {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .game-title-group h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.05rem, 2.5vw, 1.45rem);
+  font-size: clamp(0.95rem, 2.2vw, 1.35rem);
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--cyan);
 }
-.game-subtitle {
-  font-size: 0.78rem;
-  color: var(--ink-dim);
-  margin-top: 2px;
-}
 
-.header-right {
+.header-hud {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
+  flex: 1;
 }
 
 .user-profile-card {
@@ -90,28 +87,38 @@ html, body {
 }
 .btn-sound.muted { opacity: 0.55; }
 
-.header-stat-badge {
-  background: var(--panel);
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  padding: 6px 10px;
-  min-width: 72px;
+.tool-slots {
+  display: flex;
+  gap: 6px;
+}
+.tool-slot {
+  min-width: 64px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--stroke);
+  font-size: 0.75rem;
   text-align: center;
+  background: rgba(0, 0, 0, 0.25);
 }
-.stat-badge-label {
-  display: block;
-  font-size: 0.65rem;
-  color: var(--ink-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.tool-slot.filled {
+  border-style: solid;
+  background: rgba(61, 232, 255, 0.12);
+  color: var(--cyan);
+  font-weight: 700;
 }
-.stat-badge-val {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1rem;
+.tank-pips {
+  display: flex;
+  gap: 5px;
 }
-.highlight-cyan { color: var(--cyan); }
-.highlight-gold { color: var(--gold); }
+.tank-pip {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 107, 138, 0.35);
+}
+.tank-pip.current { outline: 2px solid var(--gold); }
+.tank-pip.fixed { background: rgba(93, 255, 176, 0.55); border-color: var(--ok); }
 
 .time-gauge {
   position: absolute;
@@ -164,7 +171,7 @@ html, body {
   width: min(520px, calc(100% - 48px));
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   background: rgba(6, 18, 32, 0.92);
   border: 2px solid rgba(255, 213, 106, 0.65);
@@ -192,70 +199,6 @@ html, body {
   color: #fff;
   text-align: center;
 }
-.chance-pips {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.chance-pip {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--cyan);
-  background: transparent;
-}
-.chance-pip.used { background: var(--cyan); opacity: 0.35; }
-.chance-pip.active { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(255, 213, 106, 0.5); }
-
-.inventory-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: rgba(8, 28, 48, 0.55);
-  border: 1px solid rgba(61, 232, 255, 0.2);
-  border-radius: 12px;
-}
-.inv-label {
-  font-size: 0.75rem;
-  color: var(--ink-dim);
-  font-weight: 700;
-}
-.tool-slots {
-  display: flex;
-  gap: 6px;
-  flex: 1;
-}
-.tool-slot {
-  min-width: 72px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px dashed var(--stroke);
-  font-size: 0.8rem;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.25);
-}
-.tool-slot.filled {
-  border-style: solid;
-  background: rgba(61, 232, 255, 0.12);
-  color: var(--cyan);
-  font-weight: 700;
-}
-.tank-pips {
-  display: flex;
-  gap: 6px;
-}
-.tank-pip {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 1px solid var(--stroke);
-  background: rgba(255, 107, 138, 0.35);
-}
-.tank-pip.current { outline: 2px solid var(--gold); }
-.tank-pip.fixed { background: rgba(93, 255, 176, 0.55); border-color: var(--ok); }
 
 .canvas-section { margin-bottom: 8px; }
 .canvas-wrapper.world-wrap {
@@ -442,20 +385,12 @@ html, body {
   background: transparent;
 }
 
-.profile-card .opening-banner { text-align: center; margin-bottom: 16px; }
-.opening-hero {
-  margin: 0 auto 12px;
-  max-width: 280px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--stroke);
-}
-.opening-still { width: 100%; display: block; }
+.profile-card .opening-banner { text-align: center; margin-bottom: 14px; }
 .opening-subtitle {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   letter-spacing: 0.12em;
-  color: var(--danger);
+  color: var(--gold);
   font-weight: 700;
   margin-bottom: 6px;
 }
@@ -463,13 +398,89 @@ html, body {
   font-family: var(--font-display);
   font-size: 1.25rem;
   color: var(--cyan);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
-.opening-desc {
+
+.champ-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 12px;
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 213, 106, 0.55);
+  background: linear-gradient(135deg, rgba(255, 213, 106, 0.18), rgba(61, 232, 255, 0.08));
+  text-align: left;
+}
+.champ-trophy { font-size: 1.8rem; }
+.champ-info { flex: 1; min-width: 0; }
+.champ-name {
+  display: block;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #fff;
+}
+.champ-id {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  margin-top: 2px;
+}
+.champ-score {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.champ-score small {
+  font-size: 0.7rem;
+  margin-left: 2px;
+  color: var(--ink-dim);
+}
+
+.btn-toggle-opening-leaderboard {
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 10px;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(61, 232, 255, 0.08);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.opening-leaderboard-box {
+  max-width: 360px;
+  margin: 0 auto 12px;
+  text-align: left;
+}
+.opening-leaderboard-box.hidden { display: none; }
+
+.game-guide-box.short-banner {
+  max-width: 360px;
+  margin: 0 auto 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(61, 232, 255, 0.28);
+  background: rgba(8, 28, 48, 0.65);
+  text-align: center;
+}
+.game-guide-box .guide-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--cyan);
+  margin-bottom: 4px;
+}
+.game-guide-box .guide-desc {
   font-size: 0.88rem;
   color: var(--ink-dim);
-  line-height: 1.5;
+  line-height: 1.4;
 }
+
 .profile-form {
   display: flex;
   flex-direction: column;
@@ -729,32 +740,28 @@ html, body {
 
 @media (max-width: 720px) {
   .game-header { flex-direction: column; align-items: stretch; }
-  .header-right { justify-content: flex-start; }
+  .header-hud { justify-content: flex-start; }
   .scene-chrome-actions { flex-wrap: wrap; }
   .round-scores-grid { grid-template-columns: repeat(3, 1fr); }
   .game-container { padding: 8px 10px 16px; }
-  .game-subtitle { display: none; }
 }
 
 /* Landscape phones: keep the playfield fully on screen instead of clipping. */
 @media (orientation: landscape) and (max-height: 520px) {
-  :root { --chrome-h: 108px; }
+  :root { --chrome-h: 56px; }
   .game-container { padding: 4px 8px 8px; }
   .game-header {
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 4px;
   }
-  .game-title-group h1 { font-size: 0.95rem; }
-  .game-subtitle,
-  .inventory-bar .inv-label { display: none; }
-  .inventory-bar {
-    margin-bottom: 4px;
-    padding: 4px 8px;
-    gap: 8px;
-  }
+  .game-title-group { display: none; }
+  .header-hud { flex-wrap: nowrap; }
   .user-profile-card { padding: 4px 8px; }
-  .header-stat-badge { padding: 4px 8px; }
-  .mission-toast { padding: 8px 12px; font-size: 0.85rem; }
+  .profile-id { display: none; }
+  .tool-slot { min-width: 52px; padding: 4px 6px; font-size: 0.7rem; }
+  .mission-toast { padding: 8px 12px; }
+  .mission-text { font-size: 0.9rem; }
+  .app-footer { display: none; }
 }

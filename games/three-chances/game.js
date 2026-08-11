@@ -149,13 +149,10 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.width = VIEW_W;
   canvas.height = VIEW_H;
 
-  const hudRound = document.getElementById("hud-round");
   const hudTimer = document.getElementById("hud-timer");
-  const hudScore = document.getElementById("hud-score");
   const timeGaugeFill = document.getElementById("time-gauge-fill");
   const missionBar = document.getElementById("mission-bar");
   const missionText = document.getElementById("mission-text");
-  const chancePips = document.getElementById("chance-pips");
   const toolSlots = document.getElementById("tool-slots");
   const tankPips = document.getElementById("tank-pips");
   const sceneChrome = document.getElementById("scene-chrome");
@@ -172,6 +169,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const profileModal = document.getElementById("profile-modal");
   const profileForm = document.getElementById("profile-form");
   const introOverlay = document.getElementById("intro-overlay");
+  const btnToggleOpeningLeaderboard = document.getElementById("btn-toggle-opening-leaderboard");
+  const openingLeaderboardBox = document.getElementById("opening-leaderboard-box");
+  const openingLeaderboardTbody = document.getElementById("opening-leaderboard-tbody");
+  const openingChampName = document.getElementById("opening-champ-name");
+  const openingChampId = document.getElementById("opening-champ-id");
+  const openingChampScore = document.getElementById("opening-champ-score");
+  const thOpeningId = document.getElementById("th-opening-id");
   const introVideo = document.getElementById("intro-video");
   const btnSkipIntro = document.getElementById("btn-skip-intro");
   const successOverlay = document.getElementById("success-overlay");
@@ -530,9 +534,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateHud() {
-    hudRound.textContent = `${tankIndex + 1} / ${TOTAL_TANKS}`;
-    hudTimer.textContent = formatTime(timeLeftMs);
-    hudScore.textContent = formatClearTime(elapsedMs());
+    if (hudTimer) hudTimer.textContent = formatTime(timeLeftMs);
     document.getElementById("display-profile-name").textContent = playerName;
     const idEl = document.getElementById("display-profile-id");
     if (activeMode === "dorms") {
@@ -545,7 +547,7 @@ document.addEventListener("DOMContentLoaded", () => {
       timeGaugeFill.style.transform = `scaleX(${ratio})`;
       timeGaugeFill.classList.toggle("low", ratio <= 0.25);
     }
-    hudTimer.style.color = ratio <= 0.25 ? "#ff6b8a" : "";
+    if (hudTimer) hudTimer.style.color = ratio <= 0.25 ? "#ff6b8a" : "";
   }
 
   function toolsRemaining() {
@@ -1708,18 +1710,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function renderPips() {
-    const used = measureHistory.length;
-    chancePips.innerHTML = "";
-    for (let i = 0; i < 3; i++) {
-      const pip = document.createElement("span");
-      pip.className = "chance-pip"
-        + (i < used ? " used" : "")
-        + (i === used && scene === "tank" && tankMode === "measure" ? " active" : "");
-      chancePips.appendChild(pip);
-    }
-  }
-
   function renderTankPips() {
     tankPips.innerHTML = "";
     for (let i = 0; i < TOTAL_TANKS; i++) {
@@ -1848,7 +1838,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function refreshUI() {
     updateHud();
     renderBag();
-    renderPips();
     renderTankPips();
     setMission();
     syncSceneChrome();
@@ -4554,11 +4543,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadLeaderboard() {
-    const tbody = document.getElementById("gameover-leaderboard-tbody");
+    const gameoverTbody = document.getElementById("gameover-leaderboard-tbody");
     const colSpan = activeMode === "dorms" ? 3 : 4;
-    tbody.innerHTML = `<tr><td colspan='${colSpan}'>불러오는 중…</td></tr>`;
+    const loadingHtml = `<tr><td colspan='${colSpan}'>불러오는 중…</td></tr>`;
+    const emptyHtml = `<tr><td colspan='${colSpan}'>아직 기록이 없습니다</td></tr>`;
+    const failHtml = `<tr><td colspan='${colSpan}'>불러오기 실패</td></tr>`;
+    if (gameoverTbody) gameoverTbody.innerHTML = loadingHtml;
+    if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = loadingHtml;
+
     if (!firebaseDb) {
-      tbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
+      if (gameoverTbody) gameoverTbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
+      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
+      updateOpeningChamp(null);
       return;
     }
     try {
@@ -4570,29 +4566,60 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = sanitizeInput(v.name || "", 12);
         const sid = sanitizeInput(v.studentId || "", 10);
         const key = activeMode === "dorms" ? name : `${name}_${sid}`;
-        const clearTimeMs = Number(v.clearTimeMs);
-        if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return;
+        const clearMs = Number(v.clearTimeMs);
+        if (!Number.isFinite(clearMs) || clearMs <= 0) return;
         const prev = best.get(key);
-        if (!prev || clearTimeMs < prev.clearTimeMs) {
-          best.set(key, { name, studentId: sid, clearTimeMs });
+        if (!prev || clearMs < prev.clearTimeMs) {
+          best.set(key, { name, studentId: sid, clearTimeMs: clearMs });
         }
       });
       const top = Array.from(best.values())
         .sort((a, b) => a.clearTimeMs - b.clearTimeMs)
         .slice(0, 20);
+
+      updateOpeningChamp(top[0] || null);
+
       if (!top.length) {
-        tbody.innerHTML = `<tr><td colspan='${colSpan}'>아직 기록이 없습니다</td></tr>`;
+        if (gameoverTbody) gameoverTbody.innerHTML = emptyHtml;
+        if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = emptyHtml;
         return;
       }
-      tbody.innerHTML = top.map((r, i) => {
+      const rowsHtml = top.map((r, i) => {
         const idCell = activeMode === "dorms"
           ? ""
           : `<td>${escapeHtml(r.studentId || "-")}</td>`;
         return `<tr><td>${i + 1}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
       }).join("");
+      if (gameoverTbody) gameoverTbody.innerHTML = rowsHtml;
+      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = rowsHtml;
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan='${colSpan}'>불러오기 실패</td></tr>`;
+      if (gameoverTbody) gameoverTbody.innerHTML = failHtml;
+      if (openingLeaderboardTbody) openingLeaderboardTbody.innerHTML = failHtml;
+      updateOpeningChamp(null);
     }
+  }
+
+  function updateOpeningChamp(champ) {
+    if (!openingChampName || !openingChampScore) return;
+    if (!champ) {
+      openingChampName.textContent = "아직 없음";
+      if (openingChampId) {
+        openingChampId.textContent = activeMode === "dorms" ? "dorms" : "학번: —";
+        openingChampId.style.display = activeMode === "dorms" ? "none" : "";
+      }
+      openingChampScore.innerHTML = "—";
+      return;
+    }
+    openingChampName.textContent = champ.name || "도전자";
+    if (openingChampId) {
+      if (activeMode === "dorms") {
+        openingChampId.style.display = "none";
+      } else {
+        openingChampId.style.display = "";
+        openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : "학번: 미입력";
+      }
+    }
+    openingChampScore.innerHTML = `${formatClearTime(champ.clearTimeMs)}<small></small>`;
   }
 
   async function sendScore() {
@@ -4943,6 +4970,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ? "dorms 명예의 전당 (Top 20)"
         : "우리 학교 명예의 전당 (Top 20)";
     }
+    if (thOpeningId) thOpeningId.style.display = activeMode === "dorms" ? "none" : "";
     if (activeMode !== "dorms") return;
     const labelId = document.getElementById("label-student-id");
     const inputId = document.getElementById("input-student-id");
@@ -4972,6 +5000,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   applyDormsModeUi();
+  loadLeaderboard();
+
+  if (btnToggleOpeningLeaderboard && openingLeaderboardBox) {
+    btnToggleOpeningLeaderboard.addEventListener("click", () => {
+      sound.click();
+      const open = openingLeaderboardBox.classList.toggle("hidden") === false;
+      btnToggleOpeningLeaderboard.textContent = open
+        ? "🏆 명예의 전당 순위표 접기"
+        : "🏆 명예의 전당 순위표 전체 보기";
+    });
+  }
 
   const savedName = localStorage.getItem("hm_player_name");
   const savedId = localStorage.getItem("hm_student_id");
@@ -4983,7 +5022,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadArt().then(() => {
     updateHud();
     renderBag();
-    renderPips();
     renderTankPips();
     setMission();
     requestAnimationFrame(draw);

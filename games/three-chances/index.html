@@ -22,10 +22,9 @@
       <div class="header-left">
         <div class="game-title-group">
           <h1>기회는 세 번! 구멍을 메워라!</h1>
-          <p class="game-subtitle">←→ / AD 이동 · 탭·드래그 · 수조 5개</p>
         </div>
       </div>
-      <div class="header-right">
+      <div class="header-hud">
         <div class="user-profile-card">
           <span class="profile-avatar">👤</span>
           <div class="profile-text">
@@ -34,25 +33,13 @@
           </div>
           <button id="btn-edit-profile" class="btn-small-edit" type="button">✏️</button>
         </div>
-        <div class="header-stat-badge">
-          <span class="stat-badge-label">수조</span>
-          <span class="stat-badge-val highlight-cyan" id="hud-round">1 / 5</span>
-        </div>
-        <div class="header-stat-badge">
-          <span class="stat-badge-label">경과</span>
-          <span class="stat-badge-val" id="hud-score">0:00</span>
-        </div>
+        <div class="tool-slots" id="tool-slots" aria-label="입에 문 도구"></div>
+        <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
         <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
       </div>
     </header>
 
     <main class="game-main">
-      <section class="inventory-bar">
-        <div class="inv-label">입에 문 도구</div>
-        <div class="tool-slots" id="tool-slots"></div>
-        <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
-      </section>
-
       <section class="canvas-section">
         <div class="canvas-wrapper world-wrap">
           <div class="time-gauge" aria-label="남은 시간">
@@ -64,7 +51,6 @@
           <canvas id="game-canvas" width="960" height="520"></canvas>
           <div class="mission-toast" id="mission-bar">
             <div class="mission-text" id="mission-text">작업대로 가서 도구를 챙기세요!</div>
-            <div class="chance-pips" id="chance-pips" aria-label="측정 기회"></div>
           </div>
           <div id="scene-chrome" class="scene-chrome hidden">
             <div class="scene-chrome-top">
@@ -198,19 +184,46 @@
   </div>
 
   <div id="profile-modal" class="modal-backdrop">
-    <div class="modal-card profile-card">
+    <div class="modal-card profile-card modal-opening">
       <div class="opening-banner">
-        <div class="opening-hero">
-          <img src="assets/opening-still.jpg" alt="새는 실험 수조" class="opening-still">
+        <span class="opening-subtitle">1위 챔피언 도전!</span>
+        <h2>👑 명예의 전당 랭킹 1위</h2>
+
+        <div class="champ-card" id="champ-card-box">
+          <div class="champ-trophy">🥇</div>
+          <div class="champ-info">
+            <span class="champ-name" id="opening-champ-name">—</span>
+            <span class="champ-id" id="opening-champ-id">학번: —</span>
+          </div>
+          <div class="champ-score" id="opening-champ-score">—<small></small></div>
         </div>
-        <span class="opening-subtitle">LAB ALERT · 수조 누수</span>
-        <h2>기회는 세 번! 구멍을 메워라!</h2>
-        <p class="opening-desc">
-          실험실 수조 다섯 개가 새고 있어요.<br>
-          바닥을 탭하면 고양이가 그곳으로 걷고, 옆으로 드래그하면 화면이 움직여요.<br>
-          작업대·수조에 도착하면 안쪽 화면으로 들어가 고칩니다!
-        </p>
+
+        <button type="button" id="btn-toggle-opening-leaderboard" class="btn-toggle-opening-leaderboard">
+          🏆 명예의 전당 순위표 전체 보기
+        </button>
+
+        <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+          <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th id="th-opening-id">학번</th>
+                  <th>클리어</th>
+                </tr>
+              </thead>
+              <tbody id="opening-leaderboard-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      <div class="game-guide-box short-banner">
+        <div class="guide-title">🐱 기회는 세 번! 구멍을 메워라!</div>
+        <p class="guide-desc">수조 다섯 개를 재고 삼각형 패치로 고치세요. 측정은 세 번뿐!</p>
+      </div>
+
       <form id="profile-form" class="profile-form">
         <label id="label-player-name">이름
           <input id="input-player-name" type="text" maxlength="12" placeholder="이름 입력" required autocomplete="nickname">
@@ -218,7 +231,7 @@
         <label id="label-student-id">학번
           <input id="input-student-id" type="text" maxlength="12" placeholder="학번 입력" autocomplete="off">
         </label>
-        <button type="submit" class="btn-modal-action btn-primary" id="btn-start-game">수리 시작!</button>
+        <button type="submit" class="btn-modal-action btn-primary" id="btn-start-game">챔피언에 도전하기 (게임 시작)</button>
       </form>
     </div>
   </div>
