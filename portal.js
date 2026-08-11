@@ -84,9 +84,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnPlayBingsoo = document.getElementById('btn-play-bingsoo');
   const btnPlayCongruence = document.getElementById('btn-play-congruence');
+  const btnPlayThreeChances = document.getElementById('btn-play-three-chances');
   const leaderboardTitle = document.getElementById('leaderboard-title');
+  const leaderboardModeNote = document.getElementById('leaderboard-mode-note');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
+  const leaderboardTableHeaderMetric = document.getElementById('th-header-metric');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
+  const leaderboardTabs = document.getElementById('leaderboard-tabs');
+
+  const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
+  const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
+  let activeLeaderboardGame = 'bingsoo';
+  let scoresUnsub = null;
+  let threeChancesUnsub = null;
+
+  function formatClearTime(ms) {
+    const n = Math.max(0, Math.floor(Number(ms) || 0));
+    const m = Math.floor(n / 60000);
+    const s = Math.floor((n % 60000) / 1000);
+    const cs = Math.floor((n % 1000) / 10);
+    return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+  }
+
+  function isDormsRecord(val, key, isDormsSubtree) {
+    const valStudentId = String((val && val.studentId) || '').trim();
+    const valChannel = String((val && val.channel) || '').trim();
+    return !!(
+      isDormsSubtree
+      || valStudentId === 'DORMS'
+      || valStudentId === 'DOREMS'
+      || valChannel === 'dorms'
+      || valChannel === 'dorems'
+      || key === 'dorms'
+    );
+  }
+
+  function matchesActiveMode(val, key, isDormsSubtree) {
+    const dorms = isDormsRecord(val, key, isDormsSubtree);
+    return activeMode === 'dorms' ? dorms : !dorms;
+  }
+
+  function gameHref(path) {
+    return `${path}?mode=${activeMode === 'dorms' ? 'dorms' : 'school'}`;
+  }
 
   // ----------------------------------------------------
   // Apply Channel Isolation UI & Branding
@@ -109,15 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       leaderboardTitle.textContent = '🏆 dorms 명예의 전당 (Top 20)';
+      if (leaderboardModeNote) {
+        leaderboardModeNote.textContent = '도름 모드 · 학번 없이 닉네임만 기록됩니다';
+      }
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = 'none';
-      }
-
-      if (btnPlayBingsoo) {
-        btnPlayBingsoo.href = `games/bingsoo/index.html?mode=dorms`;
-      }
-      if (btnPlayCongruence) {
-        btnPlayCongruence.href = `games/congruence/index.html?mode=dorms`;
       }
     } else {
       // School Mode
@@ -134,17 +170,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       leaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (Top 20)';
+      if (leaderboardModeNote) {
+        leaderboardModeNote.textContent = '학교 모드 · 이름과 학번으로 기록됩니다';
+      }
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = '';
       }
-
-      if (btnPlayBingsoo) {
-        btnPlayBingsoo.href = `games/bingsoo/index.html?mode=school`;
-      }
-      if (btnPlayCongruence) {
-        btnPlayCongruence.href = `games/congruence/index.html?mode=school`;
-      }
     }
+
+    if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo/index.html');
+    if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
+    if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
 
     updateProfileDisplay();
   }
@@ -206,41 +242,133 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ----------------------------------------------------
-  // Channel Isolated Leaderboard Listener
+  // Channel + game isolated leaderboard
   // ----------------------------------------------------
+  function updateMetricHeader() {
+    if (!leaderboardTableHeaderMetric) return;
+    leaderboardTableHeaderMetric.textContent =
+      activeLeaderboardGame === 'three-chances' ? '클리어 시간' : '최고 점수';
+  }
+
+  if (leaderboardTabs) {
+    leaderboardTabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('.lb-tab');
+      if (!btn || !btn.dataset.game) return;
+      activeLeaderboardGame = btn.dataset.game;
+      leaderboardTabs.querySelectorAll('.lb-tab').forEach((el) => {
+        const on = el === btn;
+        el.classList.toggle('active', on);
+        el.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      updateMetricHeader();
+      listenRealtimeLeaderboard();
+    });
+  }
+
+  updateMetricHeader();
   listenRealtimeLeaderboard();
 
+  function stopLeaderboardListeners() {
+    if (typeof scoresUnsub === 'function') {
+      try { scoresUnsub(); } catch (e) { /* ignore */ }
+      scoresUnsub = null;
+    }
+    if (typeof threeChancesUnsub === 'function') {
+      try { threeChancesUnsub(); } catch (e) { /* ignore */ }
+      threeChancesUnsub = null;
+    }
+  }
+
   function listenRealtimeLeaderboard() {
-    if (!firebaseDb) return;
+    stopLeaderboardListeners();
+    if (!firebaseDb) {
+      renderLeaderboardTable([]);
+      return;
+    }
 
-    firebaseDb.ref('scores').orderByChild('score').limitToLast(100).on('value', (snapshot) => {
-      const list = [];
-      snapshot.forEach(childSnap => {
-        const val = childSnap.val();
-        if (val) {
-          const valStudentId = sanitizeInput(val.studentId || '', 10);
-          const isDormsEntry = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || val.channel === 'dorms' || val.channel === 'dorems');
+    // All arcade games write under scores/ with gameId + channel.
+    // Also watch scores/dorms for older dorms writes.
+    const process = (rootVal) => {
+      const list = collectGameScores(rootVal, activeLeaderboardGame);
+      renderLeaderboardTable(list.slice(0, 20));
+    };
 
-          if (activeMode === 'dorms' && isDormsEntry) {
-            list.push({
-              name: sanitizeInput(val.name, 12),
-              studentId: '',
-              score: Math.max(0, Math.min(500, parseInt(val.score, 10) || 0))
-            });
-          } else if (activeMode === 'school' && !isDormsEntry) {
-            list.push({
-              name: sanitizeInput(val.name, 12),
-              studentId: valStudentId,
-              score: Math.max(0, Math.min(500, parseInt(val.score, 10) || 0))
-            });
+    const scoresRef = firebaseDb.ref('scores');
+    const onScores = scoresRef.on('value', (snap) => process(snap.val()), (err) => {
+      console.error('Leaderboard fetch error:', err);
+    });
+    scoresUnsub = () => scoresRef.off('value', onScores);
+  }
+
+  function collectGameScores(dataObj, gameKey) {
+    const bestMap = new Map();
+
+    const acceptGame = (entry) => {
+      const id = String((entry && entry.gameId) || '').trim();
+      if (gameKey === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
+      if (gameKey === 'three-chances') {
+        return id === 'three-chances' || id === 'three_chances';
+      }
+      // bingsoo: explicit id, or legacy rows with no gameId and a numeric score (not clear-time)
+      if (id === 'bingsoo') return true;
+      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id)) {
+        return true;
+      }
+      return false;
+    };
+
+    const visit = (obj, isDormsSubtree = false) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((key) => {
+        const item = obj[key];
+        if (!item || typeof item !== 'object') return;
+        if (item.name) {
+          if (!acceptGame(item)) return;
+          if (!matchesActiveMode(item, key, isDormsSubtree)) return;
+
+          const name = sanitizeInput(item.name, 12);
+          const sid = sanitizeInput(item.studentId || '', 10);
+          const userKey = activeMode === 'school' ? `${name}_${sid}` : name;
+
+          if (gameKey === 'three-chances') {
+            const clearTimeMs = Number(item.clearTimeMs);
+            if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return;
+            const prev = bestMap.get(userKey);
+            if (!prev || clearTimeMs < prev.clearTimeMs) {
+              bestMap.set(userKey, {
+                name,
+                studentId: sid,
+                clearTimeMs,
+                metricLabel: formatClearTime(clearTimeMs)
+              });
+            }
+          } else {
+            const score = Math.max(0, Math.min(500, parseInt(item.score, 10) || 0));
+            const prev = bestMap.get(userKey);
+            if (!prev || score > prev.score) {
+              bestMap.set(userKey, {
+                name,
+                studentId: sid,
+                score,
+                metricLabel: `${score}점`
+              });
+            }
           }
+        } else {
+          visit(item, key === 'dorms' || isDormsSubtree);
         }
       });
-      list.reverse();
-      renderLeaderboardTable(list.slice(0, 20));
-    }, (err) => {
-      console.error("Leaderboard fetch error:", err);
-    });
+    };
+
+    visit(dataObj);
+
+    const list = Array.from(bestMap.values());
+    if (gameKey === 'three-chances') {
+      list.sort((a, b) => a.clearTimeMs - b.clearTimeMs);
+    } else {
+      list.sort((a, b) => b.score - a.score);
+    }
+    return list;
   }
 
   function renderLeaderboardTable(list) {
@@ -270,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td class="rank-${index + 1}">${rankDisplay}</td>
         <td>${escapeHtml(item.name || '익명')}</td>
         ${idTd}
-        <td><strong>${item.score}점</strong></td>
+        <td><strong>${escapeHtml(item.metricLabel || (item.score != null ? `${item.score}점` : '-'))}</strong></td>
       `;
       leaderboardTbody.appendChild(tr);
     });

@@ -88,8 +88,8 @@ const CAT_BASELINE = CAT_SPRITE * (246 / 256);
 const CAT_SPEED = 340;
 const PX_PER_CM = 22;
 const NICE_ANGLES = [30, 40, 45, 50, 60, 70, 80, 90];
-const LB_PATH_SCHOOL = "leaderboards/three-chances";
-const LB_PATH_DORMS = "leaderboards/three-chances-dorms";
+const LB_PATH = "scores";
+const GAME_ID = "three-chances";
 const SIDE_LABELS = ["①", "②", "③"];
 const ANGLE_LABELS = ["A", "B", "C"];
 const DRAG_THRESH = 10;
@@ -110,7 +110,6 @@ function resolveActiveMode() {
 }
 
 const activeMode = resolveActiveMode();
-const LB_PATH = activeMode === "dorms" ? LB_PATH_DORMS : LB_PATH_SCHOOL;
 /** URL ?test=a1s2 | sas | angle1 → 각1·변2만 바로 플레이 */
 const TEST_A1S2 = (() => {
   try {
@@ -4539,6 +4538,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------- Firebase ----------
+  function isThreeChancesEntry(v) {
+    const id = String((v && v.gameId) || "").trim();
+    return id === GAME_ID || id === "three_chances";
+  }
+
+  function isDormsEntry(v) {
+    const sid = String((v && v.studentId) || "").trim();
+    const ch = String((v && v.channel) || "").trim();
+    return sid === "DORMS" || sid === "DOREMS" || ch === "dorms" || ch === "dorems";
+  }
+
+  function matchesMode(v) {
+    return activeMode === "dorms" ? isDormsEntry(v) : !isDormsEntry(v);
+  }
+
   async function loadLeaderboard() {
     const tbody = document.getElementById("gameover-leaderboard-tbody");
     const colSpan = activeMode === "dorms" ? 3 : 4;
@@ -4548,15 +4562,24 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     try {
-      const snap = await firebaseDb.ref(LB_PATH).limitToLast(80).once("value");
-      const rows = [];
+      const snap = await firebaseDb.ref(LB_PATH).once("value");
+      const best = new Map();
       snap.forEach((child) => {
         const v = child.val();
-        if (!v || v.clearTimeMs == null) return;
-        rows.push(v);
+        if (!v || !isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
+        const name = sanitizeInput(v.name || "", 12);
+        const sid = sanitizeInput(v.studentId || "", 10);
+        const key = activeMode === "dorms" ? name : `${name}_${sid}`;
+        const clearTimeMs = Number(v.clearTimeMs);
+        if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return;
+        const prev = best.get(key);
+        if (!prev || clearTimeMs < prev.clearTimeMs) {
+          best.set(key, { name, studentId: sid, clearTimeMs });
+        }
       });
-      rows.sort((a, b) => (a.clearTimeMs || 1e15) - (b.clearTimeMs || 1e15));
-      const top = rows.slice(0, 20);
+      const top = Array.from(best.values())
+        .sort((a, b) => a.clearTimeMs - b.clearTimeMs)
+        .slice(0, 20);
       if (!top.length) {
         tbody.innerHTML = `<tr><td colspan='${colSpan}'>아직 기록이 없습니다</td></tr>`;
         return;
@@ -4574,6 +4597,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function sendScore() {
     const msg = document.getElementById("api-status-msg");
+    const btn = document.getElementById("btn-send-data");
     if (clearTimeMs == null) {
       msg.textContent = "다섯 수조를 모두 고쳐야 등록할 수 있어요.";
       return;
@@ -4582,22 +4606,39 @@ document.addEventListener("DOMContentLoaded", () => {
       msg.textContent = "서버에 연결되지 않았습니다.";
       return;
     }
+    const cleanName = sanitizeInput(playerName || "", 12);
+    if (!cleanName) {
+      msg.textContent = "이름을 먼저 등록해 주세요.";
+      return;
+    }
+    if (activeMode === "school") {
+      const cleanId = sanitizeInput(studentId || "", 10);
+      if (!cleanId) {
+        msg.textContent = "학번을 먼저 등록해 주세요.";
+        return;
+      }
+    }
     msg.textContent = "등록 중…";
+    if (btn) btn.disabled = true;
     try {
       const payload = {
-        name: playerName,
-        clearTimeMs,
-        channel: activeMode,
-        ts: Date.now()
+        name: cleanName,
+        studentId: activeMode === "dorms" ? "DORMS" : sanitizeInput(studentId || "", 10),
+        clearTimeMs: Number(clearTimeMs),
+        // Higher is better for shared scores ordering; derived from faster clear times.
+        score: Math.max(0, Math.min(500, Math.round(500 - Number(clearTimeMs) / 1000))),
+        channel: activeMode === "dorms" ? "dorms" : "school",
+        gameId: GAME_ID,
+        timestamp: Date.now()
       };
-      if (activeMode !== "dorms") {
-        payload.studentId = studentId || "";
-      }
       await firebaseDb.ref(LB_PATH).push(payload);
       msg.textContent = "클리어 시간이 등록되었습니다!";
       loadLeaderboard();
     } catch (e) {
+      console.error("three-chances score submit failed:", e);
       msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -4896,12 +4937,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applyDormsModeUi() {
+    const lbTitle = document.getElementById("result-leaderboard-title");
+    if (lbTitle) {
+      lbTitle.textContent = activeMode === "dorms"
+        ? "dorms 명예의 전당 (Top 20)"
+        : "우리 학교 명예의 전당 (Top 20)";
+    }
     if (activeMode !== "dorms") return;
     const labelId = document.getElementById("label-student-id");
     const inputId = document.getElementById("input-student-id");
     const idWrap = document.getElementById("result-locked-id-wrap");
     const thId = document.getElementById("th-leaderboard-id");
-    const lbTitle = document.getElementById("result-leaderboard-title");
     const labelName = document.getElementById("label-player-name");
     const displayId = document.getElementById("display-profile-id");
     if (labelId) labelId.style.display = "none";
@@ -4911,7 +4957,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (idWrap) idWrap.style.display = "none";
     if (thId) thId.style.display = "none";
-    if (lbTitle) lbTitle.textContent = "dorms 명예의 전당 (Top 20)";
     if (labelName) {
       const nameInput = labelName.querySelector("input");
       labelName.textContent = "";

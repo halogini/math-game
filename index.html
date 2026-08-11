@@ -79,6 +79,19 @@
               ⚡ 지금 게임 시작하기
             </a>
           </div>
+
+          <!-- Game #3: Three Chances -->
+          <div class="game-card active">
+            <span class="card-tag tag-active">PLAY NOW</span>
+            <div class="game-icon-box">🐱</div>
+            <div>
+              <h3 class="game-title">기회는 세 번! 구멍을 메워라!</h3>
+              <p class="game-desc">수조 다섯 개의 구멍을 자로 재고 삼각형 패치로 고치세요. 측정은 세 번뿐, 클리어 시간을 겨룹니다!</p>
+            </div>
+            <a href="games/three-chances/index.html" id="btn-play-three-chances" class="btn-play-game">
+              ⚡ 지금 게임 시작하기
+            </a>
+          </div>
         </div>
       </section>
 
@@ -87,6 +100,12 @@
         <div class="leaderboard-container">
           <div class="section-header">
             <h2 id="leaderboard-title">🏆 명예의 전당 (Top 20)</h2>
+            <p class="leaderboard-mode-note" id="leaderboard-mode-note"></p>
+          </div>
+          <div class="leaderboard-tabs" id="leaderboard-tabs" role="tablist" aria-label="게임별 명예의 전당">
+            <button type="button" class="lb-tab active" data-game="bingsoo" role="tab" aria-selected="true">🍧 팥빙수</button>
+            <button type="button" class="lb-tab" data-game="congruence" role="tab" aria-selected="false">📐 합동</button>
+            <button type="button" class="lb-tab" data-game="three-chances" role="tab" aria-selected="false">🐱 기회는 세 번</button>
           </div>
           <div class="table-wrapper">
             <table class="leaderboard-table">
@@ -95,7 +114,7 @@
                   <th>순위</th>
                   <th>도전자</th>
                   <th id="th-header-id">학번</th>
-                  <th>최고 점수</th>
+                  <th id="th-header-metric">최고 점수</th>
                 </tr>
               </thead>
               <tbody id="leaderboard-tbody">
