@@ -39,8 +39,8 @@
           <span class="stat-badge-val highlight-cyan" id="hud-round">1 / 5</span>
         </div>
         <div class="header-stat-badge">
-          <span class="stat-badge-label">총점</span>
-          <span class="stat-badge-val" id="hud-score">0점</span>
+          <span class="stat-badge-label">경과</span>
+          <span class="stat-badge-val" id="hud-score">0:00</span>
         </div>
         <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
       </div>
@@ -168,8 +168,8 @@
       </div>
       <div class="final-score-display">
         <div class="score-circle">
-          <span class="score-num" id="final-total-score">0</span>
-          <span class="score-unit">점</span>
+          <span class="score-num" id="final-total-score">—</span>
+          <span class="score-unit" id="final-score-unit">클리어</span>
         </div>
         <div class="round-scores-grid" id="round-scores-grid"></div>
       </div>
@@ -177,23 +177,22 @@
       <div class="send-action-box">
         <div class="result-locked-player-box">
           등록 참가자: <strong id="result-locked-name">도전자</strong>
-          (<span>(학번: <strong id="result-locked-id">미입력</strong>)</span>
+          <span id="result-locked-id-wrap"> (학번: <strong id="result-locked-id">미입력</strong>)</span>
         </div>
-        <button id="btn-send-data" class="btn-modal-action btn-primary" type="button">점수 등록하기</button>
+        <button id="btn-send-data" class="btn-modal-action btn-primary" type="button">기록 등록하기</button>
         <div id="api-status-msg" class="api-status-msg"></div>
       </div>
       <div class="leaderboard-section">
-        <h3>명예의 전당 (Top 20)</h3>
+        <h3 id="result-leaderboard-title">명예의 전당 (Top 20)</h3>
         <div class="leaderboard-table-wrapper">
           <table class="leaderboard-table">
-            <thead><tr><th>순위</th><th>이름</th><th>학번</th><th>점수</th></tr></thead>
+            <thead><tr><th>순위</th><th>이름</th><th id="th-leaderboard-id">학번</th><th>클리어</th></tr></thead>
             <tbody id="gameover-leaderboard-tbody"></tbody>
           </table>
         </div>
       </div>
       <div class="gameover-actions">
         <button id="btn-restart-game" class="btn-modal-action btn-primary" type="button">다시 도전하기</button>
-        <a href="../../index.html" class="btn-modal-action btn-secondary">아케이드 로비로</a>
       </div>
     </div>
   </div>
@@ -213,10 +212,10 @@
         </p>
       </div>
       <form id="profile-form" class="profile-form">
-        <label>이름
+        <label id="label-player-name">이름
           <input id="input-player-name" type="text" maxlength="12" placeholder="이름 입력" required autocomplete="nickname">
         </label>
-        <label>학번
+        <label id="label-student-id">학번
           <input id="input-student-id" type="text" maxlength="12" placeholder="학번 입력" autocomplete="off">
         </label>
         <button type="submit" class="btn-modal-action btn-primary" id="btn-start-game">수리 시작!</button>
@@ -229,6 +228,22 @@
     <div class="intro-chrome">
       <div class="intro-alert">⚠ WATER TANK BREACH</div>
       <button type="button" id="btn-skip-intro" class="btn-skip-intro">건너뛰기 ➔</button>
+    </div>
+  </div>
+
+  <div id="success-overlay" class="intro-overlay hidden" aria-hidden="true">
+    <video id="success-video" class="intro-video" src="assets/success.mp4" playsinline preload="auto"></video>
+    <div class="intro-chrome">
+      <div class="intro-alert success-alert">✓ ALL TANKS SECURE</div>
+      <button type="button" id="btn-skip-success" class="btn-skip-intro">결과 보기 ➔</button>
+    </div>
+  </div>
+
+  <div id="timeout-overlay" class="intro-overlay hidden" aria-hidden="true">
+    <video id="timeout-video" class="intro-video" src="assets/timeout.mp4" playsinline preload="auto"></video>
+    <div class="intro-chrome">
+      <div class="intro-alert timeout-alert">⏱ TIME UP — FLOOD</div>
+      <button type="button" id="btn-skip-timeout" class="btn-skip-intro">결과 보기 ➔</button>
     </div>
   </div>
 

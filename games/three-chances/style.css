@@ -658,6 +658,14 @@ html, body {
   font-size: 0.85rem;
   text-shadow: 0 0 12px rgba(255, 107, 138, 0.6);
 }
+.intro-alert.success-alert {
+  color: #5dffb0;
+  text-shadow: 0 0 12px rgba(93, 255, 176, 0.55);
+}
+.intro-alert.timeout-alert {
+  color: #7ec8ff;
+  text-shadow: 0 0 12px rgba(126, 200, 255, 0.55);
+}
 .btn-skip-intro {
   pointer-events: auto;
   align-self: flex-end;

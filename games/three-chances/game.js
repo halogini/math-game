@@ -82,16 +82,44 @@ const GROUND_Y = 418;
 const CAT_SPEED = 340;
 const PX_PER_CM = 22;
 const NICE_ANGLES = [30, 40, 45, 50, 60, 70, 80, 90];
-const LB_PATH = "leaderboards/three-chances";
+const LB_PATH_SCHOOL = "leaderboards/three-chances";
+const LB_PATH_DORMS = "leaderboards/three-chances-dorms";
 const SIDE_LABELS = ["①", "②", "③"];
 const ANGLE_LABELS = ["A", "B", "C"];
 const DRAG_THRESH = 10;
 const POI_ENTER_DIST = 70;
+
+function resolveActiveMode() {
+  try {
+    const search = window.location.search || "";
+    const hash = window.location.hash || "";
+    const href = window.location.href || "";
+    if (search.includes("mode=dorms") || search.includes("mode=dorems")
+      || hash.includes("mode=dorms") || hash.includes("mode=dorems")
+      || href.includes("dorms") || href.includes("dorems")) {
+      return "dorms";
+    }
+  } catch (e) { /* ignore */ }
+  return "school";
+}
+
+const activeMode = resolveActiveMode();
+const LB_PATH = activeMode === "dorms" ? LB_PATH_DORMS : LB_PATH_SCHOOL;
 /** URL ?test=a1s2 | sas | angle1 → 각1·변2만 바로 플레이 */
 const TEST_A1S2 = (() => {
   try {
     const t = new URLSearchParams(window.location.search).get("test");
     return t === "a1s2" || t === "sas" || t === "angle1";
+  } catch (e) {
+    return false;
+  }
+})();
+
+/** URL ?test=asa | a2s1 | angle2 → 각2·변1(낀변) 바로 플레이 */
+const TEST_A2S1 = (() => {
+  try {
+    const t = new URLSearchParams(window.location.search).get("test");
+    return t === "asa" || t === "a2s1" || t === "angle2";
   } catch (e) {
     return false;
   }
@@ -141,6 +169,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const introOverlay = document.getElementById("intro-overlay");
   const introVideo = document.getElementById("intro-video");
   const btnSkipIntro = document.getElementById("btn-skip-intro");
+  const successOverlay = document.getElementById("success-overlay");
+  const successVideo = document.getElementById("success-video");
+  const btnSkipSuccess = document.getElementById("btn-skip-success");
+  const timeoutOverlay = document.getElementById("timeout-overlay");
+  const timeoutVideo = document.getElementById("timeout-video");
+  const btnSkipTimeout = document.getElementById("btn-skip-timeout");
   const btnNext = document.getElementById("btn-next-round");
   const btnRestart = document.getElementById("btn-restart-game");
   const btnSend = document.getElementById("btn-send-data");
@@ -151,9 +185,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let studentId = "";
   let totalScore = 0;
   let roundScores = [];
-  let highScore = Number(localStorage.getItem("hm_three_chances_high") || 0);
+  /** 클리어 시간(ms). 전부 수리 성공 시에만 설정 */
+  let clearTimeMs = null;
+  let bestClearTimeMs = Number(localStorage.getItem(
+    activeMode === "dorms" ? "hm_three_chances_best_dorms" : "hm_three_chances_best"
+  ) || 0);
   let running = false;
   let pendingStartAfterIntro = false;
+  let pendingGameOverAfterSuccess = false;
+  let pendingGameOverAfterTimeout = false;
   let timeLeftMs = TIME_LIMIT_MS;
   let lastTs = 0;
 
@@ -466,12 +506,29 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${m}:${String(r).padStart(2, "0")}`;
   }
 
+  function formatClearTime(ms) {
+    if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, "0")}`;
+  }
+
+  function elapsedMs() {
+    return Math.max(0, TIME_LIMIT_MS - timeLeftMs);
+  }
+
   function updateHud() {
     hudRound.textContent = `${tankIndex + 1} / ${TOTAL_TANKS}`;
     hudTimer.textContent = formatTime(timeLeftMs);
-    hudScore.textContent = totalScore + "점";
+    hudScore.textContent = formatClearTime(elapsedMs());
     document.getElementById("display-profile-name").textContent = playerName;
-    document.getElementById("display-profile-id").textContent = studentId ? `학번 ${studentId}` : "학번 미입력";
+    const idEl = document.getElementById("display-profile-id");
+    if (activeMode === "dorms") {
+      idEl.textContent = "dorms";
+    } else {
+      idEl.textContent = studentId ? `학번 ${studentId}` : "학번 미입력";
+    }
     const ratio = Math.max(0, Math.min(1, timeLeftMs / TIME_LIMIT_MS));
     if (timeGaugeFill) {
       timeGaugeFill.style.transform = `scaleX(${ratio})`;
@@ -503,8 +560,34 @@ document.addEventListener("DOMContentLoaded", () => {
       && measuredSides.filter(Boolean).length === 2;
   }
 
+  /** 각 2 + 변 1 */
+  function isTwoAngleBuild() {
+    return measuredAngles.filter(Boolean).length === 2
+      && measuredSides.filter(Boolean).length === 1;
+  }
+
+  /** 각2·변1 자유 작도 (낀변 ASA + 끝각 하나 미측정 AAS) */
+  function isAsaFreeBuild() {
+    return isTwoAngleBuild();
+  }
+
+  function isFreeConstructBuild() {
+    return isOneAngleBuild() || isAsaFreeBuild();
+  }
+
+  /** 작도 트레이에 올릴 끝각 꼭짓점 (변의 양끝) */
+  function twoAngleEndVertices() {
+    const si = primaryMeasuredSide();
+    if (si < 0) return [];
+    return sideEnds(si);
+  }
+
   function measuredAngleIndex() {
     return [0, 1, 2].find((i) => measuredAngles[i]);
+  }
+
+  function measuredAngleList() {
+    return [0, 1, 2].filter((i) => measuredAngles[i]);
   }
 
   function measuredSideList() {
@@ -553,12 +636,17 @@ document.addEventListener("DOMContentLoaded", () => {
       raysT: 0,
       // one-angle construction
       startKind: null,
-      baseSide: null, // { index, p0, p1 }
+      baseSide: null, // { index, p0, p1, ray? }
       angleAt: null, // { end:'p0'|'p1'|null, deg, origin, dirA, dirB, fromPiece:bool }
       secondSide: null, // { index, p0, p1 }
       resultPts: null,
       pendingHinge: null, // { end, sideIndex }
-      hingeDeg: null
+      hingeDeg: null,
+      // two-angle (ASA) construction
+      endAngleP0: null, // { index, deg, origin, dirAlong, dirOpen, fromPiece }
+      endAngleP1: null,
+      lastPlacedEnd: null, // 'p0' | 'p1'
+      apex: null
     };
   }
 
@@ -572,6 +660,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function syncAssembleTaps() {
     if (!asm) {
       assembleTaps = 0;
+      return;
+    }
+    if (isAsaFreeBuild()) {
+      let n = 0;
+      if (asm.baseSide) n++;
+      if (asm.endAngleP0) n++;
+      if (asm.endAngleP1) n++;
+      // 각 먼저: 변 전에 angleAt만 있을 때
+      if (!asm.baseSide && asm.angleAt) n = Math.max(n, 1);
+      assembleTaps = n;
       return;
     }
     if (isOneAngleBuild()) {
@@ -597,7 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function assembleNeeded() {
-    if (isOneAngleBuild()) return 3;
+    if (isOneAngleBuild() || isAsaFreeBuild()) return 3;
     const si = primaryMeasuredSide();
     const asaMode = si >= 0 && measuredSides.filter(Boolean).length === 1 && !isSssBuild();
     if (asaMode) return 3;
@@ -662,9 +760,191 @@ document.addEventListener("DOMContentLoaded", () => {
     return canFormTriangle(asm.resultPts);
   }
 
+  /** 두 반직선 교점 (둘 다 전방 t,s > 여유) */
+  function rayRayIntersection(o1, dir1, o2, dir2) {
+    const ux = Math.cos(dir1);
+    const uy = Math.sin(dir1);
+    const vx = Math.cos(dir2);
+    const vy = Math.sin(dir2);
+    const dx = o2.x - o1.x;
+    const dy = o2.y - o1.y;
+    const det = ux * vy - uy * vx;
+    if (Math.abs(det) < 1e-5) return null;
+    const t = (dx * vy - dy * vx) / det;
+    const s = (dx * uy - dy * ux) / det;
+    if (t < 8 || s < 8) return null;
+    if (t > 900 || s > 900) return null;
+    return { x: o1.x + t * ux, y: o1.y + t * uy };
+  }
+
+  function constructionMatchesHoleAsa() {
+    if (!asm.resultPts || !canFormTriangle(asm.resultPts)) return false;
+    const si = primaryMeasuredSide();
+    if (si < 0 || !asm.baseSide || asm.baseSide.index !== si) return false;
+    if (!asm.endAngleP0 || !asm.endAngleP1) return false;
+    const ends = sideEnds(si);
+    // 양끝 °만 맞으면 좌·우 뒤집어 붙여도 합동(반사)
+    const placed = [asm.endAngleP0.deg, asm.endAngleP1.deg].sort((a, b) => a - b);
+    const expect = [hole.anglesDeg[ends[0]], hole.anglesDeg[ends[1]]].sort((a, b) => a - b);
+    if (Math.abs(placed[0] - expect[0]) > 4) return false;
+    if (Math.abs(placed[1] - expect[1]) > 4) return false;
+    // AAS: 잰 맞은편 각이 있으면 작도된 꼭짓점 각과 비교
+    const opp = [0, 1, 2].find((i) => !ends.includes(i));
+    if (opp != null && measuredAngles[opp]) {
+      const apexDeg = angleDegBetween(
+        asm.resultPts[0],
+        asm.resultPts[2],
+        asm.resultPts[1]
+      );
+      if (Math.abs(apexDeg - hole.anglesDeg[opp]) > 6) return false;
+    }
+    return true;
+  }
+
+  function angleDegBetween(a, vertex, b) {
+    const a0 = Math.atan2(a.y - vertex.y, a.x - vertex.x);
+    const a1 = Math.atan2(b.y - vertex.y, b.x - vertex.x);
+    let delta = a1 - a0;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return Math.abs(delta) * (180 / Math.PI);
+  }
+
+  function finalizeTwoAngleConstruction() {
+    if (!asm.baseSide || !asm.endAngleP0 || !asm.endAngleP1) return false;
+    // 양끝 열림을 같은 반평면으로 재정렬 후 교점
+    const base = asm.baseSide;
+    asm.endAngleP0.dirOpen = asaOpenDirFromAlong(
+      asm.endAngleP0.dirAlong,
+      (asm.endAngleP0.deg * Math.PI) / 180,
+      base
+    );
+    asm.endAngleP1.dirOpen = asaOpenDirFromAlong(
+      asm.endAngleP1.dirAlong,
+      (asm.endAngleP1.deg * Math.PI) / 180,
+      base
+    );
+    let apex = rayRayIntersection(
+      asm.endAngleP0.origin,
+      asm.endAngleP0.dirOpen,
+      asm.endAngleP1.origin,
+      asm.endAngleP1.dirOpen
+    );
+    if (!apex) {
+      asm.apex = null;
+      asm.resultPts = null;
+      return false;
+    }
+    asm.apex = apex;
+    asm.resultPts = [
+      { ...asm.baseSide.p0 },
+      { ...asm.baseSide.p1 },
+      { ...apex }
+    ];
+    return canFormTriangle(asm.resultPts);
+  }
+
+  function tryCloseTwoAngle() {
+    if (!asm.baseSide || !asm.endAngleP0 || !asm.endAngleP1) return;
+    const okForm = finalizeTwoAngleConstruction();
+    if (!okForm) {
+      asm.phase = "failed";
+      buildOk = false;
+      plankDesign = null;
+      hasTriangle = false;
+      sound.fail();
+      showAssembleFailChoices("삼각형을 만드는 데 실패한 것 같아요.");
+      refreshUI();
+      return;
+    }
+    buildOk = constructionMatchesHoleAsa();
+    if (buildOk) {
+      plankDesign = hole.designPts.map((p) => ({ ...p }));
+    } else {
+      const c = centroid(asm.resultPts);
+      plankDesign = asm.resultPts.map((p) => ({ x: p.x - c.x, y: p.y - c.y }));
+    }
+    asm.phase = "done";
+    showFlash(buildOk ? "삼각형이 완성됐어요!" : "삼각형은 만들어졌어요. 구멍에 맞을까요?");
+    sound.success();
+    refreshUI();
+  }
+
+  /** 변 p0→p1 기준 같은 반평면에 열리는 각의 반직선 방향 */
+  function asaOpenDirFromAlong(along, rad, base) {
+    const baseDir = Math.atan2(base.p1.y - base.p0.y, base.p1.x - base.p0.x);
+    const score = (dir) => Math.sin(dir - baseDir); // >0 이면 p0→p1 왼쪽
+    const a = along + rad;
+    const b = along - rad;
+    return score(a) >= score(b) ? a : b;
+  }
+
+  /** 변 끝에 각 조각 부착 (ASA). degOverride: ?각 입력값 */
+  function attachAsaEndAngle(endKey, angleIndex, degOverride) {
+    const base = asm.baseSide;
+    if (!base) return false;
+    const slot = endKey === "p0" ? "endAngleP0" : "endAngleP1";
+    if (asm[slot]) return false;
+    const origin = endKey === "p0" ? base.p0 : base.p1;
+    const other = endKey === "p0" ? base.p1 : base.p0;
+    const along = Math.atan2(other.y - origin.y, other.x - origin.x);
+    const deg = degOverride != null ? degOverride : hole.anglesDeg[angleIndex];
+    const rad = (deg * Math.PI) / 180;
+    const dirOpen = asaOpenDirFromAlong(along, rad, base);
+    asm[slot] = {
+      index: angleIndex,
+      deg,
+      origin: { ...origin },
+      dirAlong: along,
+      dirOpen,
+      fromPiece: true
+    };
+    asm.placedAngles[angleIndex] = true;
+    asm.lastPlacedEnd = endKey;
+    asm.phase = "building";
+    if (asm.angleAt && Math.hypot(asm.angleAt.origin.x - origin.x, asm.angleAt.origin.y - origin.y) < 14) {
+      asm.angleAt = null;
+    }
+    const otherSlot = endKey === "p0" ? "endAngleP1" : "endAngleP0";
+    if (asm[otherSlot]) {
+      const o = asm[otherSlot];
+      o.dirOpen = asaOpenDirFromAlong(o.dirAlong, (o.deg * Math.PI) / 180, base);
+    }
+    syncAssembleTaps();
+    if (asm.endAngleP0 && asm.endAngleP1) tryCloseTwoAngle();
+    return true;
+  }
+
+  /** 각 먼저: 반직선에 변을 붙인 뒤, 꼭짓점 쪽 끝각을 angleAt에서 이관 */
+  function bindAngleAtToBaseEnd() {
+    if (!asm.baseSide || !asm.angleAt) return;
+    const a = asm.angleAt;
+    const d0 = Math.hypot(asm.baseSide.p0.x - a.origin.x, asm.baseSide.p0.y - a.origin.y);
+    const d1 = Math.hypot(asm.baseSide.p1.x - a.origin.x, asm.baseSide.p1.y - a.origin.y);
+    const endKey = d0 <= d1 ? "p0" : "p1";
+    const other = endKey === "p0" ? asm.baseSide.p1 : asm.baseSide.p0;
+    const along = Math.atan2(other.y - a.origin.y, other.x - a.origin.x);
+    const index = a.index != null ? a.index : measuredAngleList()[0];
+    const deg = a.deg;
+    const rad = (deg * Math.PI) / 180;
+    const dirOpen = asaOpenDirFromAlong(along, rad, asm.baseSide);
+    const slot = endKey === "p0" ? "endAngleP0" : "endAngleP1";
+    asm[slot] = {
+      index,
+      deg,
+      origin: { ...a.origin },
+      dirAlong: along,
+      dirOpen,
+      fromPiece: true
+    };
+    asm.lastPlacedEnd = endKey;
+    asm.angleAt = null;
+    syncAssembleTaps();
+  }
+
   function isAssembleComplete() {
     if (!asm) return false;
-    if (isOneAngleBuild()) {
+    if (isOneAngleBuild() || isAsaFreeBuild()) {
       return asm.phase === "done" && !!asm.resultPts;
     }
     if (asmMysteryIndex >= 0 && !asm.mysterySolved) return false;
@@ -725,6 +1005,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dirB = rad / 2;
     asm.angleAt = {
       end: null,
+      index,
       deg,
       origin: { x: ox, y: oy },
       dirA,
@@ -843,40 +1124,34 @@ document.addEventListener("DOMContentLoaded", () => {
     return -1;
   }
 
-  /** 각+변1 이후: 남은 변은 양 끝 중 하나에만 붙임 */
-  function attachSecondSideAtEnd(sideIndex, endKey) {
-    const base = asm.baseSide;
-    if (!base || asm.secondSide) return false;
-    const origin = endKey === "p0" ? base.p0 : base.p1;
+  /** 각이 있는 끝의 반대쪽(자유 끝) */
+  function freeBaseEndAwayFromAngle() {
+    if (!asm.baseSide || !asm.angleAt) return null;
+    const o = asm.angleAt.origin;
+    const d0 = Math.hypot(asm.baseSide.p0.x - o.x, asm.baseSide.p0.y - o.y);
+    const d1 = Math.hypot(asm.baseSide.p1.x - o.x, asm.baseSide.p1.y - o.y);
+    return d0 <= d1 ? "p1" : "p0";
+  }
+
+  function nearestFreeBaseEnd(sx, sy) {
+    const key = freeBaseEndAwayFromAngle();
+    if (!key || !asm.baseSide) return null;
+    const p = asm.baseSide[key];
+    if (Math.hypot(sx - p.x, sy - p.y) < 48) return key;
+    return null;
+  }
+
+  function distToAngleRay(sx, sy, rayIdx) {
+    if (!asm.angleAt || rayIdx < 0) return Infinity;
     const a = asm.angleAt;
-    const atAngle = !!(a && Math.hypot(origin.x - a.origin.x, origin.y - a.origin.y) < 14);
-
-    if (atAngle && a && asm.hingeDeg != null) {
-      const ray = freeAngleRay();
-      if (ray < 0) {
-        showFlash("남은 반직선이 없어요");
-        return false;
-      }
-      const dir = ray === 0 ? a.dirA : a.dirB;
-      const len = sideBoardLen(sideIndex);
-      const tip = {
-        x: a.origin.x + Math.cos(dir) * len,
-        y: a.origin.y + Math.sin(dir) * len
-      };
-      asm.secondSide = {
-        index: sideIndex,
-        p0: { ...a.origin },
-        p1: tip,
-        ray
-      };
-      asm.placedSides[sideIndex] = true;
-      syncAssembleTaps();
-      tryCloseOneAngle();
-      return true;
+    const dir = rayIdx === 0 ? a.dirA : a.dirB;
+    let best = Math.hypot(sx - a.origin.x, sy - a.origin.y);
+    for (let t = 16; t < 170; t += 10) {
+      const x = a.origin.x + Math.cos(dir) * t;
+      const y = a.origin.y + Math.sin(dir) * t;
+      best = Math.min(best, Math.hypot(sx - x, sy - y));
     }
-
-    openHingeAngleQuiz(endKey, sideIndex);
-    return true;
+    return best;
   }
 
   function tryCloseOneAngle() {
@@ -892,19 +1167,16 @@ document.addEventListener("DOMContentLoaded", () => {
       refreshUI();
       return;
     }
+    // 닫힌 삼각형이면 완성 — 구멍과 달라도 패치로 가져가 설치(안 맞으면 튕김)
     buildOk = constructionMatchesHole();
-    if (!buildOk) {
-      asm.phase = "failed";
-      plankDesign = null;
-      hasTriangle = false;
-      sound.fail();
-      showAssembleFailChoices("삼각형을 만드는 데 실패한 것 같아요.");
-      refreshUI();
-      return;
+    if (buildOk) {
+      plankDesign = hole.designPts.map((p) => ({ ...p }));
+    } else {
+      const c = centroid(asm.resultPts);
+      plankDesign = asm.resultPts.map((p) => ({ x: p.x - c.x, y: p.y - c.y }));
     }
-    plankDesign = hole.designPts.map((p) => ({ ...p }));
     asm.phase = "done";
-    showFlash("삼각형이 완성됐어요!");
+    showFlash(buildOk ? "삼각형이 완성됐어요!" : "삼각형은 만들어졌어요. 구멍에 맞을까요?");
     sound.success();
     refreshUI();
   }
@@ -926,13 +1198,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function remakeTriangleOnly() {
     hideAssembleFailChoices();
+    bag = [];
+    toolIndex = 0;
+    measuredSides = [false, false, false];
+    measuredAngles = [false, false, false];
+    measureHistory = [];
     hasTriangle = false;
     plankDesign = null;
     buildOk = false;
     resetAssembleState();
     updateCarrySprite();
-    showFlash("측정은 그대로예요. 삼각형을 다시 만들어 보세요!");
+    // 작업대에서 도구 다시 고르기 (선택했던 도구·측정 전부 리셋)
+    scene = "bench";
+    benchMode = "pick";
+    setupBenchPickTools();
+    phase = "need_tools";
     refreshUI();
+    showFlash("도구부터 다시 골라 주세요!");
   }
 
   function failAssembleToRemeasure() {
@@ -952,6 +1234,12 @@ document.addEventListener("DOMContentLoaded", () => {
       exitToWorld("go_measure", "테스트: 다시 수조에서 재세요");
       return;
     }
+    if (TEST_A2S1) {
+      applyTestA2S1Loadout();
+      refreshUI();
+      exitToWorld("go_measure", "테스트: 다시 수조에서 재세요");
+      return;
+    }
     exitToWorld("need_tools", "삼각형을 못 만들었어요. 도구를 다시 챙기고 재세요!");
   }
 
@@ -960,6 +1248,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (asm.pendingHinge || phase === "quiz") return false;
     if (assembleFailModal && !assembleFailModal.classList.contains("hidden")) return false;
 
+    if (isAsaFreeBuild()) {
+      if (asm.phase === "failed") return false;
+      if (asm.phase === "done") return true;
+      if (asm.endAngleP0 || asm.endAngleP1) return true;
+      if (asm.baseSide) return true;
+      if (asm.angleAt) return true;
+      return false;
+    }
     if (isOneAngleBuild()) {
       if (asm.phase === "failed") return false;
       if (asm.phase === "done") return true;
@@ -982,6 +1278,72 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         showFlash("되돌릴 단계가 없어요");
       }
+      return;
+    }
+
+    if (isAsaFreeBuild()) {
+      if (asm.phase === "failed") return;
+      if (asm.phase === "done") {
+        asm.phase = "building";
+        asm.resultPts = null;
+        asm.apex = null;
+        plankDesign = null;
+        buildOk = false;
+        hasTriangle = false;
+        showFlash("완성을 취소했어요");
+      } else if (asm.endAngleP0 || asm.endAngleP1) {
+        let endKey = asm.lastPlacedEnd;
+        if (endKey !== "p0" && endKey !== "p1") {
+          endKey = asm.endAngleP1 ? "p1" : "p0";
+        }
+        const slot = endKey === "p0" ? "endAngleP0" : "endAngleP1";
+        const ang = asm[slot];
+        if (ang) {
+          asm.placedAngles[ang.index] = false;
+          asm[slot] = null;
+        }
+        asm.lastPlacedEnd = asm.endAngleP0 ? "p0" : (asm.endAngleP1 ? "p1" : null);
+        if (!asm.endAngleP0 && !asm.endAngleP1 && !asm.baseSide) {
+          asm.startKind = null;
+          asm.phase = "pick_first";
+        } else {
+          asm.phase = "building";
+        }
+        showFlash("각을 되돌렸어요");
+      } else if (asm.baseSide) {
+        asm.placedSides[asm.baseSide.index] = false;
+        asm.baseSide = null;
+        for (const slot of ["endAngleP0", "endAngleP1"]) {
+          const ang = asm[slot];
+          if (ang) {
+            asm.placedAngles[ang.index] = false;
+            asm[slot] = null;
+          }
+        }
+        asm.lastPlacedEnd = null;
+        asm.apex = null;
+        if (asm.angleAt) {
+          const ai = asm.angleAt.index != null ? asm.angleAt.index : measuredAngleList()[0];
+          if (ai != null) asm.placedAngles[ai] = false;
+          asm.angleAt = null;
+        }
+        asm.startKind = null;
+        asm.phase = "pick_first";
+        showFlash("변을 되돌렸어요");
+      } else if (asm.angleAt) {
+        const ai = asm.angleAt.index != null ? asm.angleAt.index : measuredAngleList()[0];
+        if (ai != null) asm.placedAngles[ai] = false;
+        asm.angleAt = null;
+        asm.startKind = null;
+        asm.phase = "pick_first";
+        showFlash("각을 되돌렸어요");
+      } else {
+        showFlash("되돌릴 단계가 없어요");
+        return;
+      }
+      syncAssembleTaps();
+      sound.click();
+      refreshUI();
       return;
     }
 
@@ -1058,8 +1420,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function openHingeAngleQuiz(endKey, sideIndex) {
-    asm.pendingHinge = { end: endKey, sideIndex };
+    asm.pendingHinge = { end: endKey, sideIndex, mode: "hinge" };
     phase = "quiz";
+    setHingeModalCopy("이 사이 각도는?", "두 변 사이의 각을 입력하세요.");
     if (hingeAngleFeedback) {
       hingeAngleFeedback.textContent = "";
       hingeAngleFeedback.style.color = "";
@@ -1078,6 +1441,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 30);
   }
 
+  /** AAS: 안 잰 끝각 ? 를 변 끝에 붙일 때 */
+  function openAsaMysteryQuiz(endKey, angleIndex) {
+    asm.pendingHinge = { end: endKey, angleIndex, mode: "asaMystery" };
+    phase = "quiz";
+    setHingeModalCopy("이 끝의 각도는?", "안 잰 끝각을 계산해 입력하세요.");
+    if (hingeAngleFeedback) {
+      hingeAngleFeedback.textContent = "";
+      hingeAngleFeedback.style.color = "";
+    }
+    if (hingeAngleInput) {
+      hingeAngleInput.value = "";
+      hingeAngleInput.focus();
+    }
+    if (hingeAngleModal) {
+      hingeAngleModal.classList.remove("hidden");
+      hingeAngleModal.setAttribute("aria-hidden", "false");
+    }
+    document.body.classList.add("modal-open");
+    setTimeout(() => {
+      if (hingeAngleInput) hingeAngleInput.focus();
+    }, 30);
+  }
+
+  function setHingeModalCopy(title, prompt) {
+    const card = hingeAngleModal && hingeAngleModal.querySelector(".hinge-angle-card");
+    if (!card) return;
+    const h2 = card.querySelector("h2");
+    const p = card.querySelector(".quiz-prompt");
+    if (h2) h2.textContent = title;
+    if (p) p.textContent = prompt;
+  }
+
   function closeHingeAngleModal(cancelled) {
     if (hingeAngleModal) {
       hingeAngleModal.classList.add("hidden");
@@ -1087,7 +1482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     phase = "go_build";
     if (cancelled) {
       asm.pendingHinge = null;
-      showFlash("취소했어요. 다시 끝을 골라 변을 붙이세요");
+      showFlash("취소했어요. 다시 끝을 골라 붙이세요");
     }
     refreshUI();
   }
@@ -1107,19 +1502,56 @@ document.addEventListener("DOMContentLoaded", () => {
       sound.fail();
       return;
     }
-    const { end, sideIndex } = asm.pendingHinge;
     const useDeg = Math.round(deg);
+    const pending = asm.pendingHinge;
+
+    if (pending.mode === "asaMystery") {
+      const { end, angleIndex } = pending;
+      closeHingeAngleModal(false);
+      asm.pendingHinge = null;
+      // 입력한 °로 항상 붙임 (틀려도 붙음 → 이상한 삼각형 / 설치 튕김)
+      attachAsaEndAngle(end, angleIndex, useDeg);
+      sound.measure();
+      if (asm.phase !== "done" && asm.phase !== "failed") {
+        showFlash("끝각을 붙였어요!");
+      }
+      refreshUI();
+      return;
+    }
+
+    const { end, sideIndex } = pending;
     closeHingeAngleModal(false);
     attachSecondSideAtAngle(sideIndex, end, useDeg);
     refreshUI();
   }
 
-  function nearestBaseEnd(sx, sy) {
+  function nearestBaseEnd(sx, sy, thresh = 72) {
     if (!asm.baseSide) return null;
     const d0 = Math.hypot(sx - asm.baseSide.p0.x, sy - asm.baseSide.p0.y);
     const d1 = Math.hypot(sx - asm.baseSide.p1.x, sy - asm.baseSide.p1.y);
-    if (d0 < 42 || d1 < 42) return d0 <= d1 ? "p0" : "p1";
+    if (d0 <= thresh || d1 <= thresh) return d0 <= d1 ? "p0" : "p1";
     return null;
+  }
+
+  /** 각/? 붙이기: 아직 비어 있는 끝만 (점유 끝은 무시) */
+  function nearestFreeAsaEnd(sx, sy, thresh = 88) {
+    if (!asm.baseSide) return null;
+    const cands = [];
+    if (!asm.endAngleP0) {
+      cands.push({
+        key: "p0",
+        d: Math.hypot(sx - asm.baseSide.p0.x, sy - asm.baseSide.p0.y)
+      });
+    }
+    if (!asm.endAngleP1) {
+      cands.push({
+        key: "p1",
+        d: Math.hypot(sx - asm.baseSide.p1.x, sy - asm.baseSide.p1.y)
+      });
+    }
+    if (!cands.length) return null;
+    cands.sort((a, b) => a.d - b.d);
+    return cands[0].d <= thresh ? cands[0].key : null;
   }
 
   function nearestAngleRay(sx, sy) {
@@ -1148,9 +1580,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const a = asm.angleAt;
     if (!a) return;
     const draggingSide = !!(asm.drag && asm.drag.kind === "side");
-    // 각만 있을 때(첫 변)만 반직선 위 드롭. 변 하나 있으면 양 끝만.
+    // 첫 변(빈 팔) 또는 남은 변(남은 반직선) 드롭 힌트
     const needSides = draggingSide && asm.phase === "building"
-      && asm.startKind === "angle" && !asm.baseSide;
+      && ((asm.startKind === "angle" && !asm.baseSide)
+        || (asm.baseSide && !asm.secondSide && freeAngleRay() >= 0));
     const rayLen = 160;
     const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 220);
 
@@ -1300,10 +1733,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const done = isAssembleComplete();
       missionText.textContent = done
         ? "작업대: 패치가 완성됐어요. 챙기세요!"
-        : isOneAngleBuild()
+        : isFreeConstructBuild()
           ? (asm && asm.phase === "pick_first"
-            ? "작업대: 각부터 / 변부터 고르세요"
-            : `작업대: 작도 중 (${assembleTaps}/${need})`)
+            ? "작업대: 변 또는 각을 가운데로 끌어 놓으세요"
+            : isAsaFreeBuild() && asm && asm.baseSide && (!asm.endAngleP0 || !asm.endAngleP1)
+              ? "작업대: 변의 양끝에 각을 붙이세요"
+              : `작업대: 작도 중 (${assembleTaps}/${need})`)
           : `작업대: 조각을 드래그해 붙이세요 (${assembleTaps}/${need})`;
       return;
     }
@@ -1356,10 +1791,14 @@ document.addEventListener("DOMContentLoaded", () => {
       sceneBadge.textContent = "작업대 · 조립";
       sceneHint.textContent = done
         ? (buildOk ? "유리 패치가 완성됐어요!" : "이 모양은 구멍과 다를 수 있어요…")
-        : isOneAngleBuild()
+        : isFreeConstructBuild()
           ? (asm && asm.phase === "pick_first"
-            ? "각도 조각 또는 변을 골라 먼저 놓으세요."
-            : "끝점에 각을 붙이거나, 변을 붙이면 각도를 물어요.")
+            ? "왼쪽 조각을 가운데로 끌어 놓으세요."
+            : isAsaFreeBuild()
+              ? (asm && asm.baseSide && (!asm.endAngleP0 || !asm.endAngleP1)
+                ? "변의 양끝에 각을 붙이면 반직선이 만나요."
+                : "변의 양끝에 각을 붙이면 반직선이 만나 삼각형이 돼요.")
+              : "끝점에 각을 붙이거나, 변을 붙이면 각도를 물어요.")
           : (asmMysteryIndex >= 0 && !asm.mysterySolved
             ? "빨간 ? 끝각은 직접 계산해 보세요."
             : isSssBuild()
@@ -1558,6 +1997,28 @@ document.addEventListener("DOMContentLoaded", () => {
       benchTools = items;
       return;
     }
+    // 테스트: 자1·각도기2 (각2변1)
+    if (TEST_A2S1) {
+      const layout = [
+        { kind: "ruler", x: 300, y: 290 },
+        { kind: "protractor", x: 520, y: 280 },
+        { kind: "protractor", x: 720, y: 300 }
+      ];
+      layout.forEach((L, i) => {
+        items.push({
+          id: "t" + i,
+          kind: L.kind,
+          x: L.x,
+          y: L.y,
+          w: L.kind === "ruler" ? 150 : 88,
+          h: L.kind === "ruler" ? 36 : 88,
+          taken: false,
+          rot: L.kind === "ruler" ? -4 : 0
+        });
+      });
+      benchTools = items;
+      return;
+    }
     if (tankIndex === 0) {
       // Three rulers on the table
       for (let i = 0; i < 3; i++) {
@@ -1613,6 +2074,15 @@ document.addEventListener("DOMContentLoaded", () => {
     showFlash("테스트: 각1·변2 — 수조로 가서 재세요");
   }
 
+  function applyTestA2S1Loadout() {
+    if (!TEST_A2S1) return;
+    if (tankIndex < 1) tankIndex = 1;
+    bag = ["ruler", "protractor", "protractor"];
+    updateCarrySprite();
+    phase = "go_measure";
+    showFlash("테스트: 각2·변1 — 변과 양끝 각을 재세요");
+  }
+
   function enterBenchPick() {
     scene = "bench";
     benchMode = "pick";
@@ -1632,11 +2102,13 @@ document.addEventListener("DOMContentLoaded", () => {
     phase = "go_build";
     refreshUI();
     showFlash(
-      isOneAngleBuild()
-        ? "각부터 / 변부터 — 원하는 조각으로 시작하세요"
-        : isSssBuild()
-          ? "변을 이어 붙여 삼각형을 만드세요"
-          : "원하는 조각부터 드래그해 붙이세요"
+      isAsaFreeBuild()
+        ? "변을 놓고 양끝에 각을 붙이세요"
+        : isOneAngleBuild()
+          ? "각부터 / 변부터 — 원하는 조각으로 시작하세요"
+          : isSssBuild()
+            ? "변을 이어 붙여 삼각형을 만드세요"
+            : "원하는 조각부터 드래그해 붙이세요"
     );
   }
 
@@ -1686,8 +2158,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     syncAssembleTaps();
-    if (isOneAngleBuild()) {
-      // buildOk / plankDesign already set in tryCloseOneAngle
+    if (isOneAngleBuild() || isAsaFreeBuild()) {
+      // buildOk / plankDesign already set in tryClose*
       if (!plankDesign && asm.resultPts) {
         const c = centroid(asm.resultPts);
         plankDesign = asm.resultPts.map((p) => ({ x: p.x - c.x, y: p.y - c.y }));
@@ -1740,6 +2212,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     toolIndex = 0;
     sound.success();
+    // 이미 잰 상태면(삼각형 다시 만들기) 바로 조립으로
+    if (measureHistory.length >= 3) {
+      enterBenchBuild();
+      return;
+    }
     exitToWorld("go_measure", `수조 ${tankIndex + 1}로 이동하세요`);
   }
 
@@ -1763,8 +2240,9 @@ document.addEventListener("DOMContentLoaded", () => {
     phase = "need_tools";
     updateCarrySprite();
     applyTestA1S2Loadout();
+    applyTestA2S1Loadout();
     // 테스트 시 해당 수조 앞으로 이동
-    if (TEST_A1S2) {
+    if (TEST_A1S2 || TEST_A2S1) {
       const z = zoneById(`tank${tankIndex}`);
       if (z) {
         cat.x = z.x;
@@ -1986,7 +2464,7 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshUI();
     document.getElementById("result-icon").textContent = ok ? "✅" : "💧";
     document.getElementById("result-title").textContent = title;
-    document.getElementById("result-score-badge").textContent = ok ? `+${pts}점` : "+0점";
+    document.getElementById("result-score-badge").textContent = ok ? "수리 완료" : "실패";
     document.getElementById("result-subtitle").textContent = ok
       ? `${TOTAL_TANKS - tanksFixed.filter(Boolean).length}개 남음`
       : "패치가 구멍에 맞지 않았어요";
@@ -2000,7 +2478,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function advanceAfterResult() {
     resultModal.classList.add("hidden");
     document.body.classList.remove("modal-open");
-    if (tanksFixed.every(Boolean) || tankIndex >= TOTAL_TANKS - 1) {
+    if (tanksFixed.every(Boolean)) {
+      playSuccessThenGameOver();
+      return;
+    }
+    if (tankIndex >= TOTAL_TANKS - 1) {
       openGameOver();
       return;
     }
@@ -2014,19 +2496,92 @@ document.addEventListener("DOMContentLoaded", () => {
     beginTank();
   }
 
+  function playSuccessThenGameOver() {
+    pendingGameOverAfterSuccess = true;
+    if (successOverlay) {
+      successOverlay.classList.remove("hidden");
+      successOverlay.setAttribute("aria-hidden", "false");
+    }
+    document.body.classList.add("modal-open");
+    try {
+      if (successVideo) {
+        successVideo.currentTime = 0;
+        const p = successVideo.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function finishSuccessCutscene() {
+    if (!pendingGameOverAfterSuccess) return;
+    pendingGameOverAfterSuccess = false;
+    try { if (successVideo) successVideo.pause(); } catch (e) { /* ignore */ }
+    if (successOverlay) {
+      successOverlay.classList.add("hidden");
+      successOverlay.setAttribute("aria-hidden", "true");
+    }
+    document.body.classList.remove("modal-open");
+    openGameOver();
+  }
+
+  function playTimeoutThenGameOver() {
+    pendingGameOverAfterTimeout = true;
+    if (timeoutOverlay) {
+      timeoutOverlay.classList.remove("hidden");
+      timeoutOverlay.setAttribute("aria-hidden", "false");
+    }
+    document.body.classList.add("modal-open");
+    try {
+      if (timeoutVideo) {
+        timeoutVideo.currentTime = 0;
+        const p = timeoutVideo.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function finishTimeoutCutscene() {
+    if (!pendingGameOverAfterTimeout) return;
+    pendingGameOverAfterTimeout = false;
+    try { if (timeoutVideo) timeoutVideo.pause(); } catch (e) { /* ignore */ }
+    if (timeoutOverlay) {
+      timeoutOverlay.classList.add("hidden");
+      timeoutOverlay.setAttribute("aria-hidden", "true");
+    }
+    document.body.classList.remove("modal-open");
+    openGameOver();
+  }
+
   function openGameOver() {
     running = false;
     phase = "gameover";
     scene = "world";
     refreshUI();
-    if (totalScore > highScore) {
-      highScore = totalScore;
-      localStorage.setItem("hm_three_chances_high", String(highScore));
-      document.getElementById("new-highscore-banner").classList.remove("hidden");
+
+    const allFixed = tanksFixed.every(Boolean);
+    clearTimeMs = allFixed ? elapsedMs() : null;
+
+    const finalEl = document.getElementById("final-total-score");
+    const unitEl = document.getElementById("final-score-unit");
+    if (clearTimeMs != null) {
+      finalEl.textContent = formatClearTime(clearTimeMs);
+      unitEl.textContent = "클리어";
+      if (!bestClearTimeMs || clearTimeMs < bestClearTimeMs) {
+        bestClearTimeMs = clearTimeMs;
+        localStorage.setItem(
+          activeMode === "dorms" ? "hm_three_chances_best_dorms" : "hm_three_chances_best",
+          String(bestClearTimeMs)
+        );
+        document.getElementById("new-highscore-banner").classList.remove("hidden");
+      } else {
+        document.getElementById("new-highscore-banner").classList.add("hidden");
+      }
     } else {
+      finalEl.textContent = "미완";
+      unitEl.textContent = "클리어";
       document.getElementById("new-highscore-banner").classList.add("hidden");
     }
-    document.getElementById("final-total-score").textContent = String(totalScore);
+
     document.getElementById("result-locked-name").textContent = playerName;
     document.getElementById("result-locked-id").textContent = studentId || "미입력";
     const grid = document.getElementById("round-scores-grid");
@@ -2034,9 +2589,22 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 0; i < TOTAL_TANKS; i++) {
       const cell = document.createElement("div");
       cell.className = "round-score-cell";
-      cell.innerHTML = `<div>수조 ${i + 1}</div><strong>${roundScores[i] ?? 0}</strong>`;
+      cell.innerHTML = `<div>수조 ${i + 1}</div><strong>${tanksFixed[i] ? "✓" : "—"}</strong>`;
       grid.appendChild(cell);
     }
+
+    const btnSendEl = document.getElementById("btn-send-data");
+    const msg = document.getElementById("api-status-msg");
+    if (btnSendEl) {
+      btnSendEl.disabled = clearTimeMs == null;
+      btnSendEl.textContent = clearTimeMs == null ? "클리어 후 등록 가능" : "기록 등록하기";
+    }
+    if (msg && clearTimeMs == null) {
+      msg.textContent = "다섯 수조를 모두 고쳐야 클리어 시간을 등록할 수 있어요.";
+    } else if (msg) {
+      msg.textContent = "";
+    }
+
     gameoverModal.classList.remove("hidden");
     document.body.classList.add("modal-open");
     loadLeaderboard();
@@ -2047,6 +2615,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.remove("modal-open");
     totalScore = 0;
     roundScores = [];
+    clearTimeMs = null;
     tankIndex = 0;
     tanksFixed = [false, false, false, false, false];
     timeLeftMs = TIME_LIMIT_MS;
@@ -2196,7 +2765,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       // tap red ? socket on board (ASA legacy)
-      if (!isOneAngleBuild() && asmMysteryIndex >= 0 && !asm.mysterySolved) {
+      if (!isFreeConstructBuild() && asmMysteryIndex >= 0 && !asm.mysterySolved) {
         const full = assembleBoardPts();
         const v = full[asmMysteryIndex];
         if (Math.hypot(p.x - v.x, p.y - v.y) < 36) {
@@ -2264,13 +2833,26 @@ document.addEventListener("DOMContentLoaded", () => {
       asm.drag = null;
       pointer.down = false;
       pointer.dragging = false;
-      const placed = tryPlaceAssemblePiece(drag, p.x, p.y);
+      let placed = tryPlaceAssemblePiece(drag, p.x, p.y);
+      // ASA: 끝에 살짝 못 미치면 빈 끝으로 한 번 더 스냅
+      if (!placed && isAsaFreeBuild() && asm.baseSide
+        && (drag.kind === "angle" || drag.kind === "asaMystery")) {
+        const snapEnd = nearestFreeAsaEnd(p.x, p.y, 120);
+        if (snapEnd) {
+          const pt = asm.baseSide[snapEnd];
+          placed = tryPlaceAssemblePiece(drag, pt.x, pt.y);
+        }
+      }
       if (!placed && drag.kind === "mystery" && pointer.moved < DRAG_THRESH) {
         openAngleQuiz();
-      } else if (!placed && pointer.moved < DRAG_THRESH && drag.kind !== "mystery" && !isOneAngleBuild()) {
+      } else if (!placed && pointer.moved < DRAG_THRESH && drag.kind !== "mystery" && !isFreeConstructBuild()) {
         tryPlaceAssemblePiece(drag, ...assembleSnapPoint(drag));
       } else if (!placed) {
-        showFlash(isOneAngleBuild() ? "끝점·반직선·작업 영역에 놓으세요" : "점선 자리에 더 가까이 놓으세요");
+        showFlash(
+          isAsaFreeBuild() && asm && asm.baseSide
+            ? "변의 양끝에 각을 놓으세요"
+            : (isFreeConstructBuild() ? "끝점·반직선·작업 영역에 놓으세요" : "점선 자리에 더 가까이 놓으세요")
+        );
       }
       refreshUI();
       return;
@@ -2722,6 +3304,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (benchMode === "build") {
+      if (isAsaFreeBuild()) {
+        drawTwoAngleAssemble();
+        return;
+      }
       if (isOneAngleBuild()) {
         drawOneAngleAssemble();
         return;
@@ -3012,6 +3598,236 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function drawTwoAngleAssemble() {
+    if (!asm) resetAssembleState();
+    ctx.fillStyle = "#e8f4ff";
+    ctx.font = "800 18px Oxanium, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("패치 조립", VIEW_W / 2, 58);
+    ctx.fillStyle = "#8fb4d4";
+    ctx.font = "600 13px Outfit, sans-serif";
+    let sub = "각 조각 또는 변을 먼저 놓으세요";
+    if (asm.phase === "building") {
+      if (asm.angleAt && !asm.baseSide) sub = "반직선 위에 변을 놓으세요";
+      else if (asm.baseSide && (!asm.endAngleP0 || !asm.endAngleP1)) {
+        const left = !asm.endAngleP0;
+        const right = !asm.endAngleP1;
+        if (left && right) {
+          sub = "변의 양끝에 각을 붙이세요";
+        } else {
+          sub = left
+            ? "남은 왼쪽 끝에 각을 붙이세요"
+            : "남은 오른쪽 끝에 각을 붙이세요";
+        }
+      } else sub = "작도 중…";
+    } else if (asm.phase === "done") {
+      sub = buildOk ? "삼각형 완성!" : "이상한 삼각형…";
+    }
+    ctx.fillText(sub, VIEW_W / 2, 82);
+
+    if (asm.phase === "pick_first") {
+      ctx.fillStyle = "rgba(61, 232, 255, 0.06)";
+      ctx.beginPath();
+      ctx.ellipse(ASM_CX, ASM_CY, 140, 85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(143, 180, 212, 0.65)";
+      ctx.font = "600 14px Outfit, sans-serif";
+      ctx.fillText("변 또는 각을 여기로 끌어 놓으세요", ASM_CX, ASM_CY);
+    }
+
+    // angle-first preview (before side)
+    if (asm.angleAt && !asm.baseSide) {
+      const hotRay = (asm.drag && asm.drag.kind === "side")
+        ? nearestAngleRay(asm.drag.x, asm.drag.y)
+        : -1;
+      drawAngleRaysHighlighted(hotRay);
+    }
+
+    if (asm.baseSide) {
+      const s = asm.baseSide;
+      ctx.strokeStyle = "#3de8ff";
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(61, 232, 255, 0.5)";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(s.p0.x, s.p0.y);
+      ctx.lineTo(s.p1.x, s.p1.y);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#e8f4ff";
+      ctx.beginPath();
+      ctx.arc(s.p0.x, s.p0.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(s.p1.x, s.p1.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#3de8ff";
+      ctx.font = "800 14px Oxanium, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatSideLen(s.index), (s.p0.x + s.p1.x) / 2, (s.p0.y + s.p1.y) / 2 - 12);
+    }
+
+    const drawAsaEnd = (ea, endKey) => {
+      if (!ea) return;
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 220);
+      const rayLen = 160;
+      // 열린 반직선만 (변 방향은 숨김)
+      const needAng = !!(asm.drag && asm.drag.kind === "angle" && asm.baseSide
+        && ((endKey === "p0" && !asm.endAngleP0) || (endKey === "p1" && !asm.endAngleP1)));
+      ctx.save();
+      ctx.strokeStyle = needAng
+        ? `rgba(255, 213, 106, ${0.55 + 0.4 * pulse})`
+        : "rgba(255, 213, 106, 0.85)";
+      ctx.lineWidth = needAng ? 5 : 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(ea.origin.x, ea.origin.y);
+      ctx.lineTo(
+        ea.origin.x + Math.cos(ea.dirOpen) * rayLen,
+        ea.origin.y + Math.sin(ea.dirOpen) * rayLen
+      );
+      ctx.stroke();
+      ctx.restore();
+      // wedge
+      ctx.beginPath();
+      ctx.moveTo(ea.origin.x, ea.origin.y);
+      ctx.arc(ea.origin.x, ea.origin.y, 36, ea.dirAlong, ea.dirOpen, ea.dirOpen < ea.dirAlong);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255, 213, 106, 0.28)";
+      ctx.fill();
+      ctx.fillStyle = "#ffd56a";
+      ctx.font = "800 14px Oxanium, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`${ea.deg}°`, ea.origin.x, ea.origin.y - 44);
+    };
+
+    drawAsaEnd(asm.endAngleP0, "p0");
+    drawAsaEnd(asm.endAngleP1, "p1");
+
+    // 교점 미리보기
+    if (asm.endAngleP0 && asm.endAngleP1 && asm.phase === "building") {
+      const preview = rayRayIntersection(
+        asm.endAngleP0.origin, asm.endAngleP0.dirOpen,
+        asm.endAngleP1.origin, asm.endAngleP1.dirOpen
+      );
+      if (preview) {
+        ctx.strokeStyle = "rgba(93, 255, 176, 0.55)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        ctx.moveTo(asm.baseSide.p0.x, asm.baseSide.p0.y);
+        ctx.lineTo(preview.x, preview.y);
+        ctx.lineTo(asm.baseSide.p1.x, asm.baseSide.p1.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#5dffb0";
+        ctx.beginPath();
+        ctx.arc(preview.x, preview.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 끝점 하이라이트 (각 / ? 붙이기)
+    if (asm.baseSide && asm.phase === "building" && (!asm.endAngleP0 || !asm.endAngleP1)) {
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200);
+      const draggingAng = asm.drag && (asm.drag.kind === "angle" || asm.drag.kind === "asaMystery");
+      const hotEnd = draggingAng
+        ? nearestFreeAsaEnd(asm.drag.x, asm.drag.y)
+        : null;
+      for (const key of ["p0", "p1"]) {
+        if (key === "p0" && asm.endAngleP0) continue;
+        if (key === "p1" && asm.endAngleP1) continue;
+        const p = asm.baseSide[key];
+        const hot = hotEnd === key;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, hot ? 20 : 15, 0, Math.PI * 2);
+        ctx.strokeStyle = hot ? "#3de8ff" : `rgba(255, 213, 106, ${0.45 + 0.4 * pulse})`;
+        ctx.lineWidth = hot ? 3.5 : 2.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (draggingAng) {
+          ctx.fillStyle = hot ? "#3de8ff" : "#ffd56a";
+          ctx.font = "700 11px Outfit, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(
+            asm.drag.kind === "asaMystery" ? "? 붙이기" : "각 붙이기",
+            p.x,
+            p.y - 26
+          );
+        }
+      }
+    }
+
+    if (asm.phase === "done" && asm.resultPts) {
+      drawGlassTriangle(asm.resultPts, {
+        fill: buildOk ? "rgba(93, 255, 176, 0.35)" : "rgba(255, 107, 138, 0.28)",
+        stroke: buildOk ? "#5dffb0" : "#ff6b8a",
+        lineWidth: 4
+      });
+      ctx.fillStyle = buildOk ? "#5dffb0" : "#ff6b8a";
+      ctx.font = "700 13px Outfit, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        buildOk ? "삼각형이 완성됐어요! 패치 챙기기" : "구멍과 다른 삼각형이에요",
+        VIEW_W / 2,
+        448
+      );
+    }
+
+    // tray
+    asmTrayHits = [];
+    let py = 200;
+    ctx.fillStyle = "rgba(8, 20, 36, 0.45)";
+    ctx.beginPath();
+    ctx.roundRect(40, 160, 200, 280, 12);
+    ctx.fill();
+    ctx.fillStyle = "#8fb4d4";
+    ctx.font = "700 12px Outfit, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("잰 조각", 140, 182);
+
+    for (const i of measuredSideList()) {
+      if (asm.placedSides[i]) continue;
+      if (asm.drag && asm.drag.kind === "side" && asm.drag.index === i) continue;
+      const len = Math.min(150, hole.sidesCm[i] * 16);
+      const hit = { kind: "side", index: i, x: 140, y: py, w: len + 20, h: 36 };
+      asmTrayHits.push(hit);
+      drawTraySidePiece(hit.x, hit.y, hole.sidesCm[i], len, false);
+      py += 52;
+    }
+    // 측정한 각은 모두 표시
+    for (const i of measuredAngleList()) {
+      if (asm.placedAngles[i]) continue;
+      if (asm.drag && asm.drag.kind === "angle" && asm.drag.index === i) continue;
+      const hit = { kind: "angle", index: i, x: 140, y: py, w: 88, h: 78 };
+      asmTrayHits.push(hit);
+      drawAngleWedgeIcon(hit.x, hit.y - 8, hole.anglesDeg[i], false);
+      py += 92;
+    }
+    // 변의 끝인데 안 잰 각만 ?
+    for (const i of twoAngleEndVertices()) {
+      if (measuredAngles[i] || asm.placedAngles[i]) continue;
+      if (asm.drag && asm.drag.kind === "asaMystery" && asm.drag.index === i) continue;
+      const hit = { kind: "asaMystery", index: i, x: 140, y: py, w: 88, h: 78 };
+      asmTrayHits.push(hit);
+      drawMysteryAngleIcon(hit.x, hit.y - 8);
+      py += 92;
+    }
+
+    if (asm.drag) {
+      const d = asm.drag;
+      if (d.kind === "side") {
+        drawTraySidePiece(d.x, d.y, hole.sidesCm[d.index], Math.min(150, hole.sidesCm[d.index] * 16), true);
+      } else if (d.kind === "angle") {
+        drawAngleWedgeIcon(d.x, d.y, hole.anglesDeg[d.index], false);
+      } else if (d.kind === "asaMystery") {
+        drawMysteryAngleIcon(d.x, d.y);
+      }
+    }
+  }
+
   function drawOneAngleAssemble() {
     if (!asm) resetAssembleState();
     ctx.fillStyle = "#e8f4ff";
@@ -3027,9 +3843,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (asm.startKind === "angle" && (!asm.baseSide || !asm.secondSide)) {
         sub = !asm.baseSide
           ? "반직선이 반짝일 때 — 그 위에 변을 놓으세요"
-          : "남은 변은 양 끝 중 하나에 붙이세요";
+          : "변의 끝, 또는 남은 반직선에 붙이세요";
       } else if (asm.baseSide && asm.angleAt && !asm.secondSide) {
-        sub = "남은 변은 양 끝 중 하나에 붙이세요";
+        sub = "변의 끝, 또는 남은 반직선에 붙이세요";
       } else sub = "작도 중…";
     } else if (asm.phase === "done") {
       sub = buildOk ? "삼각형 완성!" : "이상한 삼각형…";
@@ -3073,19 +3889,29 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillText(formatSideLen(s.index), (s.p0.x + s.p1.x) / 2, (s.p0.y + s.p1.y) / 2 - 12);
     }
 
-    // angle rays (+ drop hints while dragging first side onto empty arms)
+    // angle rays (+ drop hints: 첫 변 / 남은 반직선)
     if (asm.angleAt) {
-      const hotRay = (asm.drag && asm.drag.kind === "side" && !asm.baseSide)
+      const hotRay = (asm.drag && asm.drag.kind === "side"
+        && (!asm.baseSide || !asm.secondSide))
         ? nearestAngleRay(asm.drag.x, asm.drag.y)
         : -1;
       drawAngleRaysHighlighted(hotRay);
     }
 
-    // 양 끝 하이라이트: 각 붙이기 / 두 번째 변 붙이기
+    // 끝점 하이라이트
+    // - 각 조각 드래그: 양 끝
+    // - 각+변1 후 남은 변: 자유 끝만 (각 꼭짓점은 반직선과 겹침)
+    // - 각 없을 때 둘째 변: 양 끝
     if (asm.baseSide && !asm.secondSide && asm.phase === "building" && asm.drag) {
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200);
-      const hotEnd = nearestBaseEnd(asm.drag.x, asm.drag.y);
-      for (const key of ["p0", "p1"]) {
+      const freeOnly = asm.drag.kind === "side" && !!asm.angleAt;
+      const endKeys = freeOnly
+        ? [freeBaseEndAwayFromAngle()].filter(Boolean)
+        : ["p0", "p1"];
+      const hotEnd = freeOnly
+        ? nearestFreeBaseEnd(asm.drag.x, asm.drag.y)
+        : nearestBaseEnd(asm.drag.x, asm.drag.y);
+      for (const key of endKeys) {
         const p = asm.baseSide[key];
         const hot = hotEnd === key;
         ctx.beginPath();
@@ -3100,15 +3926,17 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.font = "700 11px Outfit, sans-serif";
           ctx.textAlign = "center";
           ctx.fillText(
-            asm.drag.kind === "angle" ? "각 붙이기" : "변 붙이기",
+            asm.drag.kind === "angle" ? "각 붙이기" : "변 끝에",
             p.x,
             p.y - 26
           );
         }
       }
     } else if (asm.baseSide && !asm.secondSide && asm.phase === "building") {
-      // idle hint rings on ends
-      for (const key of ["p0", "p1"]) {
+      const endKeys = asm.angleAt
+        ? [freeBaseEndAwayFromAngle()].filter(Boolean)
+        : ["p0", "p1"];
+      for (const key of endKeys) {
         const p = asm.baseSide[key];
         ctx.beginPath();
         ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
@@ -3245,6 +4073,103 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
+  function tryPlaceTwoAnglePiece(drag, sx, sy) {
+    if (!drag || !asm || asm.phase === "done" || asm.phase === "failed") return false;
+
+    // 안 잰 끝각 ?
+    if (drag.kind === "asaMystery") {
+      if (asm.placedAngles[drag.index]) return false;
+      if (!asm.baseSide) {
+        showFlash("먼저 변을 가운데에 놓으세요");
+        return false;
+      }
+      const end = nearestFreeAsaEnd(sx, sy);
+      if (!end) {
+        showFlash("변의 양 끝에 ? 각을 붙이세요");
+        return false;
+      }
+      openAsaMysteryQuiz(end, drag.index);
+      return true;
+    }
+
+    if (drag.kind === "angle") {
+      if (asm.placedAngles[drag.index]) return false;
+      if (!measuredAngles[drag.index]) {
+        showFlash("안 잰 각은 ? 조각으로 붙이세요");
+        return false;
+      }
+      // 각 먼저 — 잰 각이면 어느 것이든 가능
+      if (asm.phase === "pick_first" || (!asm.baseSide && !asm.angleAt && !asm.endAngleP0 && !asm.endAngleP1)) {
+        if (!workAreaHit(sx, sy)) {
+          showFlash("가운데 작업 영역에 놓으세요");
+          return false;
+        }
+        placeAngleFirst(drag.index, sx, sy);
+        sound.measure();
+        showFlash("각을 놓았어요. 반직선에 변을 붙이세요");
+        refreshUI();
+        return true;
+      }
+      // 변의 양 끝에 각 — 어느 끝이든, 어느 각이든 붙음
+      if (asm.baseSide) {
+        const end = nearestFreeAsaEnd(sx, sy);
+        if (!end) {
+          showFlash("변의 양 끝에 각을 붙이세요");
+          return false;
+        }
+        attachAsaEndAngle(end, drag.index);
+        sound.measure();
+        if (asm.phase !== "done" && asm.phase !== "failed") {
+          showFlash(
+            asm.endAngleP0 && asm.endAngleP1
+              ? "양끝 각을 붙였어요!"
+              : "각을 붙였어요. 다른 끝에도 각을 붙이세요"
+          );
+        }
+        refreshUI();
+        return true;
+      }
+      return false;
+    }
+
+    // side
+    if (asm.placedSides[drag.index]) return false;
+    const si = primaryMeasuredSide();
+    if (drag.index !== si) {
+      showFlash("잰 변을 놓으세요");
+      return false;
+    }
+
+    if (asm.phase === "pick_first" || (!asm.baseSide && !asm.angleAt)) {
+      if (!workAreaHit(sx, sy)) {
+        showFlash("가운데 작업 영역에 놓으세요");
+        return false;
+      }
+      placeBaseSide(drag.index, sx, sy);
+      sound.measure();
+      showFlash("변을 놓았어요. 양끝에 각을 붙이세요");
+      refreshUI();
+      return true;
+    }
+
+    // 각 먼저: 반직선에 변
+    if (asm.angleAt && !asm.baseSide) {
+      const ray = nearestAngleRay(sx, sy);
+      if (ray < 0) {
+        showFlash("각의 팔(반직선) 위에 놓으세요");
+        return false;
+      }
+      attachSideToAngleRay(drag.index, ray);
+      bindAngleAtToBaseEnd();
+      sound.measure();
+      showFlash("변을 붙였어요. 남은 끝에 각을 붙이세요");
+      refreshUI();
+      return true;
+    }
+
+    return false;
+  }
+
   function tryPlaceOneAnglePiece(drag, sx, sy) {
     if (!drag || !asm || asm.phase === "done" || asm.phase === "failed") return false;
 
@@ -3271,7 +4196,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         attachAngleToBaseEnd(end);
         sound.measure();
-        showFlash("각을 붙였어요. 남은 변을 양 끝에 붙이세요");
+        showFlash("각을 붙였어요. 남은 변은 끝 또는 반직선에");
         refreshUI();
         return true;
       }
@@ -3293,7 +4218,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return true;
     }
 
-    // 각 먼저: 첫 변만 반직선에. 이후는 양 끝만.
+    // 각 먼저: 첫 변은 반직선에
     if (asm.startKind === "angle" && asm.angleAt && !asm.baseSide) {
       const ray = nearestAngleRay(sx, sy);
       if (ray < 0) {
@@ -3301,25 +4226,43 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
       }
       attachSideToAngleRay(drag.index, ray);
-      showFlash("변을 붙였어요. 남은 변은 양 끝에 붙이세요");
+      showFlash("변을 붙였어요. 남은 변은 끝 또는 반직선에");
       refreshUI();
       return true;
     }
 
-    // 남은 변: 양 끝만
+    // 남은 변: (각 있음) 자유 끝 ↔ 남은 반직선 / (각 없음) 양 끝 힌지
     if (asm.baseSide && !asm.secondSide) {
+      if (asm.angleAt) {
+        const end = nearestFreeBaseEnd(sx, sy);
+        const ray = nearestAngleRay(sx, sy);
+        let pick = null; // "end" | "ray"
+        if (end && ray >= 0) {
+          const ep = asm.baseSide[end];
+          const dEnd = Math.hypot(sx - ep.x, sy - ep.y);
+          const dRay = distToAngleRay(sx, sy, ray);
+          pick = dEnd <= dRay ? "end" : "ray";
+        } else if (end) {
+          pick = "end";
+        } else if (ray >= 0) {
+          pick = "ray";
+        } else {
+          showFlash("변의 끝, 또는 남은 반직선 위에 놓으세요");
+          return false;
+        }
+        if (pick === "ray") {
+          attachSideToAngleRay(drag.index, ray);
+          sound.measure();
+          refreshUI();
+          return true;
+        }
+        openHingeAngleQuiz(end, drag.index);
+        return true;
+      }
       const end = nearestBaseEnd(sx, sy);
       if (!end) {
         showFlash("변의 양 끝 중 하나에 붙이세요");
         return false;
-      }
-      if (asm.angleAt) {
-        const ok = attachSecondSideAtEnd(drag.index, end);
-        if (ok) {
-          sound.measure();
-          refreshUI();
-        }
-        return ok;
       }
       openHingeAngleQuiz(end, drag.index);
       return true;
@@ -3330,6 +4273,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function tryPlaceAssemblePiece(drag, sx, sy) {
     if (!drag) return false;
+    if (isAsaFreeBuild()) return tryPlaceTwoAnglePiece(drag, sx, sy);
     if (isOneAngleBuild()) return tryPlaceOneAnglePiece(drag, sx, sy);
 
     const full = assembleBoardPts();
@@ -3540,7 +4484,7 @@ document.addEventListener("DOMContentLoaded", () => {
         timeLeftMs = 0;
         running = false;
         scene = "world";
-        openGameOver();
+        playTimeoutThenGameOver();
       }
       updateHud();
     }
@@ -3559,43 +4503,60 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------- Firebase ----------
   async function loadLeaderboard() {
     const tbody = document.getElementById("gameover-leaderboard-tbody");
-    tbody.innerHTML = "<tr><td colspan='4'>불러오는 중…</td></tr>";
+    const colSpan = activeMode === "dorms" ? 3 : 4;
+    tbody.innerHTML = `<tr><td colspan='${colSpan}'>불러오는 중…</td></tr>`;
     if (!firebaseDb) {
-      tbody.innerHTML = "<tr><td colspan='4'>랭킹 서버 연결 없음</td></tr>";
+      tbody.innerHTML = `<tr><td colspan='${colSpan}'>랭킹 서버 연결 없음</td></tr>`;
       return;
     }
     try {
-      const snap = await firebaseDb.ref(LB_PATH).orderByChild("score").limitToLast(20).once("value");
+      const snap = await firebaseDb.ref(LB_PATH).limitToLast(80).once("value");
       const rows = [];
-      snap.forEach((child) => { rows.push(child.val()); });
-      rows.sort((a, b) => (b.score || 0) - (a.score || 0));
-      if (!rows.length) {
-        tbody.innerHTML = "<tr><td colspan='4'>아직 기록이 없습니다</td></tr>";
+      snap.forEach((child) => {
+        const v = child.val();
+        if (!v || v.clearTimeMs == null) return;
+        rows.push(v);
+      });
+      rows.sort((a, b) => (a.clearTimeMs || 1e15) - (b.clearTimeMs || 1e15));
+      const top = rows.slice(0, 20);
+      if (!top.length) {
+        tbody.innerHTML = `<tr><td colspan='${colSpan}'>아직 기록이 없습니다</td></tr>`;
         return;
       }
-      tbody.innerHTML = rows.map((r, i) => (
-        `<tr><td>${i + 1}</td><td>${escapeHtml(r.name || "")}</td><td>${escapeHtml(r.studentId || "-")}</td><td>${r.score || 0}</td></tr>`
-      )).join("");
+      tbody.innerHTML = top.map((r, i) => {
+        const idCell = activeMode === "dorms"
+          ? ""
+          : `<td>${escapeHtml(r.studentId || "-")}</td>`;
+        return `<tr><td>${i + 1}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
+      }).join("");
     } catch (e) {
-      tbody.innerHTML = "<tr><td colspan='4'>불러오기 실패</td></tr>";
+      tbody.innerHTML = `<tr><td colspan='${colSpan}'>불러오기 실패</td></tr>`;
     }
   }
 
   async function sendScore() {
     const msg = document.getElementById("api-status-msg");
+    if (clearTimeMs == null) {
+      msg.textContent = "다섯 수조를 모두 고쳐야 등록할 수 있어요.";
+      return;
+    }
     if (!firebaseDb) {
       msg.textContent = "서버에 연결되지 않았습니다.";
       return;
     }
     msg.textContent = "등록 중…";
     try {
-      await firebaseDb.ref(LB_PATH).push({
+      const payload = {
         name: playerName,
-        studentId: studentId || "",
-        score: totalScore,
+        clearTimeMs,
+        channel: activeMode,
         ts: Date.now()
-      });
-      msg.textContent = "점수가 등록되었습니다!";
+      };
+      if (activeMode !== "dorms") {
+        payload.studentId = studentId || "";
+      }
+      await firebaseDb.ref(LB_PATH).push(payload);
+      msg.textContent = "클리어 시간이 등록되었습니다!";
       loadLeaderboard();
     } catch (e) {
       msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
@@ -3628,6 +4589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tanksFixed = [false, false, false, false, false];
     totalScore = 0;
     roundScores = [];
+    clearTimeMs = null;
     cat.x = zoneById("tank0").x;
     cameraX = Math.max(0, cat.x - VIEW_W * 0.42);
     beginTank();
@@ -3647,7 +4609,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (scene === "bench" && benchMode === "pick") confirmToolsAndExit();
     else if (scene === "bench" && benchMode === "build") {
       if (isAssembleComplete()) finishAssembleAndExit();
-      else showFlash(isOneAngleBuild() ? "조각을 드래그해 작도하세요" : "왼쪽 조각을 드래그해서 붙이세요");
+      else showFlash(isFreeConstructBuild() ? "조각을 드래그해 작도하세요" : "왼쪽 조각을 드래그해서 붙이세요");
     }
   });
 
@@ -3715,10 +4677,24 @@ document.addEventListener("DOMContentLoaded", () => {
     rctx.font = "600 13px Outfit, sans-serif";
     rctx.textAlign = "center";
     rctx.fillText(`수조 ${tankIndex + 1} · 내가 잰 모습`, W / 2, 28);
+    const sideBits = measuredSideList().map((i) => formatSideLen(i));
+    const angBits = measuredAngleList().map((i) => `${hole.anglesDeg[i]}°`);
+    const summary = [
+      sideBits.length ? `변 ${sideBits.join(", ")}` : "",
+      angBits.length ? `각 ${angBits.join(", ")}` : ""
+    ].filter(Boolean).join(" · ");
+    if (summary) {
+      rctx.fillStyle = "rgba(143, 180, 212, 0.9)";
+      rctx.font = "600 12px Outfit, sans-serif";
+      rctx.fillText(summary, W / 2, H - 16);
+    }
   }
 
   function openMeasureRef() {
     if (!hole || scene !== "bench" || benchMode !== "build") return;
+    if (assembleFailModal && !assembleFailModal.classList.contains("hidden")) return;
+    if (hingeAngleModal && !hingeAngleModal.classList.contains("hidden")) return;
+    if (phase === "quiz") return;
     measureRefOverlay.classList.remove("hidden");
     measureRefOverlay.setAttribute("aria-hidden", "false");
     drawMeasureRefCanvas();
@@ -3846,9 +4822,13 @@ document.addEventListener("DOMContentLoaded", () => {
   profileForm.addEventListener("submit", (e) => {
     e.preventDefault();
     playerName = sanitizeInput(document.getElementById("input-player-name").value) || "도전자";
-    studentId = sanitizeInput(document.getElementById("input-student-id").value);
+    if (activeMode === "dorms") {
+      studentId = "";
+    } else {
+      studentId = sanitizeInput(document.getElementById("input-student-id").value);
+      localStorage.setItem("hm_student_id", studentId);
+    }
     localStorage.setItem("hm_player_name", playerName);
-    localStorage.setItem("hm_student_id", studentId);
     profileModal.classList.add("hidden");
     document.body.classList.remove("modal-open");
     updateHud();
@@ -3857,11 +4837,64 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   introVideo.addEventListener("ended", () => finishIntro());
   btnSkipIntro.addEventListener("click", () => { sound.click(); finishIntro(); });
+  if (successVideo) {
+    successVideo.addEventListener("ended", () => finishSuccessCutscene());
+  }
+  if (btnSkipSuccess) {
+    btnSkipSuccess.addEventListener("click", () => {
+      sound.click();
+      finishSuccessCutscene();
+    });
+  }
+  if (timeoutVideo) {
+    timeoutVideo.addEventListener("ended", () => finishTimeoutCutscene());
+  }
+  if (btnSkipTimeout) {
+    btnSkipTimeout.addEventListener("click", () => {
+      sound.click();
+      finishTimeoutCutscene();
+    });
+  }
+
+  function applyDormsModeUi() {
+    if (activeMode !== "dorms") return;
+    const labelId = document.getElementById("label-student-id");
+    const inputId = document.getElementById("input-student-id");
+    const idWrap = document.getElementById("result-locked-id-wrap");
+    const thId = document.getElementById("th-leaderboard-id");
+    const lbTitle = document.getElementById("result-leaderboard-title");
+    const labelName = document.getElementById("label-player-name");
+    const displayId = document.getElementById("display-profile-id");
+    if (labelId) labelId.style.display = "none";
+    if (inputId) {
+      inputId.removeAttribute("required");
+      inputId.value = "";
+    }
+    if (idWrap) idWrap.style.display = "none";
+    if (thId) thId.style.display = "none";
+    if (lbTitle) lbTitle.textContent = "dorms 명예의 전당 (Top 20)";
+    if (labelName) {
+      const nameInput = labelName.querySelector("input");
+      labelName.textContent = "";
+      labelName.append("닉네임");
+      if (nameInput) {
+        nameInput.placeholder = "닉네임 입력";
+        labelName.appendChild(document.createTextNode(" "));
+        labelName.appendChild(nameInput);
+      }
+    }
+    if (displayId) displayId.style.display = "none";
+    studentId = "";
+  }
+
+  applyDormsModeUi();
 
   const savedName = localStorage.getItem("hm_player_name");
   const savedId = localStorage.getItem("hm_student_id");
   if (savedName) document.getElementById("input-player-name").value = savedName;
-  if (savedId) document.getElementById("input-student-id").value = savedId;
+  if (savedId && activeMode !== "dorms") {
+    document.getElementById("input-student-id").value = savedId;
+  }
 
   loadArt().then(() => {
     updateHud();
