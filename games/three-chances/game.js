@@ -276,6 +276,8 @@ document.addEventListener("DOMContentLoaded", () => {
     startX: 0,
     startY: 0,
     lastX: 0,
+    startClientX: 0,
+    startClientY: 0,
     moved: 0
   };
 
@@ -2738,11 +2740,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---------- Pointer ----------
   function canvasPos(evt) {
     const rect = canvas.getBoundingClientRect();
-    const src = evt.touches ? evt.touches[0] : (evt.changedTouches ? evt.changedTouches[0] : evt);
+    // touchend has an empty touches list that is still truthy — prefer changedTouches.
+    const src =
+      (evt.changedTouches && evt.changedTouches.length > 0 && evt.changedTouches[0])
+      || (evt.touches && evt.touches.length > 0 && evt.touches[0])
+      || evt;
+    const rw = rect.width || 1;
+    const rh = rect.height || 1;
     return {
-      x: ((src.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((src.clientY - rect.top) / rect.height) * canvas.height,
-      clientX: src.clientX
+      x: ((src.clientX - rect.left) / rw) * canvas.width,
+      y: ((src.clientY - rect.top) / rh) * canvas.height,
+      clientX: src.clientX,
+      clientY: src.clientY
     };
   }
 
@@ -2756,6 +2765,8 @@ document.addEventListener("DOMContentLoaded", () => {
     pointer.startX = p.x;
     pointer.startY = p.y;
     pointer.lastX = p.x;
+    pointer.startClientX = p.clientX;
+    pointer.startClientY = p.clientY;
     pointer.moved = 0;
 
     if (scene === "tank" && tankMode === "measure") {
@@ -2804,7 +2815,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (asm && asm.drag && scene === "bench" && benchMode === "build") {
       evt.preventDefault();
       pointer.dragging = true;
-      pointer.moved += Math.hypot(p.x - asm.drag.x, p.y - asm.drag.y);
+      pointer.moved = Math.hypot(
+        p.clientX - pointer.startClientX,
+        p.clientY - pointer.startClientY
+      );
       asm.drag.x = p.x;
       asm.drag.y = p.y;
       return;
@@ -2813,6 +2827,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (patchDrag && scene === "tank" && tankMode === "install" && !dockAnim) {
       evt.preventDefault();
       pointer.dragging = true;
+      pointer.moved = Math.hypot(
+        p.clientX - pointer.startClientX,
+        p.clientY - pointer.startClientY
+      );
       patchPose.x = Math.max(60, Math.min(VIEW_W - 60, p.x - patchDrag.dx));
       patchPose.y = Math.max(80, Math.min(VIEW_H - 40, p.y - patchDrag.dy));
       return;
@@ -2821,7 +2839,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!pointer.down) return;
     evt.preventDefault();
     const dx = p.x - pointer.lastX;
-    pointer.moved += Math.abs(p.x - pointer.startX) + Math.abs(p.y - pointer.startY);
+    // Screen pixels, not canvas coords — on a phone the canvas is often ~half width,
+    // so a 6px finger wobble already exceeds DRAG_THRESH when measured in canvas space.
+    pointer.moved = Math.hypot(
+      p.clientX - pointer.startClientX,
+      p.clientY - pointer.startClientY
+    );
     pointer.lastX = p.x;
 
     if (scene === "world" && pointer.moved > DRAG_THRESH) {
@@ -4615,9 +4638,10 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("mousemove", onPointerMove);
   window.addEventListener("mouseup", onPointerUp);
   canvas.addEventListener("touchstart", onPointerDown, { passive: false });
-  canvas.addEventListener("touchmove", onPointerMove, { passive: false });
-  canvas.addEventListener("touchend", onPointerUp);
-  canvas.addEventListener("touchcancel", onPointerUp);
+  // Match mouse: keep tracking if the finger slides off the canvas mid-gesture.
+  window.addEventListener("touchmove", onPointerMove, { passive: false });
+  window.addEventListener("touchend", onPointerUp);
+  window.addEventListener("touchcancel", onPointerUp);
 
   btnSceneAction.addEventListener("click", () => {
     sound.click();

@@ -260,7 +260,8 @@ html, body {
 .canvas-section { margin-bottom: 8px; }
 .canvas-wrapper.world-wrap {
   position: relative;
-  width: 100%;
+  width: min(100%, calc((100dvh - var(--chrome-h, 200px)) * 960 / 520));
+  margin-inline: auto;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--stroke);
@@ -271,8 +272,11 @@ html, body {
   display: block;
   width: 100%;
   height: auto;
+  aspect-ratio: 960 / 520;
   cursor: pointer;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .scene-chrome {
@@ -728,4 +732,29 @@ html, body {
   .header-right { justify-content: flex-start; }
   .scene-chrome-actions { flex-wrap: wrap; }
   .round-scores-grid { grid-template-columns: repeat(3, 1fr); }
+  .game-container { padding: 8px 10px 16px; }
+  .game-subtitle { display: none; }
+}
+
+/* Landscape phones: keep the playfield fully on screen instead of clipping. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --chrome-h: 108px; }
+  .game-container { padding: 4px 8px 8px; }
+  .game-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .game-title-group h1 { font-size: 0.95rem; }
+  .game-subtitle,
+  .inventory-bar .inv-label { display: none; }
+  .inventory-bar {
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    gap: 8px;
+  }
+  .user-profile-card { padding: 4px 8px; }
+  .header-stat-badge { padding: 4px 8px; }
+  .mission-toast { padding: 8px 12px; font-size: 0.85rem; }
 }
