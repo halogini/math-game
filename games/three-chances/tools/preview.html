@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>art preview</title>
+<style>
+  body { margin:0; background:#0a141c; color:#8fb4d4; font:11px sans-serif; }
+  .row { display:flex; flex-wrap:wrap; }
+  figure { margin:0; padding:4px; }
+  img { display:block; height:128px; background:repeating-conic-gradient(#1d2b36 0 25%, #16222c 0 50%) 0 0/16px 16px; }
+  figcaption { text-align:center; }
+</style>
+<div class="row" id="row"></div>
+<script>
+const names = [
+  "cat-idle", "cat-walk-1", "cat-walk-2", "cat-walk-3", "cat-walk-4",
+  "cat-tools", "cat-tools-walk-1", "cat-tools-walk-2", "cat-tools-walk-3", "cat-tools-walk-4",
+  "cat-triangle", "cat-triangle-walk-1", "cat-triangle-walk-2", "cat-triangle-walk-3", "cat-triangle-walk-4",
+  "tank-cracked", "tank-repaired", "bench-station"
+];
+const row = document.getElementById("row");
+for (const n of names) {
+  const fig = document.createElement("figure");
+  const img = document.createElement("img");
+  img.src = "../assets/" + n + ".png";
+  const cap = document.createElement("figcaption");
+  cap.textContent = n;
+  fig.appendChild(img);
+  fig.appendChild(cap);
+  row.appendChild(fig);
+}
+</script>

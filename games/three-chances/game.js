@@ -79,6 +79,12 @@ const VIEW_W = 960;
 const VIEW_H = 520;
 const WORLD_W = 2600;
 const GROUND_Y = 418;
+// Must match TANK_W / FLOOR_Y in tools/build-art.ps1, which composes level-bg.png.
+const TANK_DRAW_W = 150;
+const TANK_BASE_Y = 430;
+// Cat sprites are square with the paws sitting on the bottom margin baked in by build-art.ps1.
+const CAT_SPRITE = 200;
+const CAT_BASELINE = CAT_SPRITE * (246 / 256);
 const CAT_SPEED = 340;
 const PX_PER_CM = 22;
 const NICE_ANGLES = [30, 40, 45, 50, 60, 70, 80, 90];
@@ -283,7 +289,9 @@ document.addEventListener("DOMContentLoaded", () => {
     toolsWalk: [],
     triangleWalk: [],
     workbench: null,
-    tank: null
+    tank: null,
+    ruler: null,
+    protractor: null
   };
 
   function loadImg(src) {
@@ -296,17 +304,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadArt() {
-    const base = "assets/samples/";
-    art.bg = await loadImg(base + "sample-level-bg.png");
-    art.repaired = await loadImg(base + "sample-tank-repaired.png");
-    art.idle = await loadImg(base + "sample-cat-idle.png");
-    art.tools = await loadImg(base + "sample-cat-tools.png");
-    art.triangle = await loadImg(base + "sample-cat-triangle.png");
-    art.walk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `sample-cat-walk-${n}.png`)));
-    art.toolsWalk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `sample-cat-tools-walk-${n}.png`)));
-    art.triangleWalk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `sample-cat-triangle-walk-${n}.png`)));
-    art.workbench = await loadImg("assets/workbench.png");
-    art.tank = await loadImg("assets/tank.png");
+    const base = "assets/";
+    art.bg = await loadImg(base + "level-bg.jpg");
+    art.repaired = await loadImg(base + "tank-repaired.png");
+    art.idle = await loadImg(base + "cat-idle.png");
+    art.tools = await loadImg(base + "cat-tools.png");
+    art.triangle = await loadImg(base + "cat-triangle.png");
+    art.walk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `cat-walk-${n}.png`)));
+    art.toolsWalk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `cat-tools-walk-${n}.png`)));
+    art.triangleWalk = await Promise.all([1, 2, 3, 4].map((n) => loadImg(base + `cat-triangle-walk-${n}.png`)));
+    art.workbench = await loadImg(base + "scene-bench.jpg");
+    art.tank = await loadImg(base + "scene-tank.jpg");
+    art.ruler = await loadImg(base + "ruler.png");
+    art.protractor = await loadImg(base + "protractor.png");
   }
 
   // ---------- Geometry ----------
@@ -2043,10 +2053,11 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < rulerCount; i++) {
         layout.push({ kind: "ruler", x: rulerXs[i], y: 265 + (i % 2) * 35 });
       }
+      // Keep the rightmost protractor inside the tray, which ends at VIEW_W - 40.
       layout.push(
-        { kind: "protractor", x: 640, y: 285 },
-        { kind: "protractor", x: 780, y: 305 },
-        { kind: "protractor", x: 900, y: 275 }
+        { kind: "protractor", x: 610, y: 285 },
+        { kind: "protractor", x: 735, y: 315 },
+        { kind: "protractor", x: 860, y: 275 }
       );
       layout.forEach((L, i) => {
         items.push({
@@ -2931,27 +2942,25 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.translate(x, y);
     ctx.rotate((rot * Math.PI) / 180);
     ctx.globalAlpha = dim ? 0.25 : 1;
-    ctx.fillStyle = "#d4a574";
-    ctx.strokeStyle = "#8b5a2b";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, -h / 2, w, h, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(40, 20, 10, 0.55)";
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 12; i++) {
-      const tx = -w / 2 + 10 + i * ((w - 20) / 11);
-      const tall = i % 2 === 0;
+    if (art.ruler) {
+      const dh = w * (art.ruler.height / art.ruler.width);
+      ctx.drawImage(art.ruler, -w / 2, -dh / 2, w, dh);
+    } else {
+      ctx.fillStyle = "#d4a574";
+      ctx.strokeStyle = "#8b5a2b";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(tx, -h / 2 + 4);
-      ctx.lineTo(tx, -h / 2 + (tall ? 14 : 9));
+      ctx.roundRect(-w / 2, -h / 2, w, h, 4);
+      ctx.fill();
       ctx.stroke();
     }
-    ctx.fillStyle = "#3a2412";
-    ctx.font = "800 12px Oxanium, sans-serif";
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = dim ? 0.25 : 1;
+    ctx.fillStyle = "#e8f4ff";
+    ctx.font = "700 11px Outfit, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("자", 0, 5);
+    ctx.fillText("자", x, y + h / 2 + 18);
     ctx.restore();
   }
 
@@ -2959,20 +2968,23 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.save();
     ctx.translate(x, y);
     ctx.globalAlpha = dim ? 0.25 : 1;
-    ctx.beginPath();
-    ctx.arc(0, 8, size / 2, Math.PI, 0);
-    ctx.lineTo(size / 2, 8);
-    ctx.lineTo(-size / 2, 8);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(61, 232, 255, 0.35)";
-    ctx.strokeStyle = "#3de8ff";
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
+    if (art.protractor) {
+      const dh = size * (art.protractor.height / art.protractor.width);
+      ctx.drawImage(art.protractor, -size / 2, -dh / 2, size, dh);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 8, size / 2, Math.PI, 0);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(61, 232, 255, 0.35)";
+      ctx.strokeStyle = "#3de8ff";
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.fillStyle = "#e8f4ff";
     ctx.font = "700 11px Outfit, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("각도기", 0, size / 2 + 6);
+    ctx.fillText("각도기", 0, size / 2 + 18);
     ctx.restore();
   }
 
@@ -3000,7 +3012,10 @@ document.addEventListener("DOMContentLoaded", () => {
         || (typeof z.tank === "number" && z.tank === tankIndex
           && (phase === "go_measure" || phase === "go_install") && !tanksFixed[z.tank]);
       if (typeof z.tank === "number" && tanksFixed[z.tank] && art.repaired) {
-        ctx.drawImage(art.repaired, sx - 55, 160, 110, 140);
+        // Same footprint the cracked tanks were composed with in level-bg.png.
+        const tw = TANK_DRAW_W;
+        const th = tw * (art.repaired.height / art.repaired.width);
+        ctx.drawImage(art.repaired, sx - tw / 2, TANK_BASE_Y - th, tw, th);
       }
       ctx.save();
       ctx.globalAlpha = actionable ? 0.95 : 0.5;
@@ -3035,7 +3050,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.save();
     ctx.translate(sx, GROUND_Y);
     ctx.scale(cat.facing, 1);
-    if (img) ctx.drawImage(img, -60, -112, 120, 120);
+    if (img) ctx.drawImage(img, -CAT_SPRITE / 2, -CAT_BASELINE, CAT_SPRITE, CAT_SPRITE);
     else {
       ctx.fillStyle = "#f4a460";
       ctx.beginPath();

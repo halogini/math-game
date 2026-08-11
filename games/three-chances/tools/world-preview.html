@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>world preview</title>
+<style>
+  html, body { margin:0; background:#050c12; }
+  canvas { display:block; }
+</style>
+<canvas id="c" width="960" height="520"></canvas>
+<canvas id="b" width="960" height="520"></canvas>
+<script>
+// Mirrors the constants and draw calls in game.js so asset alignment can be checked
+// without stepping through the intro and profile screens.
+const VIEW_W = 960, VIEW_H = 520, WORLD_W = 2600, GROUND_Y = 418;
+const TANK_DRAW_W = 150, TANK_BASE_Y = 430;
+const CAT_SPRITE = 200, CAT_BASELINE = CAT_SPRITE * (246 / 256);
+const cameraX = 300;
+const ctx = document.getElementById("c").getContext("2d");
+
+function load(src) {
+  return new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+}
+
+(async () => {
+  const bg = await load("../assets/level-bg.jpg");
+  const repaired = await load("../assets/tank-repaired.png");
+  const cat = await load("../assets/cat-walk-2.png");
+  const tools = await load("../assets/cat-tools.png");
+
+  const srcX = (cameraX / WORLD_W) * bg.width;
+  const srcW = (VIEW_W / WORLD_W) * bg.width;
+  ctx.drawImage(bg, srcX, 0, srcW, bg.height, 0, 0, VIEW_W, VIEW_H);
+  ctx.fillStyle = "rgba(4, 12, 20, 0.22)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  const th = TANK_DRAW_W * (repaired.height / repaired.width);
+  ctx.drawImage(repaired, 420 - cameraX - TANK_DRAW_W / 2, TANK_BASE_Y - th, TANK_DRAW_W, th);
+
+  for (const [img, x, facing] of [[cat, 620, 1], [tools, 900, -1]]) {
+    ctx.save();
+    ctx.translate(x - cameraX, GROUND_Y);
+    ctx.scale(facing, 1);
+    ctx.drawImage(img, -CAT_SPRITE / 2, -CAT_BASELINE, CAT_SPRITE, CAT_SPRITE);
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = "rgba(255,80,80,0.7)";
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y);
+  ctx.lineTo(VIEW_W, GROUND_Y);
+  ctx.stroke();
+
+  await drawBench();
+})();
+
+async function drawBench() {
+  const g = document.getElementById("b").getContext("2d");
+  const bench = await load("../assets/scene-bench.jpg");
+  const ruler = await load("../assets/ruler.png");
+  const prot = await load("../assets/protractor.png");
+
+  const scale = Math.max(VIEW_W / bench.width, VIEW_H / bench.height);
+  g.drawImage(bench, (VIEW_W - bench.width * scale) / 2, (VIEW_H - bench.height * scale) / 2,
+    bench.width * scale, bench.height * scale);
+  g.fillStyle = "rgba(4, 12, 20, 0.45)";
+  g.fillRect(0, 0, VIEW_W, VIEW_H);
+  g.fillStyle = "rgba(20, 40, 55, 0.55)";
+  g.fillRect(40, 200, VIEW_W - 80, 230);
+  g.strokeStyle = "rgba(61, 232, 255, 0.25)";
+  g.strokeRect(40, 200, VIEW_W - 80, 230);
+
+  const items = [
+    { kind: "ruler", x: 220, y: 265, w: 150, h: 36, rot: -6 },
+    { kind: "ruler", x: 420, y: 300, w: 150, h: 36, rot: 0 },
+    { kind: "protractor", x: 610, y: 285, w: 88, h: 88 },
+    { kind: "protractor", x: 735, y: 315, w: 88, h: 88 },
+    { kind: "protractor", x: 860, y: 275, w: 88, h: 88 }
+  ];
+  for (const t of items) {
+    g.save();
+    g.translate(t.x, t.y);
+    if (t.kind === "ruler") {
+      g.rotate((t.rot * Math.PI) / 180);
+      const dh = t.w * (ruler.height / ruler.width);
+      g.drawImage(ruler, -t.w / 2, -dh / 2, t.w, dh);
+    } else {
+      const dh = t.w * (prot.height / prot.width);
+      g.drawImage(prot, -t.w / 2, -dh / 2, t.w, dh);
+    }
+    g.restore();
+    g.fillStyle = "#e8f4ff";
+    g.font = "700 11px sans-serif";
+    g.textAlign = "center";
+    g.fillText(t.kind === "ruler" ? "자" : "각도기", t.x, t.y + t.h / 2 + 18);
+  }
+}
+</script>
