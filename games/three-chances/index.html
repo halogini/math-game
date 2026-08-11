@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>기회는 세 번! 구멍을 메워라! | HaloMath Arcade</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' blob:; connect-src 'self' https: wss:;">
+  <meta name="description" content="고양이와 함께 실험실 수조 다섯 개를 고쳐 보세요!">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700;800&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
+</head>
+<body class="theme-lab">
+  <div class="lab-bg" aria-hidden="true"></div>
+  <div class="game-container" id="game-container">
+    <header class="game-header">
+      <div class="header-left">
+        <div class="game-title-group">
+          <h1>기회는 세 번! 구멍을 메워라!</h1>
+          <p class="game-subtitle">←→ / AD 이동 · 탭·드래그 · 수조 5개</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="user-profile-card">
+          <span class="profile-avatar">👤</span>
+          <div class="profile-text">
+            <span class="profile-name" id="display-profile-name">도전자</span>
+            <span class="profile-id" id="display-profile-id">학번 미입력</span>
+          </div>
+          <button id="btn-edit-profile" class="btn-small-edit" type="button">✏️</button>
+        </div>
+        <div class="header-stat-badge">
+          <span class="stat-badge-label">수조</span>
+          <span class="stat-badge-val highlight-cyan" id="hud-round">1 / 5</span>
+        </div>
+        <div class="header-stat-badge">
+          <span class="stat-badge-label">총점</span>
+          <span class="stat-badge-val" id="hud-score">0점</span>
+        </div>
+        <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
+      </div>
+    </header>
+
+    <main class="game-main">
+      <section class="inventory-bar">
+        <div class="inv-label">입에 문 도구</div>
+        <div class="tool-slots" id="tool-slots"></div>
+        <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
+      </section>
+
+      <section class="canvas-section">
+        <div class="canvas-wrapper world-wrap">
+          <div class="time-gauge" aria-label="남은 시간">
+            <div class="time-gauge-track">
+              <div class="time-gauge-fill" id="time-gauge-fill"></div>
+            </div>
+            <span class="time-gauge-label" id="hud-timer">5:00</span>
+          </div>
+          <canvas id="game-canvas" width="960" height="520"></canvas>
+          <div class="mission-toast" id="mission-bar">
+            <div class="mission-text" id="mission-text">작업대로 가서 도구를 챙기세요!</div>
+            <div class="chance-pips" id="chance-pips" aria-label="측정 기회"></div>
+          </div>
+          <div id="scene-chrome" class="scene-chrome hidden">
+            <div class="scene-chrome-top">
+              <span class="scene-badge" id="scene-badge">작업대</span>
+              <p class="scene-hint" id="scene-hint"></p>
+            </div>
+            <div class="scene-chrome-actions">
+              <button type="button" class="btn-scene hidden" id="btn-assemble-undo">이전으로</button>
+              <button type="button" class="btn-scene hidden" id="btn-measure-ref">측정 다시 보기</button>
+              <button type="button" class="btn-scene btn-scene-primary hidden" id="btn-scene-action">챙겼어요!</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <a href="../../privacy.html" class="privacy-link" target="_blank" rel="noopener noreferrer">개인정보처리방침</a>
+    </footer>
+  </div>
+
+  <div id="quiz-modal" class="modal-backdrop hidden">
+    <div class="modal-card quiz-card">
+      <div class="quiz-header">
+        <span class="quiz-icon">📐</span>
+        <h2 id="quiz-title">나머지 각은?</h2>
+      </div>
+      <p class="quiz-prompt" id="quiz-prompt"></p>
+      <div class="quiz-choices" id="quiz-choices"></div>
+      <p class="quiz-feedback" id="quiz-feedback"></p>
+    </div>
+  </div>
+
+  <div id="hinge-angle-modal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card quiz-card hinge-angle-card">
+      <div class="quiz-header">
+        <span class="quiz-icon">📐</span>
+        <h2>이 사이 각도는?</h2>
+      </div>
+      <p class="quiz-prompt">두 변 사이의 각을 입력하세요.</p>
+      <label class="hinge-angle-field">
+        <input type="number" id="hinge-angle-input" min="1" max="179" step="1" inputmode="numeric" placeholder="예: 60" autocomplete="off">
+        <span class="hinge-angle-unit">°</span>
+      </label>
+      <p class="quiz-feedback" id="hinge-angle-feedback"></p>
+      <div class="hinge-angle-actions">
+        <button type="button" class="btn-modal-action btn-secondary" id="btn-hinge-cancel">취소</button>
+        <button type="button" class="btn-modal-action btn-primary" id="btn-hinge-ok">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="assemble-fail-modal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card quiz-card assemble-fail-card">
+      <div class="quiz-header">
+        <span class="quiz-icon">💧</span>
+        <h2>조립 실패</h2>
+      </div>
+      <p class="quiz-prompt" id="assemble-fail-msg">삼각형을 만드는 데 실패한 것 같아요.</p>
+      <div class="assemble-fail-actions">
+        <button type="button" class="btn-modal-action btn-secondary" id="btn-fail-remeasure">측정부터 다시하기</button>
+        <button type="button" class="btn-modal-action btn-primary" id="btn-fail-rebuild">삼각형 다시 만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="measure-ref-overlay" class="measure-ref-overlay hidden" aria-hidden="true">
+    <div class="measure-ref-card">
+      <div class="measure-ref-head">
+        <h3>측정 다시 보기</h3>
+        <button type="button" class="btn-scene" id="btn-close-measure-ref">닫기</button>
+      </div>
+      <canvas id="measure-ref-canvas" width="560" height="360"></canvas>
+      <p class="measure-ref-hint">조립은 그대로 두고, 잰 모습만 참고해요.</p>
+    </div>
+  </div>
+
+  <div id="result-modal" class="modal-backdrop hidden">
+    <div class="modal-card result-card">
+      <div class="result-header">
+        <span class="result-icon" id="result-icon">💧</span>
+        <h2 id="result-title">수리 결과</h2>
+      </div>
+      <div class="result-body">
+        <div class="result-score-badge" id="result-score-badge">+100점</div>
+        <p class="result-subtitle" id="result-subtitle"></p>
+        <p class="result-hint" id="result-hint"></p>
+      </div>
+      <div class="result-footer">
+        <button id="btn-next-round" class="btn-modal-action" type="button">다음 수조 ➔</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameover-modal" class="modal-backdrop hidden">
+    <div class="modal-card gameover-card">
+      <div class="gameover-header">
+        <span class="trophy-anim">🏆</span>
+        <h2>실험실 수리 완료!</h2>
+        <p class="gameover-subtitle">다섯 수조 미션을 마쳤습니다</p>
+      </div>
+      <div class="final-score-display">
+        <div class="score-circle">
+          <span class="score-num" id="final-total-score">0</span>
+          <span class="score-unit">점</span>
+        </div>
+        <div class="round-scores-grid" id="round-scores-grid"></div>
+      </div>
+      <div id="new-highscore-banner" class="highscore-banner hidden">최고 기록 경신!</div>
+      <div class="send-action-box">
+        <div class="result-locked-player-box">
+          등록 참가자: <strong id="result-locked-name">도전자</strong>
+          (<span>(학번: <strong id="result-locked-id">미입력</strong>)</span>
+        </div>
+        <button id="btn-send-data" class="btn-modal-action btn-primary" type="button">점수 등록하기</button>
+        <div id="api-status-msg" class="api-status-msg"></div>
+      </div>
+      <div class="leaderboard-section">
+        <h3>명예의 전당 (Top 20)</h3>
+        <div class="leaderboard-table-wrapper">
+          <table class="leaderboard-table">
+            <thead><tr><th>순위</th><th>이름</th><th>학번</th><th>점수</th></tr></thead>
+            <tbody id="gameover-leaderboard-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gameover-actions">
+        <button id="btn-restart-game" class="btn-modal-action btn-primary" type="button">다시 도전하기</button>
+        <a href="../../index.html" class="btn-modal-action btn-secondary">아케이드 로비로</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="profile-modal" class="modal-backdrop">
+    <div class="modal-card profile-card">
+      <div class="opening-banner">
+        <div class="opening-hero">
+          <img src="assets/ref-leak.png" alt="새는 실험 수조" class="opening-still">
+        </div>
+        <span class="opening-subtitle">LAB ALERT · 수조 누수</span>
+        <h2>기회는 세 번! 구멍을 메워라!</h2>
+        <p class="opening-desc">
+          실험실 수조 다섯 개가 새고 있어요.<br>
+          바닥을 탭하면 고양이가 그곳으로 걷고, 옆으로 드래그하면 화면이 움직여요.<br>
+          작업대·수조에 도착하면 안쪽 화면으로 들어가 고칩니다!
+        </p>
+      </div>
+      <form id="profile-form" class="profile-form">
+        <label>이름
+          <input id="input-player-name" type="text" maxlength="12" placeholder="이름 입력" required autocomplete="nickname">
+        </label>
+        <label>학번
+          <input id="input-student-id" type="text" maxlength="12" placeholder="학번 입력" autocomplete="off">
+        </label>
+        <button type="submit" class="btn-modal-action btn-primary" id="btn-start-game">수리 시작!</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="intro-overlay" class="intro-overlay hidden" aria-hidden="true">
+    <video id="intro-video" class="intro-video" src="assets/intro.mp4" playsinline preload="auto"></video>
+    <div class="intro-chrome">
+      <div class="intro-alert">⚠ WATER TANK BREACH</div>
+      <button type="button" id="btn-skip-intro" class="btn-skip-intro">건너뛰기 ➔</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
