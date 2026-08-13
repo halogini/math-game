@@ -382,11 +382,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const list = Array.from(bestMap.values());
     if (gameKey === 'three-chances') {
-      list.sort((a, b) => a.clearTimeMs - b.clearTimeMs);
+      list.sort((a, b) => {
+        const da = Math.floor(a.clearTimeMs / 1000) - Math.floor(b.clearTimeMs / 1000);
+        return da !== 0 ? da : a.clearTimeMs - b.clearTimeMs;
+      });
     } else {
       list.sort((a, b) => b.score - a.score);
     }
     return list;
+  }
+
+  function withCompetitionRanks(list, keyFn) {
+    const ranks = [];
+    let lastKey = null;
+    let lastRank = 0;
+    for (let i = 0; i < list.length; i++) {
+      const k = keyFn(list[i]);
+      const rank = lastKey !== null && k === lastKey ? lastRank : i + 1;
+      lastKey = k;
+      lastRank = rank;
+      ranks.push(rank);
+    }
+    const counts = {};
+    ranks.forEach((r) => { counts[r] = (counts[r] || 0) + 1; });
+    return list.map((item, i) => ({
+      item,
+      rank: ranks[i],
+      tied: counts[ranks[i]] > 1
+    }));
+  }
+
+  function formatRankLabel(rank, tied) {
+    const n = tied ? `공동 ${rank}위` : `${rank}위`;
+    if (rank === 1) return `🥇 ${n}`;
+    if (rank === 2) return `🥈 ${n}`;
+    if (rank === 3) return `🥉 ${n}`;
+    return n;
   }
 
   function renderLeaderboardTable(list) {
@@ -401,12 +432,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    list.forEach((item, index) => {
+    const ranked = activeLeaderboardGame === 'three-chances'
+      ? withCompetitionRanks(list, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
+      : list.map((item, i) => ({ item, rank: i + 1, tied: false }));
+
+    ranked.forEach(({ item, rank, tied }) => {
       const tr = document.createElement('tr');
-      let rankDisplay = `${index + 1}위`;
-      if (index === 0) rankDisplay = `🥇 1위`;
-      else if (index === 1) rankDisplay = `🥈 2위`;
-      else if (index === 2) rankDisplay = `🥉 3위`;
+      const rankDisplay = formatRankLabel(rank, tied);
 
       let idTd = '';
       if (activeMode === 'school') {
@@ -414,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       tr.innerHTML = `
-        <td class="rank-${index + 1}">${rankDisplay}</td>
+        <td class="rank-${rank}">${rankDisplay}</td>
         <td>${escapeHtml(item.name || '익명')}</td>
         ${idTd}
         <td><strong>${escapeHtml(item.metricLabel || (item.score != null ? `${item.score}점` : '-'))}</strong></td>

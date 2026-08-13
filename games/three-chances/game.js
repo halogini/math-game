@@ -166,6 +166,8 @@ const TOP_CLEAR_Y = 132;
 const TOP_SUB_Y = TOP_CLEAR_Y + 26;
 /** Above mobile bottom HUD / scene buttons */
 const BOTTOM_TIP_Y = 400;
+/** Zone names on tanks/bench — above the overlay HUD */
+const ZONE_LABEL_Y = 252;
 const WORLD_W = 2600;
 const GROUND_Y = 418;
 // Must match TANK_W / FLOOR_Y in tools/build-art.ps1, which composes level-bg.png.
@@ -260,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const portraitGateMq = window.matchMedia(
     "(orientation: portrait) and (max-width: 1024px)"
   );
+  const coarsePointerMq = window.matchMedia("(pointer: coarse)");
   const rotateGate = document.getElementById("rotate-gate");
   let portraitBlocked = false;
 
@@ -686,6 +689,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = Math.floor(s / 60);
     const r = s % 60;
     return `${m}:${String(r).padStart(2, "0")}`;
+  }
+
+  function clearTimeBucket(ms) {
+    return Math.floor(Number(ms) / 1000);
+  }
+
+  function withTimeRanks(list) {
+    const ranks = [];
+    let lastBucket = null;
+    let lastRank = 0;
+    for (let i = 0; i < list.length; i++) {
+      const bucket = clearTimeBucket(list[i].clearTimeMs);
+      const rank = lastBucket !== null && bucket === lastBucket ? lastRank : i + 1;
+      lastBucket = bucket;
+      lastRank = rank;
+      ranks.push(rank);
+    }
+    const counts = {};
+    ranks.forEach((r) => { counts[r] = (counts[r] || 0) + 1; });
+    return list.map((item, i) => ({
+      item,
+      rank: ranks[i],
+      tied: counts[ranks[i]] > 1
+    }));
   }
 
   function elapsedMs() {
@@ -1527,16 +1554,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (TEST_A1S2) {
       applyTestA1S2Loadout();
       refreshUI();
-      exitToWorld("go_measure", "테스트: 다시 수조에서 재세요");
+      exitToWorld("go_measure", "테스트: 다시 수조에서 구멍을 측정하세요");
       return;
     }
     if (TEST_A2S1) {
       applyTestA2S1Loadout();
       refreshUI();
-      exitToWorld("go_measure", "테스트: 다시 수조에서 재세요");
+      exitToWorld("go_measure", "테스트: 다시 수조에서 구멍을 측정하세요");
       return;
     }
-    exitToWorld("need_tools", "삼각형을 못 만들었어요. 도구를 다시 챙기고 재세요!");
+    exitToWorld("need_tools", "삼각형을 못 만들었어요. 도구를 다시 챙기고 구멍을 측정하세요!");
   }
 
   function canUndoAssembleStep() {
@@ -2047,7 +2074,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const rem = toolsRemaining();
       const left = rem.rulers + rem.protractors;
       missionText.textContent = left > 0
-        ? `구멍의 변·각을 재세요 (${left}번 남음)`
+        ? `구멍의 변·각을 측정하세요 (${left}번 남음)`
         : "측정 완료 — 작업대로";
       return;
     }
@@ -2060,7 +2087,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const map = {
       idle: "수리를 시작해 주세요",
       need_tools: "작업대로 가서 도구를 챙기세요",
-      go_measure: `수조 ${tankIndex + 1}로 가서 재세요`,
+      go_measure: `수조 ${tankIndex + 1}로 가서 구멍을 측정하세요`,
       go_build: "작업대로 가서 조각을 만드세요",
       go_install: `수조 ${tankIndex + 1}에 조각을 끼우세요`,
       result: "결과 확인 중…",
@@ -2360,7 +2387,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bag = ["ruler", "ruler", "protractor"];
     updateCarrySprite();
     phase = "go_measure";
-    showFlash("테스트: 각1·변2 — 수조로 가서 재세요");
+    showFlash("테스트: 각1·변2 — 수조로 가서 구멍을 측정하세요");
   }
 
   function applyTestA2S1Loadout() {
@@ -2369,7 +2396,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bag = ["ruler", "protractor", "protractor"];
     updateCarrySprite();
     phase = "go_measure";
-    showFlash("테스트: 각2·변1 — 변과 양끝 각을 재세요");
+    showFlash("테스트: 각2·변1 — 변과 양끝 각을 측정하세요");
   }
 
   function enterBenchPick() {
@@ -2841,13 +2868,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (TEST_A1S2) {
       applyTestA1S2Loadout();
       refreshUI();
-      exitToWorld("go_measure", `수조 ${tankIndex + 1}을 다시 재세요`);
+      exitToWorld("go_measure", `수조 ${tankIndex + 1}에서 다시 구멍을 측정하세요`);
       return;
     }
     if (TEST_A2S1) {
       applyTestA2S1Loadout();
       refreshUI();
-      exitToWorld("go_measure", `수조 ${tankIndex + 1}을 다시 재세요`);
+      exitToWorld("go_measure", `수조 ${tankIndex + 1}에서 다시 구멍을 측정하세요`);
       return;
     }
     phase = "need_tools";
@@ -3222,7 +3249,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const p = canvasPos(evt);
 
     if (scene === "tank" && tankMode === "measure") {
-      hover = hitTestMeasure(p.x, p.y);
+      // Ignore the synthetic mouse event that follows touchend on phones.
+      if (!(coarsePointerMq.matches && evt.type === "mousemove")) {
+        hover = hitTestMeasure(p.x, p.y);
+      }
     }
 
     if (asm && asm.drag && scene === "bench" && benchMode === "build") {
@@ -3333,6 +3363,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (scene === "tank" && tankMode === "measure") {
       const t = hitTestMeasure(p.x, p.y);
       tryMeasure(t);
+      if (coarsePointerMq.matches) hover = null;
       return;
     }
 
@@ -3462,7 +3493,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.drawImage(art.repaired, sx - tw / 2, TANK_BASE_Y - th, tw, th);
       }
       ctx.save();
-      ctx.globalAlpha = actionable ? 0.95 : 0.5;
+      ctx.globalAlpha = actionable ? 0.95 : 0.55;
       ctx.fillStyle = actionable ? "rgba(255, 213, 106, 0.22)" : "rgba(61, 232, 255, 0.08)";
       ctx.strokeStyle = actionable ? "#ffd56a" : "rgba(61, 232, 255, 0.3)";
       ctx.lineWidth = actionable ? 2 : 1;
@@ -3470,14 +3501,26 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.roundRect(sx - z.w / 2, GROUND_Y - 8, z.w, 14, 6);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = actionable ? "#ffd56a" : "#8fb4d4";
-      ctx.font = "700 12px Outfit, sans-serif";
+
+      const hint = actionable;
+      ctx.font = "800 15px Outfit, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(z.label, sx, GROUND_Y + 28);
-      if (actionable) {
+      ctx.textBaseline = "middle";
+      const labelW = Math.max(78, ctx.measureText(z.label).width + 24);
+      const pillH = hint ? 42 : 28;
+      ctx.fillStyle = "rgba(4, 14, 24, 0.82)";
+      ctx.strokeStyle = actionable ? "rgba(255, 213, 106, 0.75)" : "rgba(61, 232, 255, 0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(sx - labelW / 2, ZONE_LABEL_Y - pillH / 2, labelW, pillH, 13);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = actionable ? "#ffd56a" : "#e8f4ff";
+      ctx.fillText(z.label, sx, hint ? ZONE_LABEL_Y - 8 : ZONE_LABEL_Y);
+      if (hint) {
         ctx.font = "600 11px Outfit, sans-serif";
         ctx.fillStyle = "#e8f4ff";
-        ctx.fillText("도착하면 입장", sx, GROUND_Y + 44);
+        ctx.fillText("도착하면 입장", sx, ZONE_LABEL_Y + 10);
       }
       ctx.restore();
     }
@@ -3590,19 +3633,20 @@ document.addEventListener("DOMContentLoaded", () => {
     g.restore();
   }
 
-  function drawAngleMark(pts, i, text, hot) {
+  function drawAngleMark(pts, i, text, hot, pulse = 0) {
     const p = pts[i];
     const prev = pts[(i + 2) % 3];
     const next = pts[(i + 1) % 3];
     const a0 = Math.atan2(prev.y - p.y, prev.x - p.x);
     const a1 = Math.atan2(next.y - p.y, next.x - p.x);
     const delta = interiorAngleDelta(a0, a1, p, centroid(pts));
-    const r = hot ? 38 : 30;
+    const glow = hot ? 1 : pulse;
+    const r = 30 + 8 * glow;
     drawAngleSector(p.x, p.y, a0, delta, {
       r,
-      fill: hot ? "rgba(255, 213, 106, 0.4)" : "rgba(255, 213, 106, 0.22)",
-      lineWidth: hot ? 3.5 : 2.5,
-      rayStroke: hot ? "#ffe9a8" : "rgba(255, 213, 106, 0.85)",
+      fill: `rgba(255, 213, 106, ${0.22 + 0.18 * glow})`,
+      lineWidth: 2.5 + glow,
+      rayStroke: glow >= 1 ? "#ffe9a8" : `rgba(255, 213, 106, ${0.85 + 0.15 * glow})`,
       label: text,
       labelR: r + 18
     });
@@ -4783,6 +4827,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (tankMode === "measure") {
       const rem = toolsRemaining();
+      const hintPulse = coarsePointerMq.matches
+        ? 0.5 + 0.5 * Math.sin(performance.now() / 320)
+        : 0;
       for (let i = 0; i < 3; i++) {
         const a = pts[i];
         const b = pts[(i + 1) % 3];
@@ -4800,12 +4847,24 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.stroke();
         } else if (rem.rulers > 0) {
           const hot = hover && hover.kind === "side" && hover.index === i;
-          ctx.strokeStyle = hot ? "#ffd56a" : "rgba(61,232,255,0.7)";
-          ctx.lineWidth = hot ? 5 : 3;
+          const glow = hot ? 1 : hintPulse;
+          ctx.save();
+          if (glow > 0 && !hot) {
+            ctx.shadowColor = "rgba(255, 213, 106, 0.8)";
+            ctx.shadowBlur = 6 + 10 * glow;
+          }
+          ctx.strokeStyle = glow >= 1
+            ? "#ffd56a"
+            : (glow > 0
+              ? `rgba(255, 213, 106, ${0.45 + 0.5 * glow})`
+              : "rgba(61,232,255,0.7)");
+          ctx.lineWidth = 3 + 2 * glow;
+          ctx.lineCap = "round";
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
           ctx.stroke();
+          ctx.restore();
         }
       }
       for (let i = 0; i < 3; i++) {
@@ -4813,7 +4872,7 @@ document.addEventListener("DOMContentLoaded", () => {
           drawAngleMark(pts, i, `${hole.anglesDeg[i]}°`, false);
         } else if (rem.protractors > 0) {
           const hot = hover && hover.kind === "angle" && hover.index === i;
-          drawAngleMark(pts, i, null, hot);
+          drawAngleMark(pts, i, null, hot, hot ? 0 : hintPulse);
         }
       }
       return;
@@ -4972,6 +5031,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  const SCORES_URL = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
+
+  function playerRecordKey(name, sid) {
+    return activeMode === "dorms" ? name : `${name}_${sid}`;
+  }
+
+  async function fetchScoresMap() {
+    if (firebaseDb) {
+      try {
+        const snap = await Promise.race([
+          firebaseDb.ref(LB_PATH).once("value"),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("lb-timeout")), 2500))
+        ]);
+        return snap.val() || {};
+      } catch (err) {
+        console.warn("three-chances SDK leaderboard failed:", err);
+      }
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    try {
+      const res = await fetch(SCORES_URL, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      return (await res.json()) || {};
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.error("three-chances REST leaderboard failed:", err);
+      return null;
+    }
+  }
+
   async function loadLeaderboard() {
     const gameoverTbody = document.getElementById("gameover-leaderboard-tbody");
     const colSpan = activeMode === "dorms" ? 3 : 4;
@@ -4980,34 +5071,6 @@ document.addEventListener("DOMContentLoaded", () => {
     showChampSkeleton();
     renderLeaderboardSkeleton(gameoverTbody);
     renderLeaderboardSkeleton(openingLeaderboardTbody);
-
-    const scoresUrl = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
-
-    const fetchScoresMap = async () => {
-      if (firebaseDb) {
-        try {
-          const snap = await Promise.race([
-            firebaseDb.ref(LB_PATH).once("value"),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("lb-timeout")), 2500))
-          ]);
-          return snap.val() || {};
-        } catch (err) {
-          console.warn("three-chances SDK leaderboard failed:", err);
-        }
-      }
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      try {
-        const res = await fetch(scoresUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (!res.ok) return null;
-        return (await res.json()) || {};
-      } catch (err) {
-        clearTimeout(timeoutId);
-        console.error("three-chances REST leaderboard failed:", err);
-        return null;
-      }
-    };
 
     try {
       const data = await fetchScoresMap();
@@ -5039,7 +5102,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
       const top = Array.from(best.values())
-        .sort((a, b) => a.clearTimeMs - b.clearTimeMs)
+        .sort((a, b) => {
+          const d = clearTimeBucket(a.clearTimeMs) - clearTimeBucket(b.clearTimeMs);
+          return d !== 0 ? d : a.clearTimeMs - b.clearTimeMs;
+        })
         .slice(0, 20);
 
       updateOpeningChamp(top[0] || null);
@@ -5055,11 +5121,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         return;
       }
-      const rowsHtml = top.map((r, i) => {
+      const rowsHtml = withTimeRanks(top).map(({ item: r, rank, tied }) => {
         const idCell = activeMode === "dorms"
           ? ""
           : `<td>${escapeHtml(r.studentId || "-")}</td>`;
-        return `<tr><td>${i + 1}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
+        const rankText = tied ? `공동 ${rank}` : String(rank);
+        return `<tr><td>${rankText}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
       }).join("");
       if (gameoverTbody) {
         gameoverTbody.removeAttribute("aria-busy");
@@ -5137,14 +5204,18 @@ document.addEventListener("DOMContentLoaded", () => {
       gameId: GAME_ID,
       timestamp: Date.now()
     };
-    const scoresUrl = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
+    const myKey = playerRecordKey(payload.name, payload.studentId);
+    const myLabel = formatClearTime(payload.clearTimeMs);
 
-    const saveViaREST = async () => {
+    const saveViaREST = async (existingKey) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const url = existingKey
+        ? `https://math-game-halogini-default-rtdb.firebaseio.com/scores/${encodeURIComponent(existingKey)}.json`
+        : SCORES_URL;
       try {
-        const restRes = await fetch(scoresUrl, {
-          method: "POST",
+        const restRes = await fetch(url, {
+          method: existingKey ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
           signal: controller.signal
@@ -5161,11 +5232,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    try {
-      let ok = false;
+    const saveRecord = async (existingKey) => {
       if (firebaseDb) {
         const sdkSave = (async () => {
-          await firebaseDb.ref(LB_PATH).push(payload);
+          if (existingKey) await firebaseDb.ref(`${LB_PATH}/${existingKey}`).update(payload);
+          else await firebaseDb.ref(LB_PATH).push(payload);
           return true;
         })();
         const timedOut = await Promise.race([
@@ -5175,17 +5246,55 @@ document.addEventListener("DOMContentLoaded", () => {
           }),
           new Promise((resolve) => setTimeout(() => resolve("timeout"), 2500))
         ]);
-        if (timedOut === false) {
-          ok = true;
-        } else {
-          ok = await saveViaREST();
-        }
-      } else {
-        ok = await saveViaREST();
+        if (timedOut === false) return true;
+        return saveViaREST(existingKey);
+      }
+      return saveViaREST(existingKey);
+    };
+
+    try {
+      const data = await fetchScoresMap();
+      let existingBest = null;
+      let otherSameTime = false;
+      if (data) {
+        Object.keys(data).forEach((key) => {
+          const v = data[key];
+          if (!v || typeof v !== "object" || Array.isArray(v)) return;
+          if (!isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
+          const name = sanitizeInput(v.name || "", 12);
+          const sid = sanitizeInput(v.studentId || "", 10);
+          const clearMs = Number(v.clearTimeMs);
+          if (!Number.isFinite(clearMs) || clearMs <= 0) return;
+          if (playerRecordKey(name, sid) === myKey) {
+            if (!existingBest || clearMs < existingBest.clearTimeMs) {
+              existingBest = { key, clearTimeMs: clearMs };
+            }
+          } else if (formatClearTime(clearMs) === myLabel) {
+            otherSameTime = true;
+          }
+        });
       }
 
+      if (existingBest && payload.clearTimeMs >= existingBest.clearTimeMs) {
+        const sameDisplay = formatClearTime(existingBest.clearTimeMs) === myLabel;
+        msg.textContent = sameDisplay
+          ? `이미 같은 클리어 시간(${myLabel})이 등록되어 있어요.`
+          : `이미 더 빠른 기록(${formatClearTime(existingBest.clearTimeMs)})이 등록되어 있어요.`;
+        loadLeaderboard();
+        return;
+      }
+
+      const ok = await saveRecord(existingBest ? existingBest.key : null);
       if (ok) {
-        msg.textContent = "클리어 시간이 등록되었습니다!";
+        if (existingBest) {
+          msg.textContent = otherSameTime
+            ? `기록이 ${myLabel}로 갱신되었습니다! 같은 시간은 공동 순위예요.`
+            : `기록이 ${myLabel}로 갱신되었습니다!`;
+        } else if (otherSameTime) {
+          msg.textContent = `클리어 시간이 등록되었습니다! 같은 시간은 공동 순위예요.`;
+        } else {
+          msg.textContent = "클리어 시간이 등록되었습니다!";
+        }
         loadLeaderboard();
       } else {
         msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
