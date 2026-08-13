@@ -1985,9 +1985,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       // Snap magnitude to the labeled degree so the arc never lies.
       delta = delta < 0 ? -want : want;
+      // Rays already drawn above — arc + label only (avoids nested double-angle look).
       drawAngleSector(a.origin.x, a.origin.y, a.dirA, delta, {
         r: 36,
         fill: "rgba(255, 213, 106, 0.28)",
+        skipRays: true,
         label: `${a.deg}°`,
         labelR: 54
       });
@@ -3603,15 +3605,17 @@ document.addEventListener("DOMContentLoaded", () => {
     g.lineWidth = lineWidth;
     g.stroke();
 
-    g.strokeStyle = opts.rayStroke || stroke;
-    g.lineWidth = opts.rayWidth != null ? opts.rayWidth : Math.max(2, lineWidth - 0.5);
-    g.lineCap = "round";
-    g.beginPath();
-    g.moveTo(cx, cy);
-    g.lineTo(cx + Math.cos(a0) * (r + rayExtra), cy + Math.sin(a0) * (r + rayExtra));
-    g.moveTo(cx, cy);
-    g.lineTo(cx + Math.cos(end) * (r + rayExtra), cy + Math.sin(end) * (r + rayExtra));
-    g.stroke();
+    if (!opts.skipRays) {
+      g.strokeStyle = opts.rayStroke || stroke;
+      g.lineWidth = opts.rayWidth != null ? opts.rayWidth : Math.max(2, lineWidth - 0.5);
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(a0) * (r + rayExtra), cy + Math.sin(a0) * (r + rayExtra));
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(end) * (r + rayExtra), cy + Math.sin(end) * (r + rayExtra));
+      g.stroke();
+    }
 
     if (opts.innerTick) {
       g.beginPath();
@@ -3669,7 +3673,6 @@ document.addEventListener("DOMContentLoaded", () => {
       fill: "rgba(255, 213, 106, 0.3)",
       lineWidth: 2.5,
       rayExtra: 12,
-      innerTick: true,
       label: `${Math.round(d)}°`,
       labelR: r + 20,
       labelFont: "800 13px Oxanium, sans-serif"
@@ -3689,7 +3692,6 @@ document.addEventListener("DOMContentLoaded", () => {
       lineWidth: 3.5,
       rayStroke: "#ffe9a8",
       rayWidth: 2,
-      innerTick: true,
       label: text,
       labelR: 54
     });
@@ -4092,7 +4094,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Tray
       asmTrayHits = [];
-      let py = 200;
+      let py = 252;
       ctx.fillStyle = "rgba(8, 20, 36, 0.45)";
       ctx.beginPath();
       ctx.roundRect(40, 160, 210, 310, 12);
@@ -4100,7 +4102,8 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillStyle = "#8fb4d4";
       ctx.font = "700 12px Outfit, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("잰 조각", 140, 182);
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("잰 조각", 140, 178);
 
       for (let i = 0; i < 3; i++) {
         if (!measuredSides[i] || asm.placedSides[i]) continue;
@@ -4216,9 +4219,11 @@ document.addEventListener("DOMContentLoaded", () => {
           delta = delta > 0 ? delta - Math.PI * 2 : delta + Math.PI * 2;
         }
         delta = delta < 0 ? -want : want;
+        // Open ray already drawn — arc + label only.
         drawAngleSector(ea.origin.x, ea.origin.y, ea.dirAlong, delta, {
           r: 36,
           fill: "rgba(255, 213, 106, 0.28)",
+          skipRays: true,
           label: `${ea.deg}°`,
           labelR: 54
         });
@@ -4283,7 +4288,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // tray
     asmTrayHits = [];
-    let py = 200;
+    let py = 252;
     ctx.fillStyle = "rgba(8, 20, 36, 0.45)";
     ctx.beginPath();
     ctx.roundRect(40, 160, 210, 310, 12);
@@ -4291,7 +4296,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#8fb4d4";
     ctx.font = "700 12px Outfit, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("잰 조각", 140, 182);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("잰 조각", 140, 178);
 
     for (const i of measuredSideList()) {
       if (asm.placedSides[i]) continue;
@@ -4444,7 +4450,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // tray
     asmTrayHits = [];
-    let py = 200;
+    let py = 252;
     ctx.fillStyle = "rgba(8, 20, 36, 0.45)";
     ctx.beginPath();
     ctx.roundRect(40, 160, 210, 310, 12);
@@ -4452,7 +4458,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#8fb4d4";
     ctx.font = "700 12px Outfit, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("잰 조각", 140, 182);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("잰 조각", 140, 178);
 
     const angIdx = measuredAngleIndex();
     const angleUsed = asm.placedAngles[angIdx];
@@ -4512,8 +4519,6 @@ document.addEventListener("DOMContentLoaded", () => {
       stroke: "#ff6b8a",
       lineWidth: 2.5,
       rayExtra: 12,
-      innerTick: true,
-      tickStroke: "rgba(255, 107, 138, 0.95)",
       label: "?",
       labelColor: "#ff6b8a",
       labelR: 54,
