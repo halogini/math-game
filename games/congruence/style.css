@@ -1181,40 +1181,6 @@ body.modal-open .decision-section {
   border-left: 3px solid var(--primary-cyan);
 }
 
-@keyframes lb-skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-.lb-skeleton-row td {
-  vertical-align: middle;
-}
-
-.lb-skeleton-bar {
-  display: block;
-  height: 0.85em;
-  border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    rgba(148, 163, 184, 0.22) 25%,
-    rgba(226, 232, 240, 0.4) 37%,
-    rgba(148, 163, 184, 0.22) 63%
-  );
-  background-size: 400% 100%;
-  animation: lb-skeleton-shimmer 1.15s ease-in-out infinite;
-}
-
-.lb-skeleton-bar.w-xs { width: 22%; }
-.lb-skeleton-bar.w-sm { width: 36%; }
-.lb-skeleton-bar.w-md { width: 58%; }
-.lb-skeleton-bar.w-lg { width: 44%; }
-
-.champ-name .lb-skeleton-bar,
-.champ-id .lb-skeleton-bar,
-.champ-score .lb-skeleton-bar {
-  margin: 0.15em 0;
-}
-
 /* Opening Screen Champion & Banner Styles */
 .modal-card.modal-opening {
   max-width: 480px;
