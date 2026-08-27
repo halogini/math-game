@@ -1885,9 +1885,9 @@
       ctx.save();
       ctx.clip();
       const cave = ctx.createLinearGradient(0, 44, 0, MAP_H);
-      cave.addColorStop(0, '#2a1840');
-      cave.addColorStop(0.45, '#1a1028');
-      cave.addColorStop(1, '#120c18');
+      cave.addColorStop(0, '#3a2850');
+      cave.addColorStop(0.45, '#2a1838');
+      cave.addColorStop(1, '#1a1028');
       ctx.fillStyle = cave;
       ctx.fillRect(20, 44, MAP_W - 40, MAP_H - 64);
       if (art.hall) {
@@ -1898,9 +1898,9 @@
       ctx.restore();
 
       const floor = ctx.createLinearGradient(0, YARD.y, 0, YARD.y + YARD.h);
-      floor.addColorStop(0, 'rgba(72,52,78,0.82)');
-      floor.addColorStop(0.5, 'rgba(52,38,56,0.86)');
-      floor.addColorStop(1, 'rgba(38,28,44,0.9)');
+      floor.addColorStop(0, 'rgba(88,62,94,0.78)');
+      floor.addColorStop(0.5, 'rgba(68,48,72,0.82)');
+      floor.addColorStop(1, 'rgba(52,38,56,0.86)');
       ctx.fillStyle = floor;
       roundRect(YARD.x, YARD.y, YARD.w, YARD.h, 16);
       ctx.fill();
@@ -1916,7 +1916,7 @@
         ctx.stroke();
       }
 
-      ctx.strokeStyle = 'rgba(36,24,40,0.7)';
+      ctx.strokeStyle = 'rgba(90,68,50,0.6)';
       ctx.lineWidth = 36;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -1927,7 +1927,7 @@
       ctx.lineTo(600, 450);
       ctx.lineTo(850, 450);
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(78,58,88,0.45)';
+      ctx.strokeStyle = 'rgba(140,110,75,0.4)';
       ctx.lineWidth = 22;
       ctx.stroke();
       ctx.lineCap = 'butt';
@@ -2345,16 +2345,44 @@
       drawMachineSign('trapezoid', x, y, on, 0.55);
     }
 
-    function drawShelfBoard(pad, hot) {
+    function drawShelfBoard(pad, hot, themeId) {
       // Raised wooden display shelf — planks + front lip for depth.
       ctx.fillStyle = 'rgba(20,12,6,0.4)';
       roundRect(pad.x + 3, pad.y + pad.h - 4, pad.w, 8, 4);
       ctx.fill();
 
+      let g0, g1, g2, fLip, fStroke;
+      
+      if (themeId === 'parallel') {
+        g0 = hot ? '#3c7a70' : '#2a6058';
+        g1 = hot ? '#265a50' : '#1a4a42';
+        g2 = '#0f3830';
+        fLip = hot ? '#4c8a80' : '#3a6a60';
+        fStroke = hot ? 'rgba(134,239,172,0.75)' : 'rgba(94,234,212,0.4)';
+      } else if (themeId === 'adjacent') {
+        g0 = hot ? '#5c3882' : '#4a2870';
+        g1 = hot ? '#4a286a' : '#3a1858';
+        g2 = '#2a1040';
+        fLip = hot ? '#6c4892' : '#5a3880';
+        fStroke = hot ? 'rgba(196,181,253,0.75)' : 'rgba(167,139,250,0.4)';
+      } else if (themeId === 'right') {
+        g0 = hot ? '#8a6030' : '#7a5020';
+        g1 = hot ? '#6a4828' : '#5a3818';
+        g2 = '#3d2610';
+        fLip = hot ? '#9a7040' : '#8a6030';
+        fStroke = hot ? 'rgba(253,230,138,0.75)' : 'rgba(251,191,36,0.4)';
+      } else {
+        g0 = hot ? '#a06a38' : '#7a4e28';
+        g1 = hot ? '#6e4220' : '#553318';
+        g2 = '#3d2610';
+        fLip = hot ? '#c4894a' : '#8a5a30';
+        fStroke = hot ? 'rgba(253,230,138,0.75)' : 'rgba(180,140,80,0.4)';
+      }
+
       const grad = ctx.createLinearGradient(pad.x, pad.y, pad.x, pad.y + pad.h);
-      grad.addColorStop(0, hot ? '#a06a38' : '#7a4e28');
-      grad.addColorStop(0.5, hot ? '#6e4220' : '#553318');
-      grad.addColorStop(1, '#3d2610');
+      grad.addColorStop(0, g0);
+      grad.addColorStop(0.5, g1);
+      grad.addColorStop(1, g2);
       ctx.fillStyle = grad;
       roundRect(pad.x, pad.y, pad.w, pad.h, 8);
       ctx.fill();
@@ -2371,10 +2399,10 @@
       }
 
       // Front lip
-      ctx.fillStyle = hot ? '#c4894a' : '#8a5a30';
+      ctx.fillStyle = fLip;
       roundRect(pad.x + 2, pad.y + pad.h - 10, pad.w - 4, 9, 3);
       ctx.fill();
-      ctx.strokeStyle = hot ? 'rgba(253,230,138,0.75)' : 'rgba(180,140,80,0.4)';
+      ctx.strokeStyle = fStroke;
       ctx.lineWidth = 2;
       roundRect(pad.x, pad.y, pad.w, pad.h, 8);
       ctx.stroke();
@@ -2437,52 +2465,59 @@
       ctx.textAlign = 'left';
     }
 
-    function machineLook(lv) {
-      // Visual tiers: 0 hut → 1 wood → 2 reinforced → 3 jewel → 4 ornate → 5 palace
+    function machineLook(id, lv) {
+      // Base theme colors
+      let p;
+      if (id === 'parallel') p = { b: '#0d9488', h: '#5eead4', m: '#14b8a6', r0: '#0f766e', r1: '#2dd4bf' };
+      else if (id === 'adjacent') p = { b: '#7c3aed', h: '#c4b5fd', m: '#a78bfa', r0: '#6d28d9', r1: '#a855f7' };
+      else p = { b: '#d97706', h: '#fbbf24', m: '#f59e0b', r0: '#b45309', r1: '#fcd34d' };
+
+      // Visual tiers: 0 hut -> 1 wood -> 2 reinforced -> 3 jewel -> 4 ornate -> 5 palace
+      // Colors adjusted to be warmer and slightly brighter
       if (lv >= 5) {
         return {
-          side: '#0c0614', slab: '#e8b878', slabHi: 'rgba(255,240,200,0.48)',
-          front0: '#c87850', front1: '#9a4830', front2: '#3a1020',
-          edge: 'rgba(255,230,180,0.55)', stroke: 'rgba(255,248,210,0.85)',
-          roofL: '#5a1860', roofR: '#c04090', roofTop: '#fde68a',
-          roofStroke: 'rgba(255,255,240,0.9)', chimSide: '#1a0818', chimFront: '#c86898',
-          counter: '#fde68a', counterEdge: 'rgba(255,255,230,0.85)',
-          winStroke: 'rgba(253,224,71,1)', winGlow: true,
+          side: '#2a1420', slab: p.h, slabHi: 'rgba(255,255,255,0.5)',
+          front0: p.m, front1: p.b, front2: '#4a1824',
+          edge: 'rgba(255,255,255,0.6)', stroke: 'rgba(255,255,255,0.85)',
+          roofL: p.r0, roofR: p.r1, roofTop: p.h,
+          roofStroke: 'rgba(255,255,255,0.95)', chimSide: '#20101a', chimFront: p.r1,
+          counter: p.h, counterEdge: 'rgba(255,255,255,0.9)',
+          winStroke: 'rgba(255,255,255,1)', winGlow: true,
           roofRise: 48, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
         };
       }
       if (lv >= 4) {
         return {
-          side: '#10060e', slab: '#deb070', slabHi: 'rgba(255,235,190,0.42)',
-          front0: '#c07040', front1: '#924028', front2: '#3a1414',
-          edge: 'rgba(255,225,170,0.5)', stroke: 'rgba(255,242,200,0.78)',
-          roofL: '#501850', roofR: '#b03878', roofTop: '#f8c878',
-          roofStroke: 'rgba(255,252,230,0.82)', chimSide: '#1a0a14', chimFront: '#b86088',
-          counter: '#f8d080', counterEdge: 'rgba(255,250,220,0.78)',
-          winStroke: 'rgba(253,200,130,1)', winGlow: true,
+          side: '#24121a', slab: p.m, slabHi: 'rgba(255,255,255,0.4)',
+          front0: p.b, front1: p.r0, front2: '#3a141c',
+          edge: 'rgba(255,255,255,0.45)', stroke: 'rgba(255,255,255,0.7)',
+          roofL: p.r0, roofR: p.r1, roofTop: p.m,
+          roofStroke: 'rgba(255,255,255,0.8)', chimSide: '#1c0e14', chimFront: p.m,
+          counter: p.m, counterEdge: 'rgba(255,255,255,0.7)',
+          winStroke: 'rgba(255,255,255,0.9)', winGlow: true,
           roofRise: 45, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
         };
       }
       if (lv >= 3) {
         return {
-          side: '#12080e', slab: '#d4a06a', slabHi: 'rgba(255,230,180,0.38)',
-          front0: '#b86a3a', front1: '#8a4428', front2: '#3a1810',
-          edge: 'rgba(255,220,160,0.45)', stroke: 'rgba(255,236,180,0.7)',
-          roofL: '#4a1840', roofR: '#9a3868', roofTop: '#f0b878',
-          roofStroke: 'rgba(255,250,220,0.75)', chimSide: '#1a0a14', chimFront: '#a85878',
-          counter: '#f0c878', counterEdge: 'rgba(255,248,210,0.7)',
-          winStroke: 'rgba(253,186,116,0.95)', winGlow: true,
+          side: '#1e0e14', slab: p.b, slabHi: 'rgba(255,255,255,0.3)',
+          front0: p.r0, front1: '#5a2a14', front2: '#301016',
+          edge: 'rgba(255,255,255,0.35)', stroke: 'rgba(255,255,255,0.6)',
+          roofL: p.r0, roofR: p.b, roofTop: p.b,
+          roofStroke: 'rgba(255,255,255,0.7)', chimSide: '#180a10', chimFront: p.b,
+          counter: p.b, counterEdge: 'rgba(255,255,255,0.6)',
+          winStroke: 'rgba(255,255,255,0.8)', winGlow: true,
           roofRise: 42, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
         };
       }
       if (lv >= 2) {
         return {
-          side: '#160c08', slab: '#c89058', slabHi: 'rgba(255,220,160,0.3)',
-          front0: '#a86840', front1: '#7a4828', front2: '#3a2010',
-          edge: 'rgba(255,210,150,0.34)', stroke: 'rgba(255,220,160,0.55)',
-          roofL: '#2a2418', roofR: '#6a5030', roofTop: '#d49858',
-          roofStroke: 'rgba(255,236,200,0.55)', chimSide: '#22140c', chimFront: '#8a6040',
-          counter: '#e8b868', counterEdge: 'rgba(255,236,190,0.55)',
+          side: '#180a0e', slab: p.r0, slabHi: 'rgba(255,255,255,0.2)',
+          front0: '#8a4828', front1: '#6a341c', front2: '#240a10',
+          edge: 'rgba(255,220,160,0.3)', stroke: 'rgba(255,220,160,0.5)',
+          roofL: '#4a2414', roofR: p.r0, roofTop: p.r0,
+          roofStroke: 'rgba(255,236,200,0.55)', chimSide: '#14080a', chimFront: p.r0,
+          counter: p.r0, counterEdge: 'rgba(255,236,190,0.5)',
           winStroke: 'rgba(250,204,120,0.8)', winGlow: true,
           roofRise: 36, chimneys: 1, lanterns: true, banner: false, crystal: false, trim: true
         };
@@ -2492,7 +2527,7 @@
           side: '#1a0e08', slab: '#c48448', slabHi: 'rgba(255,220,160,0.22)',
           front0: '#9a5c34', front1: '#7a4424', front2: '#4a2810',
           edge: 'rgba(255,210,140,0.28)', stroke: 'rgba(255,220,150,0.4)',
-          roofL: '#3a1c0c', roofR: '#8a4820', roofTop: '#e8a060',
+          roofL: '#4a2814', roofR: p.r0, roofTop: '#e8a060',
           roofStroke: 'rgba(255,240,200,0.45)', chimSide: '#2a160c', chimFront: '#8a5428',
           counter: '#e0b060', counterEdge: 'rgba(255,236,180,0.5)',
           winStroke: 'rgba(240,195,106,0.65)', winGlow: false,
@@ -2500,13 +2535,13 @@
         };
       }
       return {
-        side: '#14100c', slab: '#5a4a3c', slabHi: 'rgba(255,255,255,0.06)',
-        front0: '#524034', front1: '#3a3028', front2: '#241c16',
-        edge: 'rgba(255,255,255,0.08)', stroke: 'rgba(90,70,55,0.4)',
-        roofL: '#1e1814', roofR: '#3a3028', roofTop: '#6a5848',
-        roofStroke: 'rgba(120,100,80,0.3)', chimSide: '#1a1410', chimFront: '#3a3028',
-        counter: '#6a5848', counterEdge: 'rgba(120,100,80,0.3)',
-        winStroke: 'rgba(120,100,80,0.35)', winGlow: false,
+        side: '#18120e', slab: '#6a5444', slabHi: 'rgba(255,255,255,0.08)',
+        front0: '#5a463a', front1: '#40342a', front2: '#2a2018',
+        edge: 'rgba(255,255,255,0.1)', stroke: 'rgba(100,80,60,0.45)',
+        roofL: '#28201a', roofR: '#44382e', roofTop: '#7a6654',
+        roofStroke: 'rgba(140,120,95,0.35)', chimSide: '#1c1612', chimFront: '#44382e',
+        counter: '#7a6654', counterEdge: 'rgba(140,120,95,0.35)',
+        winStroke: 'rgba(140,120,95,0.4)', winGlow: false,
         roofRise: 32, chimneys: 1, lanterns: false, banner: false, crystal: false, trim: false
       };
     }
@@ -2514,7 +2549,7 @@
     function drawMachineBuilding(m, lv) {
       const b = m.body;
       const owned = lv >= 1;
-      const look = machineLook(lv);
+      const look = machineLook(m.id, lv);
       const ws = state.workshops[m.id];
       const busy = owned && ws && (ws.processing.length || ws.queue.length);
       const D = 38;
@@ -2629,6 +2664,48 @@
         ctx.moveTo(x + 10, y - 6);
         ctx.lineTo(x + w - 10, y - 6);
         ctx.stroke();
+      }
+
+      // Per-factory roof shapes
+      if (owned) {
+        const rcx = x + w / 2 + D * 0.25;
+        if (m.id === 'parallel') {
+          ctx.fillStyle = look.roofTop;
+          ctx.beginPath();
+          ctx.arc(rcx, roofTopY + 4, 22, Math.PI, 0);
+          ctx.fill();
+          ctx.strokeStyle = look.roofStroke;
+          ctx.stroke();
+        } else if (m.id === 'adjacent') {
+          ctx.fillStyle = look.roofTop;
+          ctx.beginPath();
+          ctx.moveTo(rcx - 18, roofTopY + 4);
+          ctx.lineTo(rcx, roofTopY - 32);
+          ctx.lineTo(rcx + 18, roofTopY + 4);
+          ctx.fill();
+          ctx.strokeStyle = look.roofStroke;
+          ctx.stroke();
+        } else if (m.id === 'right') {
+          ctx.fillStyle = '#2a140a';
+          ctx.beginPath();
+          ctx.moveTo(rcx - 14, roofTopY - 14);
+          ctx.lineTo(rcx + 14, roofTopY - 14);
+          ctx.lineTo(rcx + 10, roofTopY - 6);
+          ctx.lineTo(rcx - 10, roofTopY - 6);
+          ctx.fill();
+          ctx.fillRect(rcx - 8, roofTopY - 6, 16, 10);
+          if (busy) {
+            ctx.fillStyle = '#fb923c';
+            for (let i = 0; i < 4; i++) {
+              const pt = (tNow / (180 + i * 30)) % 1;
+              const px = rcx - 12 + i * 8 + Math.sin(tNow / 100 + i) * 4;
+              const py = roofTopY - 4 - pt * 24;
+              ctx.globalAlpha = 1 - pt;
+              ctx.fillRect(px, py, 2.5, 2.5);
+            }
+            ctx.globalAlpha = 1;
+          }
+        }
       }
 
       const drawPipe = (cx0, cy0, hgt, smokePhase) => {
@@ -2757,7 +2834,7 @@
       }
     }
 
-    function drawPad(r, label, hot, fullWarn) {
+    function drawPad(r, label, hot, fullWarn, themeId) {
       if (fullWarn) {
         const pulse = warnPulse();
         ctx.fillStyle = `rgba(220,40,60,${0.28 + pulse * 0.4})`;
@@ -2768,7 +2845,7 @@
         roundRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8, 12);
         ctx.stroke();
       }
-      drawShelfBoard(r, hot || fullWarn);
+      drawShelfBoard(r, hot || fullWarn, themeId);
       ctx.fillStyle = fullWarn
         ? `rgba(254,202,202,${0.75 + 0.25 * warnPulse()})`
         : (hot ? 'rgba(253,230,138,0.85)' : 'rgba(240,195,106,0.45)');
@@ -2858,7 +2935,7 @@
       const inWarn = warnOn('in:' + m.id);
 
       if (owned) {
-        drawPad(m.input, '↓', onIn, inWarn);
+        drawPad(m.input, '↓', onIn, inWarn, m.id);
         if (ws) ws.queue.forEach((g, i) => drawGemOnShelf(g, m.input, i, inWarn));
         drawUpgradePad(m);
       } else {
@@ -2867,7 +2944,7 @@
         const locked = m.req && mLv(m.req) < 1;
         const cost = m.costs[0];
         const can = !locked && state.gold >= cost;
-        drawShelfBoard(buyR, hot);
+        drawShelfBoard(buyR, hot, m.id);
         drawCostBadge(buyR.x + buyR.w / 2, buyR.y + buyR.h / 2 + 2, cost, can, locked);
         if (hot && can && (state.buyT[m.id] || 0) > 0) {
           drawProgressRing(buyR.x + buyR.w / 2, buyR.y + buyR.h / 2 + 4, 20, state.buyT[m.id] / 0.75, '#f0c36a');
@@ -2888,7 +2965,7 @@
       if (lv < 1) return;
       const onOut = inRect(state.player, m.output);
       const outWarn = warnOn('out:' + m.id);
-      drawPad(m.output, '↑', onOut, outWarn);
+      drawPad(m.output, '↑', onOut, outWarn, m.id);
       const ws = state.workshops[m.id];
       if (ws) ws.output.forEach((g, i) => drawGemOnShelf(g, m.output, i, outWarn));
     }
