@@ -243,11 +243,6 @@
       </div>
       <div class="chip gold" id="chip-gold"><span class="label">금화</span><span class="value" id="hud-gold">0</span></div>
       <div class="hud-right">
-        <div class="chip order hidden" id="chip-order">
-          <span id="order-shape"></span>
-          <span class="value" id="order-detail">×3</span>
-          <i class="order-bar"><b id="order-fill"></b></i>
-        </div>
         <div class="chip time" id="chip-time">
           <div class="time-top">
             <span class="label">시간</span>
@@ -3286,10 +3281,6 @@
       gold: document.getElementById('hud-gold'),
       chipGold: document.getElementById('chip-gold'),
       chipTime: document.getElementById('chip-time'),
-      orderShape: document.getElementById('order-shape'),
-      orderDetail: document.getElementById('order-detail'),
-      orderFill: document.getElementById('order-fill'),
-      chipOrder: document.getElementById('chip-order'),
       shop: document.getElementById('shop'),
       shopList: document.getElementById('shop-list')
     };
@@ -3299,7 +3290,6 @@
       return m + ':' + String(s).padStart(2, '0');
     }
 
-    let orderShown = '';
     function updateHud() {
       el.time.textContent = fmtTime(state.time);
       const ratio = Math.max(0, Math.min(1, state.time / GAME_TIME));
@@ -3309,21 +3299,6 @@
       if (el.chipGold) {
         el.chipGold.classList.toggle('pulse', state.earnFlash > 0);
         el.chipGold.classList.toggle('poor', state.poorFlash > 0 && state.earnFlash <= 0);
-      }
-      if (state.order) {
-        el.chipOrder.classList.remove('hidden');
-        const ord = state.order;
-        const sig = ord.kind + '|' + ord.need + '|' + ord.got + '|' + ord.mult;
-        if (sig !== orderShown) {
-          orderShown = sig;
-          el.orderShape.innerHTML = svgFor(ord.kind, 24);
-          el.orderDetail.textContent = '×' + ord.mult + ' · ' + Math.max(0, ord.need - ord.got);
-        }
-        el.orderFill.style.width = (100 * Math.max(0, ord.t) / ord.maxT) + '%';
-        el.chipOrder.classList.toggle('urgent', ord.t < 6);
-      } else {
-        el.chipOrder.classList.add('hidden');
-        orderShown = '';
       }
     }
 
@@ -3836,7 +3811,6 @@
       state = newState();
       state.phase = 'play';
       shopSig = '';
-      orderShown = '';
       startOverlay.classList.add('hidden');
       resultOverlay.classList.add('hidden');
       updateHud();
