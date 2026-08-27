@@ -640,66 +640,7 @@
         }));
     }
 
-    // 흰 배경 및 격자선 BFS flood-fill 제거.
-    // 고양이 외곽선 안쪽의 고양이 본체는 보존하고 배경/테두리/격자를 투명화.
-    function stripWhite(canvas) {
-      const g = canvas.getContext('2d');
-      let data;
-      try { data = g.getImageData(0, 0, canvas.width, canvas.height); }
-      catch (e) { return canvas; }
-      const px = data.data;
-      const w = canvas.width, h = canvas.height;
-      const visited = new Uint8Array(w * h);
-      const queue = [];
-
-      const enqueue = (x, y) => {
-        if (x < 0 || y < 0 || x >= w || y >= h) return;
-        const i = y * w + x;
-        if (visited[i]) return;
-        const p = i * 4;
-        const r = px[p], g = px[p + 1], b = px[p + 2];
-
-        let isBg = false;
-        // 1. 흰색/연회색 배경
-        if (r > 190 && g > 190 && b > 190 && Math.abs(r - g) < 35 && Math.abs(g - b) < 35) {
-          isBg = true;
-        }
-        // 2. 프레임 테두리 경계선
-        else if (x <= 5 || x >= w - 6 || y <= 5 || y >= h - 6) {
-          isBg = true;
-        }
-        // 3. 32px 간격 배경 격자선
-        else if ((x % 32 <= 2 || x % 32 >= 30 || y % 32 <= 2 || y % 32 >= 30) &&
-                 Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && r > 50) {
-          isBg = true;
-        }
-
-        if (isBg) {
-          visited[i] = 1;
-          queue.push(i);
-        }
-      };
-
-      for (let x = 0; x < w; x++) { enqueue(x, 0); enqueue(x, h - 1); }
-      for (let y = 0; y < h; y++) { enqueue(0, y); enqueue(w - 1, y); }
-
-      let qi = 0;
-      while (qi < queue.length) {
-        const i = queue[qi++];
-        const x = i % w, y = Math.floor(i / w);
-        enqueue(x + 1, y); enqueue(x - 1, y);
-        enqueue(x, y + 1); enqueue(x, y - 1);
-      }
-
-      for (let i = 0; i < w * h; i++) {
-        if (visited[i]) px[i * 4 + 3] = 0;
-      }
-      g.putImageData(data, 0, 0);
-      return canvas;
-    }
-
-    // cols×rows 스프라이트 시트를 로드해 각 셀을 개별 canvas로 슬라이싱.
-    // 흰 배경 제거 후 { idle, walk[] } 반환.
+    // cols×rows 스프라이트 시트(투명 PNG)를 로드해 각 셀을 개별 canvas로 슬라이싱.
     function loadSheet(src, cols = 4, rows = 4) {
       return fetch(src)
         .then((r) => r.blob())
@@ -716,7 +657,6 @@
                 const c = document.createElement('canvas');
                 c.width = fw; c.height = fh;
                 c.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
-                try { stripWhite(c); } catch (e) { /* keep as-is */ }
                 frames.push(c);
               }
             }
