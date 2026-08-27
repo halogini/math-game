@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnPlayBingsoo = document.getElementById('btn-play-bingsoo');
   const btnPlayCongruence = document.getElementById('btn-play-congruence');
   const btnPlayThreeChances = document.getElementById('btn-play-three-chances');
+  const btnPlayPrismTycoon = document.getElementById('btn-play-prism-tycoon');
   const leaderboardTitle = document.getElementById('leaderboard-title');
   const leaderboardModeNote = document.getElementById('leaderboard-mode-note');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
@@ -94,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
+  const PRISM_TYCOON_GAME_IDS = new Set(['prism-tycoon', 'tycoon']);
   let activeLeaderboardGame = 'bingsoo';
   let scoresUnsub = null;
   let threeChancesUnsub = null;
@@ -181,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo/index.html');
     if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
     if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
+    if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon/index.html');
 
     updateProfileDisplay();
   }
@@ -246,8 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   function updateMetricHeader() {
     if (!leaderboardTableHeaderMetric) return;
-    leaderboardTableHeaderMetric.textContent =
-      activeLeaderboardGame === 'three-chances' ? '클리어 시간' : '최고 점수';
+    if (activeLeaderboardGame === 'three-chances') {
+      leaderboardTableHeaderMetric.textContent = '클리어 시간';
+    } else if (activeLeaderboardGame === 'prism-tycoon') {
+      leaderboardTableHeaderMetric.textContent = '총 수익';
+    } else {
+      leaderboardTableHeaderMetric.textContent = '최고 점수';
+    }
   }
 
   function renderLeaderboardSkeleton(tbody, rowCount = 6) {
@@ -324,12 +332,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const acceptGame = (entry) => {
       const id = String((entry && entry.gameId) || '').trim();
       if (gameKey === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
+      if (gameKey === 'prism-tycoon') return PRISM_TYCOON_GAME_IDS.has(id);
       if (gameKey === 'three-chances') {
         return id === 'three-chances' || id === 'three_chances';
       }
       // bingsoo: explicit id, or legacy rows with no gameId and a numeric score (not clear-time)
       if (id === 'bingsoo') return true;
-      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id)) {
+      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id) && !PRISM_TYCOON_GAME_IDS.has(id)) {
         return true;
       }
       return false;
@@ -361,14 +370,17 @@ document.addEventListener('DOMContentLoaded', () => {
               });
             }
           } else {
-            const score = Math.max(0, Math.min(500, parseInt(item.score, 10) || 0));
+            const rawScore = parseInt(item.score, 10) || 0;
+            // 팥빙수나 합동게임은 500점, 100점 만점이 있을 수 있으나, 타이쿤은 제한 없음
+            const score = gameKey === 'prism-tycoon' ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
             const prev = bestMap.get(userKey);
             if (!prev || score > prev.score) {
+              const formattedScore = score.toLocaleString();
               bestMap.set(userKey, {
                 name,
                 studentId: sid,
                 score,
-                metricLabel: `${score}점`
+                metricLabel: gameKey === 'prism-tycoon' ? `${formattedScore} 💰` : `${formattedScore}점`
               });
             }
           }

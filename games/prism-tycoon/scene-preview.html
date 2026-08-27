@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRISM TYCOON — 공방 장면</title>
+  <style>
+    html, body { margin: 0; background: #070b14; height: 100%; }
+    canvas { display: block; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1280" height="720"></canvas>
+  <script>
+    const c = document.getElementById("c");
+    const ctx = c.getContext("2d");
+    const W = 1280, H = 720;
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function poly(pts, fill, stroke, lw) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      pts.slice(1).forEach((p) => ctx.lineTo(p[0], p[1]));
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+    }
+
+    function parallelogram(cx, cy, a, b, shear, rot) {
+      const s = Math.sin(rot || 0), co = Math.cos(rot || 0);
+      const local = [[-a, -b], [a, -b], [a + shear, b], [-a + shear, b]];
+      return local.map(([x, y]) => [cx + x * co - y * s, cy + x * s + y * co]);
+    }
+
+    function rectangle(cx, cy, a, b) {
+      return [[cx - a, cy - b], [cx + a, cy - b], [cx + a, cy + b], [cx - a, cy + b]];
+    }
+
+    // background
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#122033");
+    bg.addColorStop(1, "#070b14");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // floor
+    ctx.fillStyle = "#152033";
+    roundRect(70, 130, 1140, 500, 24);
+    ctx.fill();
+
+    // zones
+    const zones = [
+      { x: 90, y: 160, w: 210, h: 250, title: "광산", sub: "원석 픽업", color: "#334155" },
+      { x: 320, y: 150, w: 640, h: 460, title: "공방", sub: "설비가 쌓인 돌을 한꺼번에 가공", color: "#1e3a4c" },
+      { x: 980, y: 160, w: 210, h: 250, title: "시장", sub: "대각선 감정", color: "#3b2f1a" },
+      { x: 980, y: 430, w: 210, h: 180, title: "상점", sub: "설비 구매", color: "#2a2438" }
+    ];
+    zones.forEach((z) => {
+      ctx.fillStyle = z.color;
+      roundRect(z.x, z.y, z.w, z.h, 16);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(232,195,106,0.25)";
+      ctx.lineWidth = 2;
+      roundRect(z.x, z.y, z.w, z.h, 16);
+      ctx.stroke();
+      ctx.fillStyle = "#e8c36a";
+      ctx.font = "700 18px Pretendard, sans-serif";
+      ctx.fillText(z.title, z.x + 14, z.y + 28);
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "600 13px Pretendard, sans-serif";
+      ctx.fillText(z.sub, z.x + 14, z.y + 48);
+    });
+
+    // mine rocks
+    [[150, 300, 28], [190, 330, 20], [130, 340, 16]].forEach(([x, y, r]) => {
+      poly(parallelogram(x, y, r, r * 0.7, 18, 0.4), "#64748b", "#cbd5e1", 2);
+    });
+
+    // machines
+    function machine(x, y, title, price, state) {
+      const on = state === "on";
+      const busy = state === "busy";
+      const locked = state === "locked";
+      ctx.fillStyle = locked ? "#1f2937" : busy ? "#3f2f12" : "#134e4a";
+      roundRect(x, y, 180, 150, 14);
+      ctx.fill();
+      ctx.strokeStyle = locked ? "#64748b" : busy ? "#e8c36a" : "#5eead4";
+      ctx.lineWidth = 3;
+      roundRect(x, y, 180, 150, 14);
+      ctx.stroke();
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "800 16px Pretendard, sans-serif";
+      ctx.fillText(title, x + 14, y + 28);
+      ctx.fillStyle = locked ? "#94a3b8" : "#fde68a";
+      ctx.font = "700 13px Pretendard, sans-serif";
+      ctx.fillText(locked ? "잠김 · " + price : (busy ? "가공 중" : "설치됨"), x + 14, y + 50);
+      return { x, y };
+    }
+    machine(350, 230, "나란히 틀", "80금", "on");
+    machine(550, 230, "직각 틀", "250금", "busy");
+    machine(750, 230, "이웃 변 틀", "250금", "locked");
+
+    // parallel ticks on first machine
+    poly(parallelogram(440, 330, 42, 22, 26, 0), "rgba(94,234,212,0.8)", "#99f6e4", 2);
+    ctx.strokeStyle = "#e8c36a";
+    ctx.lineWidth = 2;
+    [[418, 318], [448, 318], [432, 342], [462, 342]].forEach(([x, y]) => {
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 8, y - 6); ctx.stroke();
+    });
+
+    // shearing gem on right-angle jig: one parallelogram becoming rectangle
+    poly(parallelogram(640, 328, 40, 22, 8, 0), "rgba(253,230,138,0.95)", "#fde68a", 3);
+    ctx.strokeStyle = "#f8fafc";
+    ctx.setLineDash([4, 4]);
+    poly(rectangle(640, 328, 40, 22), null, "rgba(255,255,255,0.5)", 1.5);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#fde68a";
+    ctx.font = "700 12px Pretendard, sans-serif";
+    ctx.fillText("한 각 → 네 각", 592, 372);
+
+    // lock on third
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "28px sans-serif";
+    ctx.fillText("잠김", 805, 330);
+    poly(parallelogram(840, 345, 36, 20, 0, 0.7), "rgba(148,163,184,0.45)", "#cbd5e1", 2);
+
+    // character
+    const px = 640, py = 520;
+    ctx.fillStyle = "#0f766e";
+    ctx.beginPath(); ctx.ellipse(px, py + 18, 28, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#5eead4";
+    ctx.beginPath(); ctx.arc(px, py - 8, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#134e4a";
+    roundRect(px - 14, py - 4, 28, 26, 8); ctx.fill();
+
+    // gem stack: top irregular / para, then shearing, bottom rectangles
+    const stack = [
+      { y: py - 38, kind: "rect" },
+      { y: py - 68, kind: "rect" },
+      { y: py - 100, kind: "shear" },
+      { y: py - 132, kind: "para" },
+      { y: py - 164, kind: "para" },
+      { y: py - 198, kind: "raw" }
+    ];
+    stack.forEach((g) => {
+      if (g.kind === "raw") poly(parallelogram(px, g.y, 26, 16, 22, 0.35), "#64748b", "#e2e8f0", 2);
+      if (g.kind === "para") poly(parallelogram(px, g.y, 26, 15, 20, 0), "#22d3ee", "#a5f3fc", 2);
+      if (g.kind === "shear") poly(parallelogram(px, g.y, 26, 15, 7, 0), "#fbbf24", "#fde68a", 2);
+      if (g.kind === "rect") poly(rectangle(px, g.y, 24, 14), "#67e8f9", "#ecfeff", 2);
+    });
+
+    // market preview: diagonal appraisal
+    const m = [1040, 290];
+    poly(rectangle(m[0] + 40, m[1] + 40, 36, 22), "#67e8f9", "#ecfeff", 2);
+    ctx.strokeStyle = "#f8fafc";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(m[0] + 4, m[1] + 18); ctx.lineTo(m[0] + 76, m[1] + 62);
+    ctx.moveTo(m[0] + 76, m[1] + 18); ctx.lineTo(m[0] + 4, m[1] + 62);
+    ctx.stroke();
+    ctx.fillStyle = "#5eead4";
+    ctx.beginPath(); ctx.arc(m[0] + 40, m[1] + 40, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fde68a";
+    ctx.font = "700 12px Pretendard, sans-serif";
+    ctx.fillText("이등분 ✓  등장 ✓", m[0] - 8, m[1] + 88);
+    ctx.fillText("수직  ✗   70금", m[0] - 8, m[1] + 106);
+
+    // shop buttons
+    ctx.fillStyle = "#111827";
+    roundRect(1000, 470, 170, 44, 10); ctx.fill();
+    ctx.fillStyle = "#64748b";
+    ctx.font = "700 13px Pretendard, sans-serif";
+    ctx.fillText("이웃 변 틀  250금", 1014, 498);
+
+    // HUD
+    ctx.fillStyle = "rgba(7,11,20,0.82)";
+    roundRect(70, 18, 1140, 92, 18);
+    ctx.fill();
+    ctx.fillStyle = "#e8c36a";
+    ctx.font = "800 22px Pretendard, sans-serif";
+    ctx.fillText("PRISM TYCOON", 92, 50);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "600 15px Pretendard, sans-serif";
+    ctx.fillText("평행이 잠겨 있어서, 한 각이 네 각을 결정한다", 92, 78);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "800 28px Outfit, sans-serif";
+    ctx.fillText("2:48", 860, 62);
+    ctx.fillStyle = "#fde68a";
+    ctx.fillText("340금", 1020, 62);
+
+    // joystick
+    ctx.fillStyle = "rgba(15,23,42,0.7)";
+    ctx.beginPath(); ctx.arc(160, 600, 54, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#64748b"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(160, 600, 54, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#5eead4";
+    ctx.beginPath(); ctx.arc(178, 588, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "600 12px Pretendard, sans-serif";
+    ctx.fillText("가상 조이스틱", 118, 670);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "600 13px Pretendard, sans-serif";
+    ctx.fillText("퀴즈 없음 · 이름은 시장 대각선이 찍음", 430, 640);
+  </script>
+</body>
+</html>

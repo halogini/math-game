@@ -1,0 +1,8 @@
+{
+  "type": "character",
+  "characterName": "nyangsooni-tools",
+  "referenceJobId": "kh74t9jcvadwm1vq3z3b7pj5hn8cdg68",
+  "editPrompt": "add a wooden ruler with black tick marks and a translucent cyan glowing protractor held horizontally in the mouth",
+  "actions": ["walk"],
+  "actionContext": "slow relaxed quadruped cat walk, one foot always on ground, no sprint lean, tools stay in mouth"
+}

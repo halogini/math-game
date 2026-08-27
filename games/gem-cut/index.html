@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>원석을 깎아라! 감정 작전! | 할로매쓰</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:;">
+  <meta name="description" content="원석을 캐고 깎아, 대각선 십자로 감정을 받으세요. 평행이 잠기면 한 각이 네 각을 결정합니다!">
+  <meta property="og:title" content="원석을 깎아라! 감정 작전! | 할로매쓰">
+  <meta property="og:description" content="원석을 캐고 깎아, 대각선 십자로 감정을 받으세요.">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
+</head>
+<body>
+  <div class="game-app">
+    <div class="portal-nav-bar">
+      <a href="../../index.html" id="btn-back-portal" class="btn-portal-home">← 아케이드로</a>
+    </div>
+
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-emoji">💎</span>
+        <div>
+          <h1>원석을 깎아라! 감정 작전!</h1>
+          <p class="subtitle">깎기는 면, 감정은 대각선. 평행이 잠기면 한 각이 전부를 결정합니다.</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <div class="player-info-card">
+          <span class="player-icon">👤</span>
+          <div class="player-details">
+            <span class="player-name" id="display-player-name">도전자</span>
+            <span class="player-id" id="display-student-id">학번: 미입력</span>
+          </div>
+        </div>
+        <div class="status-card">
+          <span class="label">라운드</span>
+          <span class="value" id="round-display">1 / 5</span>
+        </div>
+        <div class="status-card highlight">
+          <span class="label">총점</span>
+          <span class="value" id="total-score-display">0 <small>점</small></span>
+        </div>
+        <div class="status-card">
+          <span class="label">최고 기록</span>
+          <span class="value" id="high-score-display">0 <small>점</small></span>
+        </div>
+      </div>
+    </header>
+
+    <main class="game-container">
+      <div class="stage-row" id="stage-row">
+        <span class="stage-chip" data-stage="mine">1. 캐기</span>
+        <span class="stage-chip" data-stage="cut">2. 세공</span>
+        <span class="stage-chip" data-stage="appraise">3. 감정</span>
+      </div>
+
+      <p class="mission-banner" id="mission-banner">광맥을 곡괭이로 두드려 원석을 꺼내세요.</p>
+
+      <div class="board-wrap">
+        <canvas id="gem-canvas" width="900" height="520"></canvas>
+        <div id="lock-toast" class="lock-toast hidden">평행 자물쇠 — 한 각을 밀면 네 각이 같이 섭니다</div>
+        <div id="flash-toast" class="flash-toast hidden"></div>
+      </div>
+
+      <div class="toolbar" id="toolbar"></div>
+
+      <div class="controls-bar">
+        <button type="button" class="btn btn-ghost" id="btn-undo">되돌리기</button>
+        <button type="button" class="btn btn-ghost" id="btn-reset">원석 다시</button>
+        <button type="button" class="btn btn-primary" id="btn-appraise">감정 받기</button>
+        <button type="button" class="btn btn-accent hidden" id="btn-next-round">다음 광맥</button>
+      </div>
+
+      <div id="stamp-row" class="stamp-row hidden"></div>
+    </main>
+
+    <footer class="app-footer">
+      <a href="../../privacy.html" class="privacy-link" target="_blank" rel="noopener noreferrer">개인정보처리방침</a>
+    </footer>
+  </div>
+
+  <div id="player-modal" class="modal-backdrop">
+    <div class="modal-card modal-opening">
+      <div class="opening-banner">
+        <span class="opening-subtitle">1위 챔피언 도전!</span>
+        <h2>명예의 전당 랭킹 1위</h2>
+        <div class="champ-card">
+          <div class="champ-trophy">🥇</div>
+          <div class="champ-info">
+            <span class="champ-name" id="opening-champ-name">감정사</span>
+            <span class="champ-id" id="opening-champ-id">학번: —</span>
+          </div>
+          <div class="champ-score" id="opening-champ-score">0<small>점</small></div>
+        </div>
+        <button type="button" id="btn-toggle-opening-leaderboard" class="btn btn-outline btn-sm">명예의 전당 순위표 보기</button>
+        <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+          <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th id="th-opening-id">학번</th>
+                  <th>점수</th>
+                </tr>
+              </thead>
+              <tbody id="opening-leaderboard-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="game-guide-box">
+        <div class="guide-title">원석을 깎아라! 감정 작전!</div>
+        <p class="guide-desc">마주 면을 나란히 깎고, 평행이 잠기면 한 각만 직각으로 미세요. 이름은 고르지 않습니다. 돌 속 십자가 말해 줍니다.</p>
+      </div>
+      <form id="player-form" class="modal-body">
+        <div class="form-group">
+          <label for="input-player-name" id="label-player-name">도전자 이름:</label>
+          <input type="text" id="input-player-name" class="form-input" value="도전자" placeholder="예: 홍길동" maxlength="12">
+        </div>
+        <div class="form-group" id="student-id-group">
+          <label for="input-student-id">학번:</label>
+          <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%; margin-top:10px;">챔피언에 도전하기</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="result-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2>감정 완료</h2>
+      </div>
+      <div class="modal-body">
+        <div class="final-score-box">
+          <span class="final-label">최종 획득 점수</span>
+          <div id="final-total-score" class="final-score">0 <small>/ 500</small></div>
+          <div id="new-record-badge" class="new-record-badge hidden">최고 기록 달성!</div>
+        </div>
+        <div class="send-action-box">
+          <div class="result-locked-player-box">
+            등록 참가자: <strong id="result-locked-name">홍길동</strong>
+            <span id="result-locked-id-span">(학번: <strong id="result-locked-id">2101</strong>)</span>
+          </div>
+          <button type="button" id="btn-send-data" class="btn btn-secondary btn-lg" style="width:100%;">점수 등록하기</button>
+          <div id="api-status-msg" class="api-status-msg"></div>
+        </div>
+        <div class="leaderboard-section">
+          <h3 id="result-leaderboard-title">명예의 전당 (Top 20)</h3>
+          <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th id="th-result-id">학번</th>
+                  <th>점수</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <ul id="round-history-list" class="history-list"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-modal-restart" class="btn btn-primary btn-lg">새 게임 시작하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
