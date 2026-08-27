@@ -640,8 +640,8 @@
         }));
     }
 
-    // 흰 배경 BFS flood-fill 제거.
-    // 고양이 흰 털은 어두운 외곽선으로 막혀 있어 보존됨.
+    // 흰 배경 및 격자선 BFS flood-fill 제거.
+    // 고양이 외곽선 안쪽의 고양이 본체는 보존하고 배경/테두리/격자를 투명화.
     function stripWhite(canvas) {
       const g = canvas.getContext('2d');
       let data;
@@ -658,8 +658,23 @@
         if (visited[i]) return;
         const p = i * 4;
         const r = px[p], g = px[p + 1], b = px[p + 2];
-        // 흰색/연회색 배경(JPEG 압축 노이즈 포함) 판별: RGB가 모두 195 이상이고 무채색에 가까울 때
-        if (r > 195 && g > 195 && b > 195 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
+
+        let isBg = false;
+        // 1. 흰색/연회색 배경
+        if (r > 190 && g > 190 && b > 190 && Math.abs(r - g) < 35 && Math.abs(g - b) < 35) {
+          isBg = true;
+        }
+        // 2. 프레임 테두리 경계선
+        else if (x <= 5 || x >= w - 6 || y <= 5 || y >= h - 6) {
+          isBg = true;
+        }
+        // 3. 32px 간격 배경 격자선
+        else if ((x % 32 <= 2 || x % 32 >= 30 || y % 32 <= 2 || y % 32 >= 30) &&
+                 Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && r > 50) {
+          isBg = true;
+        }
+
+        if (isBg) {
           visited[i] = 1;
           queue.push(i);
         }
