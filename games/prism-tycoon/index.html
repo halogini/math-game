@@ -320,7 +320,7 @@
     const EVENT_GAP_MIN = 36;
     const EVENT_GAP_MAX = 62;
     const BEST_KEY = 'prism-tycoon-best';
-    const CAT_SIZE = 60;
+    const CAT_SIZE = 52;
     const WALK_FPS = 9;
 
     // Yard pads — WOS-ad style: stand on dotted square to interact.
@@ -576,17 +576,45 @@
         const data = g.getImageData(0, 0, c.width, c.height);
         const px = data.data;
         for (let i = 0; i < px.length; i += 4) {
-          // Soft edge: 검정 배경 투명화
+          // Soft edge: near-black becomes transparent so the satchel doesn't keep a matte halo.
           const dark = Math.max(px[i], px[i + 1], px[i + 2]);
           if (dark < 22) px[i + 3] = 0;
           else if (dark < 42) px[i + 3] = Math.min(px[i + 3], Math.floor((dark - 22) * 12));
         }
         g.putImageData(data, 0, 0);
-        // 프레임 간 크기 왜곡/진동을 막기 위해 원본 동일 캔버스 반환
-        return c;
+        return trimCanvas(c);
       } catch (e) {
+        // file:// 프로토콜에서는 getImageData()가 SecurityError를 던짐.
+        // 픽셀 처리 없이 canvas를 그대로 반환 (스프라이트는 정상 표시됨).
         return c;
       }
+    }
+
+    function trimCanvas(src) {
+      const g = src.getContext('2d');
+      const { width: w, height: h } = src;
+      let data;
+      try {
+        data = g.getImageData(0, 0, w, h).data;
+      } catch (e) {
+        return src; // file:// 환경에서 SecurityError 시 원본 반환
+      }
+      let x0 = w, y0 = h, x1 = 0, y1 = 0, found = false;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 12) {
+          found = true;
+          if (x < x0) x0 = x; if (y < y0) y0 = y;
+          if (x > x1) x1 = x; if (y > y1) y1 = y;
+        }
+      }
+      if (!found) return src;
+      const pad = 2;
+      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+      x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+      const out = document.createElement('canvas');
+      out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+      out.getContext('2d').drawImage(src, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+      return out;
     }
 
     function loadImg(src) {
@@ -612,34 +640,160 @@
         }));
     }
 
-    // ---------- 냥순이 sprites ----------
-    const art = { idle: null, walk: [], hall: null };
+    // 흰 배경 BFS flood-fill 제거.
+    // 고양이 흰 털은 어두운 외곽선으로 막혀 있어 보존됨.
+    function stripWhite(canvas) {
+      const g = canvas.getContext('2d');
+      let data;
+      try { data = g.getImageData(0, 0, canvas.width, canvas.height); }
+      catch (e) { return canvas; }
+      const px = data.data;
+      const w = canvas.width, h = canvas.height;
+      const visited = new Uint8Array(w * h);
+      const queue = [];
 
-    async function loadArt() {
-      const [idle, w1, w2, w3, w4, hall] = await Promise.all([
-        loadImg('assets/nyangsooni-idle.png'),
-        loadImg('assets/nyangsooni-walk-1.png'),
-        loadImg('assets/nyangsooni-walk-2.png'),
-        loadImg('assets/nyangsooni-walk-3.png'),
-        loadImg('assets/nyangsooni-walk-4.png'),
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => resolve(null);
-          img.src = 'assets/hall-bg.png';
-        })
-      ]);
-      art.idle = idle;
-      art.walk = [w1, w2, w3, w4].filter(Boolean);
-      art.hall = hall;
+      const enqueue = (x, y) => {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        const i = y * w + x;
+        if (visited[i]) return;
+        const p = i * 4;
+        const r = px[p], g = px[p + 1], b = px[p + 2];
+        // 흰색/연회색 배경(JPEG 압축 노이즈 포함) 판별: RGB가 모두 195 이상이고 무채색에 가까울 때
+        if (r > 195 && g > 195 && b > 195 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
+          visited[i] = 1;
+          queue.push(i);
+        }
+      };
+
+      for (let x = 0; x < w; x++) { enqueue(x, 0); enqueue(x, h - 1); }
+      for (let y = 0; y < h; y++) { enqueue(0, y); enqueue(w - 1, y); }
+
+      let qi = 0;
+      while (qi < queue.length) {
+        const i = queue[qi++];
+        const x = i % w, y = Math.floor(i / w);
+        enqueue(x + 1, y); enqueue(x - 1, y);
+        enqueue(x, y + 1); enqueue(x, y - 1);
+      }
+
+      for (let i = 0; i < w * h; i++) {
+        if (visited[i]) px[i * 4 + 3] = 0;
+      }
+      g.putImageData(data, 0, 0);
+      return canvas;
     }
 
+    // cols×rows 스프라이트 시트를 로드해 각 셀을 개별 canvas로 슬라이싱.
+    // 흰 배경 제거 후 { idle, walk[] } 반환.
+    function loadSheet(src, cols = 4, rows = 4) {
+      return fetch(src)
+        .then((r) => r.blob())
+        .then((blob) => new Promise((resolve) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            const fw = Math.floor(img.width / cols);
+            const fh = Math.floor(img.height / rows);
+            const frames = [];
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < cols; col++) {
+                const c = document.createElement('canvas');
+                c.width = fw; c.height = fh;
+                c.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+                try { stripWhite(c); } catch (e) { /* keep as-is */ }
+                frames.push(c);
+              }
+            }
+            // 행 0(4장) = idle, 행 1~3(12장) = walk
+            resolve({ idle: frames[0], walk: frames.slice(cols) });
+          };
+          img.onerror = () => resolve(null);
+          img.src = url;
+        }))
+        .catch(() => Promise.resolve(null));
+    }
+
+    // ---------- 냥순이 sprites ----------
+    // dirs: 8방향 스프라이트 딕셔너리 (Phase 2 로드 후 채워짐)
+    // catAspect: idle 기준 고정 종횡비 — 프레임마다 크기 진동 방지
+    const DIRS_8 = ['right','down-right','down','down-left','left','up-left','up','up-right'];
+    const art = {
+      dirs: Object.fromEntries(DIRS_8.map((d) => [d, { idle: null, walk: [] }])),
+      catAspect: 1,
+      hall: null,
+      // 레거시(기존 파일) 폴백용
+      idle: null,
+      walk: []
+    };
+
+    // --- 기존 loadArt: 레거시 스프라이트 먼저 로드 (Phase 2 스프라이트 추가 전 폴백) ---
+    async function loadArt() {
+      art.hall = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = 'assets/hall-bg.png';
+      });
+      await loadArt8Dir();
+    }
+
+    // 8방향 스프라이트 로드 (Phase 2 후 호출)
+    // MIRROR_MAP: 좌측 계열은 우측 계열의 미러링으로 처리
+    const MIRROR_MAP = { 'left': 'right', 'down-left': 'down-right', 'up-left': 'up-right' };
+
+    async function loadArt8Dir() {
+      // 실제 시트 파일이 있는 5방향만 loadSheet로 로드
+      const SHEET_FILES = {
+        'right':      'assets/nyangsooni-right.jpg',
+        'down':       'assets/nyangsooni-down.jpg',
+        'up':         'assets/nyangsooni-up.jpg',
+        'down-right': 'assets/nyangsooni-down-right.jpg',
+        'up-right':   'assets/nyangsooni-up-right.jpg',
+      };
+
+      const results = await Promise.all(
+        Object.entries(SHEET_FILES).map(([dir, src]) =>
+          loadSheet(src).then((sheet) => ({ dir, sheet }))
+        )
+      );
+
+      results.forEach(({ dir, sheet }) => {
+        if (sheet) art.dirs[dir] = sheet;
+      });
+
+      // 미러 방향은 별도 파일 없이 소스 방향 참조
+      // (catImg에서 MIRROR_MAP으로 처리)
+
+      // catAspect를 새 시트 기준으로 갱신
+      const ref = art.dirs['right']?.idle;
+      if (ref) art.catAspect = ref.height / ref.width;
+    }
+
+    // catImg: { img, mirror } 반환. mirror=true 이면 drawPlayer에서 ctx.scale(-1,1) 적용.
     function catImg(p) {
-      if (p.moving && art.walk.length) {
-        const frame = Math.floor(p.walkT * WALK_FPS) % art.walk.length;
-        return art.walk[frame] || art.idle;
+      const dir = p.dir || (p.facing >= 0 ? 'right' : 'left');
+      const mirror = dir in MIRROR_MAP;
+      const lookupDir = MIRROR_MAP[dir] || dir;
+
+      const slot = art.dirs[lookupDir];
+      const fallbackWalk = art.walk;
+      const fallbackIdle = art.idle;
+
+      let img;
+      if (p.moving) {
+        const walk = slot?.walk?.length ? slot.walk : fallbackWalk;
+        if (walk.length) {
+          const frame = Math.floor(p.walkT * WALK_FPS) % walk.length;
+          img = walk[frame] || slot?.idle || fallbackIdle;
+        } else {
+          img = slot?.idle || fallbackIdle;
+        }
+      } else {
+        img = slot?.idle || fallbackIdle || slot?.walk?.[0] || fallbackWalk[0];
       }
-      return art.idle || (art.walk && art.walk[0]);
+
+      return { img, mirror };
     }
 
     // ---------- state ----------
@@ -2936,12 +3090,17 @@
         ctx.restore();
       }
 
-      const img = catImg(p);
+      const { img, mirror } = catImg(p);
       if (img) {
         ctx.save();
         ctx.translate(p.x, p.y + bob);
-        ctx.scale(p.facing, 1);
-        ctx.drawImage(img, -CAT_SIZE / 2, -CAT_SIZE + 6, CAT_SIZE, CAT_SIZE);
+        if (mirror) ctx.scale(-1, 1);
+
+        // art.catAspect는 idle 기준 고정값 → 프레임마다 크기 진동 없음
+        const dw = CAT_SIZE;
+        const dh = dw * (art.catAspect || 1.3);
+
+        ctx.drawImage(img, -dw / 2, -dh + 6, dw, dh);
         ctx.restore();
       } else {
         ctx.fillStyle = '#f0a060';
