@@ -657,7 +657,9 @@
         const i = y * w + x;
         if (visited[i]) return;
         const p = i * 4;
-        if (px[p] > 215 && px[p + 1] > 215 && px[p + 2] > 215) {
+        const r = px[p], g = px[p + 1], b = px[p + 2];
+        // 흰색/연회색 배경(JPEG 압축 노이즈 포함) 판별: RGB가 모두 195 이상이고 무채색에 가까울 때
+        if (r > 195 && g > 195 && b > 195 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
           visited[i] = 1;
           queue.push(i);
         }
