@@ -652,41 +652,33 @@
     }
 
     // ---------- 냥순이 sprites ----------
-    // dirs: 8방향 스프라이트 딕셔너리 (Phase 2 로드 후 채워짐)
-    // catAspect: idle 기준 고정 종횡비 — 프레임마다 크기 진동 방지
+    const ASSET_DIR = (function() {
+      let path = window.location.pathname || '';
+      if (!path.endsWith('/')) {
+        const last = path.lastIndexOf('/');
+        path = last >= 0 ? path.substring(0, last + 1) : '';
+      }
+      return path + 'assets/';
+    })();
+
     const DIRS_8 = ['right','down-right','down','down-left','left','up-left','up','up-right'];
     const art = {
       dirs: Object.fromEntries(DIRS_8.map((d) => [d, { idle: null, walk: [] }])),
       catAspect: 1,
       hall: null,
-      // 레거시(기존 파일) 폴백용
       idle: null,
       walk: []
     };
 
-    // --- 기존 loadArt: 레거시 스프라이트 먼저 로드 (Phase 2 스프라이트 추가 전 폴백) ---
-    async function loadArt() {
-      art.hall = await new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = 'assets/hall-bg.png';
-      });
-      await loadArt8Dir();
-    }
-
-    // 8방향 스프라이트 로드 (Phase 2 후 호출)
-    // MIRROR_MAP: 좌측 계열은 우측 계열의 미러링으로 처리
     const MIRROR_MAP = { 'left': 'right', 'down-left': 'down-right', 'up-left': 'up-right' };
 
     async function loadArt8Dir() {
-      // 실제 시트 파일이 있는 5방향만 loadSheet로 로드
       const SHEET_FILES = {
-        'right':      'assets/nyangsooni-right.png',
-        'down':       'assets/nyangsooni-down.png',
-        'up':         'assets/nyangsooni-up.png',
-        'down-right': 'assets/nyangsooni-down-right.png',
-        'up-right':   'assets/nyangsooni-up-right.png',
+        'right':      ASSET_DIR + 'nyangsooni-right.png',
+        'down':       ASSET_DIR + 'nyangsooni-down.png',
+        'up':         ASSET_DIR + 'nyangsooni-up.png',
+        'down-right': ASSET_DIR + 'nyangsooni-down-right.png',
+        'up-right':   ASSET_DIR + 'nyangsooni-up-right.png',
       };
 
       const results = await Promise.all(
@@ -699,12 +691,20 @@
         if (sheet) art.dirs[dir] = sheet;
       });
 
-      // 미러 방향은 별도 파일 없이 소스 방향 참조
-      // (catImg에서 MIRROR_MAP으로 처리)
-
-      // catAspect를 새 시트 기준으로 갱신
       const ref = art.dirs['right']?.idle;
       if (ref) art.catAspect = ref.height / ref.width;
+    }
+
+    async function loadArt() {
+      const hallPromise = new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = ASSET_DIR + 'hall-bg.png';
+      });
+
+      const [hall] = await Promise.all([hallPromise, loadArt8Dir()]);
+      art.hall = hall;
     }
 
     // catImg: { img, mirror } 반환. mirror=true 이면 drawPlayer에서 ctx.scale(-1,1) 적용.
@@ -869,7 +869,7 @@
         phase: 'ready',
         time: GAME_TIME,
         gold: 0,
-        player: { x: 248, y: 450, facing: -1, dir: 'left', walkT: 0, moving: false },
+        player: { x: 220, y: 470, facing: -1, dir: 'left', walkT: 0, moving: false },
         carry: [],
         bagLevel: 0,
         owned: { parallel: 0, adjacent: 0, right: 0 },
@@ -3074,22 +3074,44 @@
       }
 
       const { img, mirror } = catImg(p);
-      if (img) {
+      if (img && img.width > 0) {
         ctx.save();
         ctx.translate(p.x, p.y + bob);
         if (mirror) ctx.scale(-1, 1);
 
-        // art.catAspect는 idle 기준 고정값 → 프레임마다 크기 진동 없음
         const dw = CAT_SIZE;
         const dh = dw * (art.catAspect || 1.3);
 
         ctx.drawImage(img, -dw / 2, -dh + 6, dw, dh);
         ctx.restore();
       } else {
-        ctx.fillStyle = '#f0a060';
+        ctx.save();
+        ctx.translate(p.x, p.y + bob);
+        ctx.scale(p.facing, 1);
+        // 몸통
+        ctx.fillStyle = '#ea580c';
         ctx.beginPath();
-        ctx.ellipse(p.x, p.y - 28, 18, 24, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -22, 16, 20, 0, 0, Math.PI * 2);
         ctx.fill();
+        // 흰 배
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(2, -18, 9, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 귀
+        ctx.fillStyle = '#c2410c';
+        ctx.beginPath();
+        ctx.moveTo(-12, -34); ctx.lineTo(-4, -46); ctx.lineTo(2, -36);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(2, -36); ctx.lineTo(10, -46); ctx.lineTo(14, -34);
+        ctx.fill();
+        // 초록 눈
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.arc(8, -26, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     }
 
