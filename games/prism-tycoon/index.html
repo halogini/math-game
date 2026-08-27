@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #3a5166;
+      --bg: #160e22;
       --panel: rgba(28, 16, 36, 0.92);
       --gold: #f0c36a;
       --teal: #c4b5fd;
@@ -555,11 +555,15 @@
     }
 
     function svgFor(kind, size) {
-      const pts = shapeFor(kind, size / 3.1, 1)
-        .map((p) => `${(p[0] + size / 2).toFixed(1)},${(p[1] + size / 2).toFixed(1)}`).join(' ');
+      const outer = shapeFor(kind, size / 3.1, 1);
+      const inner = outer.map((p) => [p[0] * 0.72, p[1] * 0.72]);
+      const to = (pts) => pts.map((p) => `${(p[0] + size / 2).toFixed(1)},${(p[1] + size / 2).toFixed(1)}`).join(' ');
       const g = GEMS[kind];
+      const h = hash(1);
+      const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
-        <polygon points="${pts}" fill="${g.fill}" stroke="${g.line}" stroke-width="1.4"/></svg>`;
+        <polygon points="${to(outer)}" fill="#3f322e" stroke="${g.line}" stroke-width="1.4"/>
+        <polygon points="${to(inner)}" fill="${glow}" stroke="rgba(255,255,255,0.35)" stroke-width="0.6"/></svg>`;
     }
 
     // ---------- 냥순이 sprites ----------
@@ -688,12 +692,96 @@
       return MACHINES.find((m) => inRect(p, kioskRect(m)));
     }
 
+    function orePileAnchor() {
+      const v = MINE_VEIN;
+      return { cx: v.x + v.w * 0.58, cy: v.y + v.h * 0.78, rx: 54, ry: 22 };
+    }
+
+    const ORE_REST = 18;
+
+    function seedOrePile() {
+      const a = orePileAnchor();
+      const list = [];
+      for (let i = 0; i < ORE_REST; i++) {
+        const ang = hash(i * 9.1) * Math.PI * 2;
+        const rad = Math.sqrt(hash(i * 4.7));
+        list.push({
+          x: a.cx + Math.cos(ang) * a.rx * rad * 0.95,
+          y: a.cy + Math.sin(ang) * a.ry * rad - (1 - rad) * 34,
+          vx: 0, vy: 0,
+          seed: 40 + i * 13,
+          settled: true
+        });
+      }
+      return list;
+    }
+
+    function spawnOreFromCave(s, n) {
+      const v = MINE_VEIN;
+      const flying = s.oreSpill.filter((o) => !o.settled).length;
+      n = Math.min(n, Math.max(0, 6 - flying));
+      for (let i = 0; i < n; i++) {
+        const k = hash(s.oreSpill.length * 1.7 + i * 11.3 + (s.seed || 1));
+        s.oreSpill.push({
+          x: v.x - 16 + k * 10,
+          y: v.y + 12 + hash(k * 17) * 16,
+          vx: 90 + hash(k * 3) * 80,
+          vy: 10 + hash(k * 8) * 40,
+          seed: 70 + Math.floor(k * 400),
+          settled: false
+        });
+      }
+    }
+
+    function pluckOreFromPile(s) {
+      const p = s.player;
+      let best = -1, bestD = 1e9;
+      s.oreSpill.forEach((o, i) => {
+        if (!o.settled) return;
+        const d = (o.x - p.x) * (o.x - p.x) + (o.y - p.y) * (o.y - p.y);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      if (best >= 0) s.oreSpill.splice(best, 1);
+    }
+
+    function tickOreSpill(s, dt) {
+      if (!s.oreSpill) s.oreSpill = seedOrePile();
+      const v = MINE_VEIN;
+      const a = orePileAnchor();
+      s.oreSpill.forEach((o) => {
+        if (o.settled) return;
+        o.vy += 320 * dt;
+        o.x += o.vx * dt;
+        o.y += o.vy * dt;
+        o.vx *= 0.985;
+        const dx = (o.x - a.cx) / a.rx;
+        const mound = a.cy - Math.max(0, 1 - dx * dx) * 36;
+        if (Math.abs(dx) < 1.12 && o.y >= mound && o.vy > 0) {
+          o.y = mound;
+          o.settled = true;
+          o.vx = 0;
+          o.vy = 0;
+        } else if (o.y > v.y + v.h + 10) {
+          o.settled = true;
+          o.y = v.y + v.h - 6 - hash(o.seed) * 8;
+          o.vx = 0;
+          o.vy = 0;
+        }
+      });
+      let settled = 0;
+      for (let i = s.oreSpill.length - 1; i >= 0; i--) {
+        if (!s.oreSpill[i].settled) continue;
+        settled++;
+        if (settled > ORE_REST) s.oreSpill.splice(i, 1);
+      }
+    }
+
     function newState() {
       const s = {
         phase: 'ready',
         time: GAME_TIME,
         gold: 0,
-        player: { x: 148, y: 450, facing: 1, walkT: 0, moving: false },
+        player: { x: 248, y: 450, facing: -1, walkT: 0, moving: false },
         carry: [],
         bagLevel: 0,
         owned: { parallel: 0, adjacent: 0, right: 0 },
@@ -707,6 +795,8 @@
         floaters: [],
         sparks: [],
         dust: [],
+        oreSpill: seedOrePile(),
+        oreSpawnT: 0,
         bills: [],
         convey: [],
         glow: { parallel: 0, adjacent: 0, right: 0 },
@@ -929,6 +1019,8 @@
           }
           const seed = s.seed++;
           s.carry.push({ kind: 'raw', seed, pts: shapeFor('raw', GEM_S, seed), from: null, to: null, t: 1 });
+          pluckOreFromPile(s);
+          spawnOreFromCave(s, Math.random() < 0.4 ? 2 : 1);
           addSparks(MINE_VEIN.x + MINE_VEIN.w / 2, MINE_VEIN.y + 20, '#a5b4fc', 3);
         }
       } else s.mineT = 0;
@@ -1253,14 +1345,34 @@
 
     function paintGem(kind, size, seed, opt) {
       const g = GEMS[kind];
-      const fill = (opt && opt.fill) || g.fill;
       const line = (opt && opt.line) || g.line;
       const pts = shapeFor(kind, size, seed);
+      const lw = (opt && opt.lw) || 2.8;
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
-      poly(pts, fill, line, (opt && opt.lw) || 2.8);
 
-      // Specular glint
+      if (opt && opt.fill) {
+        poly(pts, opt.fill, line, lw);
+      } else {
+        const h = hash(seed || 1);
+        const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
+        const halo = h < 0.34 ? 'rgba(196,181,253,0.35)' : h < 0.67 ? 'rgba(94,234,212,0.35)' : 'rgba(251,191,36,0.35)';
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.ellipse(0, 2, size * 0.85, size * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        poly(pts, '#3f322e', line, lw);
+        const inner = pts.map((p) => [p[0] * 0.72, p[1] * 0.72]);
+        poly(inner, glow, 'rgba(255,255,255,0.35)', 0.9);
+        ctx.fillStyle = 'rgba(255,255,255,0.62)';
+        ctx.beginPath();
+        ctx.moveTo(inner[0][0] * 0.55, inner[0][1] * 0.55);
+        ctx.lineTo(inner[1][0] * 0.45, inner[1][1] * 0.45);
+        ctx.lineTo(inner[2][0] * 0.22, inner[2][1] * 0.22);
+        ctx.closePath();
+        ctx.fill();
+      }
+
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.beginPath();
       ctx.ellipse(-size * 0.22, -size * 0.28, size * 0.18, size * 0.12, -0.5, 0, Math.PI * 2);
@@ -1525,20 +1637,72 @@
       }
     }
 
-    // ---------- world (WOS-ad yard) ----------
-    function drawFence(x, y, w, h) {
-      const post = 10, gap = 18;
-      ctx.fillStyle = '#5b3a24';
-      for (let px = x; px <= x + w; px += gap) {
-        ctx.fillRect(px - 2, y - 8, 5, h + 16);
+    // ---------- world (fantasy mine + factory floor) ----------
+    function drawCrystalCluster(x, y, s) {
+      for (let i = 0; i < 4; i++) {
+        const ang = -Math.PI / 2 + (i - 1.5) * 0.38;
+        ctx.fillStyle = i % 2 ? 'rgba(167,139,250,0.88)' : 'rgba(94,234,212,0.78)';
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(ang) * 4 * s, y - 28 * s + Math.sin(ang) * 3);
+        ctx.lineTo(x + Math.cos(ang) * 16 * s + 6 * s, y + 4 * s);
+        ctx.lineTo(x + Math.cos(ang) * 16 * s - 6 * s, y + 4 * s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
-      ctx.fillStyle = '#6b4428';
-      ctx.fillRect(x - 4, y, w + 8, 7);
-      ctx.fillRect(x - 4, y + h - 7, w + 8, 7);
-      ctx.fillRect(x - 4, y, 7, h);
-      ctx.fillRect(x + w - 3, y, 7, h);
-      // gate gap on left for mine access already inside
-      void post;
+    }
+
+    function drawOreChunk(x, y, s, seed, flying) {
+      const h = hash(seed);
+      const h2 = hash(seed + 3.1);
+      const pts = [
+        [-s * (0.7 + h * 0.4), -s * (0.55 + h2 * 0.35)],
+        [s * (0.55 + h2 * 0.4), -s * (0.6 + h * 0.3)],
+        [s * (0.75 + h * 0.25), s * (0.5 + h2 * 0.3)],
+        [-s * (0.55 + h2 * 0.35), s * (0.62 + h * 0.25)]
+      ];
+      const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
+      const deep = h < 0.34 ? '#5b21b6' : h < 0.67 ? '#0f766e' : '#b45309';
+      ctx.save();
+      ctx.translate(x, y);
+      if (flying) ctx.rotate(h * 1.2 + (performance.now() / 160) * (h > 0.5 ? 1 : -1));
+      ctx.fillStyle = flying ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(2, 7, s * 0.9, s * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = deep;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0] * 0.72, pts[0][1] * 0.72);
+      ctx.lineTo(pts[1][0] * 0.7, pts[1][1] * 0.7);
+      ctx.lineTo(pts[2][0] * 0.55, pts[2][1] * 0.55);
+      ctx.lineTo(pts[3][0] * 0.58, pts[3][1] * 0.58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.arc(-s * 0.14, -s * 0.2, s * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCaveRock(x, y, w, h, col) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x, y + h * 0.55);
+      ctx.quadraticCurveTo(x + w * 0.15, y, x + w * 0.45, y + h * 0.12);
+      ctx.quadraticCurveTo(x + w * 0.75, y - h * 0.08, x + w, y + h * 0.4);
+      ctx.lineTo(x + w * 0.92, y + h);
+      ctx.lineTo(x + w * 0.08, y + h);
+      ctx.closePath();
+      ctx.fill();
     }
 
     function drawDottedPad(r, hot, fillCol, strokeCol, icon) {
@@ -1575,63 +1739,44 @@
       ctx.lineCap = 'butt';
     }
 
-    function drawTree(x, y, s) {
-      ctx.fillStyle = '#3d2a1a';
-      ctx.fillRect(x - 3 * s, y - 8 * s, 6 * s, 18 * s);
-      ctx.fillStyle = '#2f5d3a';
-      ctx.beginPath();
-      ctx.moveTo(x, y - 42 * s);
-      ctx.lineTo(x + 18 * s, y - 8 * s);
-      ctx.lineTo(x - 18 * s, y - 8 * s);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#3f7a4a';
-      ctx.beginPath();
-      ctx.moveTo(x, y - 52 * s);
-      ctx.lineTo(x + 14 * s, y - 22 * s);
-      ctx.lineTo(x - 14 * s, y - 22 * s);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = 'rgba(240,248,255,0.55)';
-      ctx.beginPath();
-      ctx.ellipse(x - 4 * s, y - 40 * s, 7 * s, 4 * s, -0.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     function drawYard() {
-      // Snow ground outside
-      const snow = ctx.createLinearGradient(0, 40, 0, MAP_H);
-      snow.addColorStop(0, '#c5d6e8');
-      snow.addColorStop(0.45, '#a8bdd4');
-      snow.addColorStop(1, '#7e94ad');
-      ctx.fillStyle = snow;
       roundRect(20, 44, MAP_W - 40, MAP_H - 64, 22);
-      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      const cave = ctx.createLinearGradient(0, 44, 0, MAP_H);
+      cave.addColorStop(0, '#2a1840');
+      cave.addColorStop(0.45, '#1a1028');
+      cave.addColorStop(1, '#120c18');
+      ctx.fillStyle = cave;
+      ctx.fillRect(20, 44, MAP_W - 40, MAP_H - 64);
+      if (art.hall) {
+        ctx.globalAlpha = 0.58;
+        ctx.drawImage(art.hall, 20, 44, MAP_W - 40, MAP_H - 64);
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
 
-      // Trees around the yard
-      [[70, 95, 1], [160, 78, 0.85], [880, 90, 1.1], [940, 120, 0.9], [50, 560, 1], [960, 540, 1]].forEach(([x, y, s]) => drawTree(x, y, s));
-
-      // Dirt yard floor with plank strips
-      const dirt = ctx.createLinearGradient(0, YARD.y, 0, YARD.y + YARD.h);
-      dirt.addColorStop(0, '#5a3d24');
-      dirt.addColorStop(0.5, '#6b4a2c');
-      dirt.addColorStop(1, '#4a321c');
-      ctx.fillStyle = dirt;
+      const floor = ctx.createLinearGradient(0, YARD.y, 0, YARD.y + YARD.h);
+      floor.addColorStop(0, 'rgba(72,52,78,0.82)');
+      floor.addColorStop(0.5, 'rgba(52,38,56,0.86)');
+      floor.addColorStop(1, 'rgba(38,28,44,0.9)');
+      ctx.fillStyle = floor;
       roundRect(YARD.x, YARD.y, YARD.w, YARD.h, 16);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-      ctx.lineWidth = 2;
-      for (let x = YARD.x + 24; x < YARD.x + YARD.w - 10; x += 28) {
+      ctx.strokeStyle = 'rgba(90,70,110,0.22)';
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 9; i++) {
+        const x0 = YARD.x + 40 + i * 92;
         ctx.beginPath();
-        ctx.moveTo(x, YARD.y + 12);
-        ctx.lineTo(x, YARD.y + YARD.h - 12);
+        ctx.moveTo(x0, YARD.y + 18);
+        ctx.lineTo(x0 + 28, YARD.y + YARD.h * 0.45);
+        ctx.lineTo(x0 - 12, YARD.y + YARD.h - 18);
         ctx.stroke();
       }
 
-      // Worn path: mine → left factories → right factories → market
-      ctx.strokeStyle = 'rgba(90,60,30,0.55)';
-      ctx.lineWidth = 34;
+      ctx.strokeStyle = 'rgba(36,24,40,0.7)';
+      ctx.lineWidth = 36;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(150, 450);
@@ -1641,43 +1786,78 @@
       ctx.lineTo(600, 450);
       ctx.lineTo(850, 450);
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,85,45,0.35)';
+      ctx.strokeStyle = 'rgba(78,58,88,0.45)';
       ctx.lineWidth = 22;
       ctx.stroke();
+      ctx.lineCap = 'butt';
 
-      drawFence(YARD.x + 6, YARD.y + 6, YARD.w - 12, YARD.h - 12);
+      // Cave walls instead of a house-yard fence
+      [
+        [18, 70, 90, 70, '#2a1a32'], [80, 48, 120, 64, '#241628'],
+        [220, 40, 110, 58, '#2e1c38'], [420, 36, 140, 54, '#261830'],
+        [700, 42, 130, 60, '#2c1a36'], [860, 58, 120, 80, '#241428'],
+        [8, 200, 70, 110, '#201426'], [8, 400, 64, 130, '#261830'],
+        [920, 180, 80, 120, '#221428'], [910, 400, 86, 150, '#1e1224'],
+        [40, 540, 140, 80, '#281830'], [820, 540, 150, 86, '#241628']
+      ].forEach(([x, y, w, h, c]) => drawCaveRock(x, y, w, h, c));
 
-      // Crates / barrels props
-      [[220, 170], [640, 170], [700, 540]].forEach(([x, y], i) => {
-        ctx.fillStyle = i === 2 ? '#6b4428' : '#8b5a2b';
-        roundRect(x, y, 28, 22, 4);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-        ctx.stroke();
-      });
+      [[80, 128, 1.05], [210, 96, 0.78], [470, 88, 0.7], [880, 108, 1],
+        [48, 310, 0.85], [956, 300, 0.9], [70, 560, 1.15], [940, 548, 1],
+        [280, 575, 0.65], [700, 572, 0.72]
+      ].forEach(([x, y, s]) => drawCrystalCluster(x, y, s));
+
+      [[108, 176, 9, 3], [168, 198, 7, 8], [92, 328, 8, 12],
+        [214, 548, 10, 21], [400, 562, 8, 17], [748, 158, 9, 29],
+        [888, 206, 8, 31], [918, 508, 10, 41], [676, 548, 7, 44],
+        [508, 128, 8, 51], [140, 540, 9, 61], [830, 170, 7, 73]
+      ].forEach(([x, y, s, seed]) => drawOreChunk(x, y, s, seed, false));
     }
 
     function drawMineVein() {
       const v = MINE_VEIN;
       const hot = inRect(state.player, v);
-      // Ice/crystal platform
-      ctx.fillStyle = hot ? 'rgba(120,200,220,0.45)' : 'rgba(100,160,190,0.28)';
-      roundRect(v.x - 8, v.y - 8, v.w + 16, v.h + 16, 14);
-      ctx.fill();
-      drawDottedPad(v, hot, 'rgba(94,234,212,0.32)', '#5eead4', '⛏️ 광맥');
+      const tNow = performance.now() / 1000;
 
-      // Rock crystals (not inventory)
-      const cx = v.x + v.w / 2, cy = v.y + v.h * 0.55;
-      for (let i = 0; i < 5; i++) {
-        const ang = -Math.PI / 2 + (i - 2) * 0.4;
-        ctx.fillStyle = i % 2 ? 'rgba(167,139,250,0.85)' : 'rgba(94,234,212,0.8)';
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(ang) * 8, cy + Math.sin(ang) * 6 - 22);
-        ctx.lineTo(cx + Math.cos(ang) * 22 + 8, cy + Math.sin(ang) * 14);
-        ctx.lineTo(cx + Math.cos(ang) * 22 - 8, cy + Math.sin(ang) * 14);
-        ctx.closePath();
-        ctx.fill();
-      }
+      ctx.fillStyle = 'rgba(8,4,14,0.85)';
+      ctx.beginPath();
+      ctx.ellipse(v.x + 10, v.y + 38, 28, 42, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a1024';
+      ctx.beginPath();
+      ctx.moveTo(v.x - 22, v.y + 88);
+      ctx.quadraticCurveTo(v.x - 28, v.y - 8, v.x + 18, v.y - 6);
+      ctx.quadraticCurveTo(v.x + 36, v.y + 20, v.x + 22, v.y + 92);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = `rgba(167,139,250,${0.18 + 0.1 * Math.sin(tNow * 2)})`;
+      ctx.beginPath();
+      ctx.ellipse(v.x + 8, v.y + 36, 16, 26, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      const a = orePileAnchor();
+      ctx.fillStyle = 'rgba(28,18,30,0.9)';
+      ctx.beginPath();
+      ctx.ellipse(a.cx, a.cy + 4, a.rx + 8, a.ry + 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawDottedPad(v, hot, 'rgba(167,139,250,0.22)', '#c4b5fd', '⛏️ 광맥');
+
+      const spill = (state.oreSpill || []).slice().sort((p, q) => p.y - q.y);
+      spill.forEach((o) => {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        if (!o.settled) ctx.rotate(o.vx * 0.012);
+        paintGem('raw', GEM_S + 2, o.seed, { lw: 2.2 });
+        ctx.restore();
+      });
+
+      drawCrystalCluster(v.x + 18, v.y + 8, 0.55);
+      drawCrystalCluster(v.x + v.w - 8, v.y + 22, 0.42);
+      ctx.fillStyle = hot ? '#c4b5fd' : 'rgba(226,232,240,0.75)';
+      ctx.font = '800 13px Pretendard, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⛏️ 광맥', v.x + v.w / 2, v.y + 16);
+      ctx.textAlign = 'left';
     }
 
     function drawBagPad() {
@@ -1732,20 +1912,17 @@
       ctx.fillStyle = '#6b3c1c';
       roundRect(x, y, w, h, 4);
       ctx.fill();
+      ctx.fillStyle = '#c48448';
+      ctx.fillRect(x + 8, y - 8, w - 16, 8);
+      ctx.fillStyle = '#8a5428';
+      ctx.fillRect(x + w * 0.62, y - 26, 10, 20);
+      ctx.fillStyle = '#6a4020';
+      ctx.fillRect(x + w * 0.62 + 8, y - 26, 6, 20);
       ctx.fillStyle = '#fde68a';
       ctx.font = '800 15px Pretendard, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('판매', x + w / 2, y + h / 2 + 6);
       ctx.textAlign = 'left';
-
-      // Roof
-      ctx.fillStyle = '#c27840';
-      ctx.beginPath();
-      ctx.moveTo(x - 10, y + 6);
-      ctx.lineTo(x + w / 2 + 8, y - H - 22);
-      ctx.lineTo(x + w + 14, y + 6);
-      ctx.closePath();
-      ctx.fill();
 
       drawDottedPad(r, hot, 'rgba(251,191,36,0.28)', '#fbbf24', '판매');
       drawSellConveyor();
@@ -2278,69 +2455,58 @@
           ctx.stroke();
         }
       }
+      ctx.fillStyle = 'rgba(255,230,180,0.28)';
+      for (let i = 1; i < strips; i++) {
+        const px = x + (w * i) / strips;
+        ctx.beginPath();
+        ctx.arc(px, y + 12, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px, y + h - 16, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      // Roof prism (taller / richer by level)
-      const rx0 = x - 8, ry0 = y + 6;
-      const rx1 = x + w + 8;
-      const apexX = x + w / 2 + D * 0.28;
-      const apexY = y - H - look.roofRise;
-      ctx.fillStyle = look.roofL;
-      ctx.beginPath();
-      ctx.moveTo(rx0, ry0);
-      ctx.lineTo(x + D * 0.4, y - H + 2);
-      ctx.lineTo(apexX, apexY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = look.roofR;
-      ctx.beginPath();
-      ctx.moveTo(rx1, ry0);
-      ctx.lineTo(x + w + D * 0.65, y - H + 2);
-      ctx.lineTo(apexX, apexY);
-      ctx.closePath();
-      ctx.fill();
+      // Factory roof: flat cap + pipes (no house peak)
+      const roofTopY = y - H;
       ctx.fillStyle = look.roofTop;
       ctx.beginPath();
-      ctx.moveTo(rx0, ry0);
-      ctx.lineTo(apexX, apexY);
-      ctx.lineTo(rx1, ry0);
+      ctx.moveTo(x + 6, y + 2);
+      ctx.lineTo(x + D * 0.55, roofTopY + 4);
+      ctx.lineTo(x + w + D * 0.55, roofTopY + 4);
+      ctx.lineTo(x + w - 6, y + 2);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = look.roofStroke;
-      ctx.lineWidth = lv >= 3 ? 2.2 : 1.5;
+      ctx.lineWidth = lv >= 3 ? 2 : 1.4;
       ctx.stroke();
-
+      ctx.fillStyle = look.front1;
+      ctx.fillRect(x + 8, y - 6, w - 16, 7);
       if (look.trim) {
-        ctx.strokeStyle = lv >= 3 ? 'rgba(253,224,140,0.75)' : 'rgba(200,170,120,0.55)';
+        ctx.strokeStyle = lv >= 3 ? 'rgba(253,224,140,0.7)' : 'rgba(200,170,120,0.5)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(rx0 + 4, ry0 - 1);
-        ctx.lineTo(apexX, apexY + 4);
-        ctx.lineTo(rx1 - 4, ry0 - 1);
+        ctx.moveTo(x + 10, y - 6);
+        ctx.lineTo(x + w - 10, y - 6);
         ctx.stroke();
       }
 
-      // Chimney(s)
-      const drawChimney = (cx0, cy0, smokePhase) => {
+      const drawPipe = (cx0, cy0, hgt, smokePhase) => {
         ctx.fillStyle = look.chimSide;
-        ctx.fillRect(cx0 + 11, cy0 - 26, 9, 32);
+        ctx.fillRect(cx0 + 9, cy0 - hgt, 7, hgt + 4);
         ctx.fillStyle = look.chimFront;
-        ctx.fillRect(cx0, cy0 - 26, 13, 32);
-        if (lv >= 2) {
-          ctx.fillStyle = lv >= 3 ? '#f0c878' : '#c8a070';
-          ctx.fillRect(cx0 - 2, cy0 - 30, 17, 5);
-        }
+        ctx.fillRect(cx0, cy0 - hgt, 10, hgt + 4);
+        ctx.fillStyle = lv >= 2 ? look.roofTop : '#3a3028';
+        ctx.fillRect(cx0 - 2, cy0 - hgt - 5, 14, 6);
         if (busy) {
-          const t = tNow / 200 + smokePhase;
-          ctx.fillStyle = `rgba(251,191,36,${0.4 + 0.3 * Math.sin(t)})`;
+          const t = tNow / 220 + smokePhase;
+          ctx.fillStyle = `rgba(200,210,230,${0.28 + 0.22 * Math.sin(t)})`;
           ctx.beginPath();
-          ctx.arc(cx0 + 6, cy0 - 32 - Math.sin(t) * 5, 6, 0, Math.PI * 2);
+          ctx.arc(cx0 + 5, cy0 - hgt - 10 - Math.sin(t) * 6, 7, 0, Math.PI * 2);
           ctx.fill();
         }
       };
-      drawChimney(x + w * 0.68, y - H - 10, 0);
-      if (look.chimneys >= 2) {
-        drawChimney(x + w * 0.28, y - H - 6, 1.4);
-      }
+      drawPipe(x + w * 0.62, roofTopY + 2, 28, 0);
+      if (look.chimneys >= 2) drawPipe(x + w * 0.38, roofTopY + 4, 22, 1.3);
 
       // Side lanterns (lv2+)
       if (look.lanterns) {
@@ -2431,12 +2597,12 @@
       drawMachineSign(m.id, x + w / 2, wy + wh * 0.52, owned, owned ? (lv >= 3 ? 1.2 : 1.05) : 0.9);
       ctx.restore();
 
-      // Apex crystal (max level) — same property mark, not destination gem
+      // Roof mark / stars sit on the factory cap, not a house peak
       if (look.crystal) {
         const pulse = 0.7 + 0.3 * Math.sin(tNow / 260);
         ctx.save();
         ctx.globalAlpha = pulse;
-        drawMachineSign(m.id, apexX, apexY - 10, true, 0.45);
+        drawMachineSign(m.id, x + w / 2 + D * 0.18, roofTopY - 18, true, 0.45);
         ctx.restore();
       }
 
@@ -2445,7 +2611,7 @@
         ctx.font = '800 13px Outfit, sans-serif';
         ctx.textAlign = 'center';
         const stars = lv <= 3 ? '★'.repeat(lv) : '★' + lv;
-        ctx.fillText(stars, x + w / 2 + D * 0.2, apexY - (look.crystal ? 22 : 6));
+        ctx.fillText(stars, x + w / 2 + D * 0.18, roofTopY - (look.crystal ? 32 : 14));
         ctx.textAlign = 'left';
       }
     }
@@ -2945,20 +3111,28 @@
     }
 
     function drawAtmosphere() {
-      // Soft outdoor light — no heavy fog particles.
-      const sky = ctx.createLinearGradient(0, 40, 0, 140);
-      sky.addColorStop(0, 'rgba(160,190,220,0.18)');
-      sky.addColorStop(1, 'rgba(160,190,220,0)');
-      ctx.fillStyle = sky;
-      ctx.fillRect(20, 44, MAP_W - 40, 100);
+      const t = performance.now() / 1000;
+      const haze = ctx.createLinearGradient(0, 40, 0, 220);
+      haze.addColorStop(0, 'rgba(88,50,140,0.22)');
+      haze.addColorStop(1, 'rgba(88,50,140,0)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(20, 44, MAP_W - 40, 160);
+      for (let i = 0; i < 12; i++) {
+        const px = 80 + (i * 79 + Math.sin(t * 0.4 + i) * 18) % 840;
+        const py = 90 + (i * 37) % 430;
+        ctx.fillStyle = `rgba(196,181,253,${0.12 + 0.12 * Math.sin(t * 2 + i)})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.6 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     function draw() {
       if (!state) return;
       const bg = ctx.createLinearGradient(0, 0, 0, view.h);
-      bg.addColorStop(0, '#6a8aaa');
-      bg.addColorStop(0.35, '#4a6a7a');
-      bg.addColorStop(1, '#2a3a48');
+      bg.addColorStop(0, '#1c1230');
+      bg.addColorStop(0.45, '#140c20');
+      bg.addColorStop(1, '#0c0814');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, view.w, view.h);
 
@@ -3338,7 +3512,7 @@
       const geo = lessonGeom(LESSON_GEM);
       const guide = cutGuide(lesson);
       const cutting = lesson.stage === 'cut1' || lesson.stage === 'cut2';
-      const fill = GEM_FILL;
+      const fill = '#3f322e';
       const border = lesson.cuts >= 2 ? GEMS.trap.line : GEMS.raw.line;
 
       ctx.fillStyle = 'rgba(8, 6, 16, 0.72)';
@@ -3446,6 +3620,9 @@
         ctx.restore();
       }
       poly(remain, fill, border, 3);
+      const inner = remain.map((p) => [p[0] * 0.72, p[1] * 0.72]);
+      const ih = hash(lesson.seed || 1);
+      poly(inner, ih < 0.34 ? '#c4b5fd' : ih < 0.67 ? '#5eead4' : '#fbbf24', 'rgba(255,255,255,0.35)', 1);
       if (cutting || lesson.cuts >= 1) {
         ctx.strokeStyle = `rgba(253,224,71,${0.55 + t * 0.45})`;
         ctx.lineWidth = 3.5;
@@ -3586,6 +3763,7 @@
         last = ts;
         if (state && state.phase === 'play') update(dt);
         else if (state && state.phase === 'cutLesson') updateCutLesson(dt);
+        if (state) tickOreSpill(state, dt);
         draw();
       } catch (err) {
         console.error('PRISM TYCOON draw error:', err);
