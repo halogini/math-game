@@ -637,31 +637,30 @@
 
     // cols×rows 스프라이트 시트(투명 PNG)를 로드해 각 셀을 개별 canvas로 슬라이싱.
     function loadSheet(src, cols = 4, rows = 4) {
-      return fetch(src)
-        .then((r) => r.blob())
-        .then((blob) => new Promise((resolve) => {
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-          img.onload = () => {
-            URL.revokeObjectURL(url);
-            const fw = Math.floor(img.width / cols);
-            const fh = Math.floor(img.height / rows);
-            const frames = [];
-            for (let row = 0; row < rows; row++) {
-              for (let col = 0; col < cols; col++) {
-                const c = document.createElement('canvas');
-                c.width = fw; c.height = fh;
-                c.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
-                frames.push(c);
-              }
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          const fw = Math.floor(w / cols);
+          const fh = Math.floor(h / rows);
+          const frames = [];
+          for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+              const c = document.createElement('canvas');
+              c.width = fw; c.height = fh;
+              c.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+              frames.push(c);
             }
-            // 행 0(4장) = idle, 행 1~3(12장) = walk
-            resolve({ idle: frames[0], walk: frames.slice(cols) });
-          };
-          img.onerror = () => resolve(null);
-          img.src = url;
-        }))
-        .catch(() => Promise.resolve(null));
+          }
+          resolve({ idle: frames[0], walk: frames.slice(cols) });
+        };
+        img.onerror = () => {
+          console.warn('loadSheet error loading:', src);
+          resolve(null);
+        };
+        img.src = src;
+      });
     }
 
     // ---------- 냥순이 sprites ----------
@@ -907,7 +906,9 @@
         eventWait: 24 + Math.random() * 18,
         seed: 1,
         lessons: { parallel: false },
-        cutLesson: null
+        cutLesson: null,
+        targetPos: null,
+        ripples: []
       };
       ensureWorkshops(s);
       return s;
@@ -985,38 +986,59 @@
         return;
       }
       if (stick || state.phase !== 'play') return;
-      stick = { id: e.pointerId, bx: e.offsetX, by: e.offsetY, x: e.offsetX, y: e.offsetY };
+      stick = { id: e.pointerId, bx: e.offsetX, by: e.offsetY, x: e.offsetX, y: e.offsetY, moved: false };
       cv.setPointerCapture(e.pointerId);
     });
+
     cv.addEventListener('pointermove', (e) => {
       if (state && state.phase === 'cutLesson') {
         onCutPointerMove(e);
         return;
       }
-      if (stick && stick.id === e.pointerId) { stick.x = e.offsetX; stick.y = e.offsetY; }
+      if (stick && stick.id === e.pointerId) {
+        stick.x = e.offsetX;
+        stick.y = e.offsetY;
+        if (Math.hypot(stick.x - stick.bx, stick.y - stick.by) > 10) {
+          stick.moved = true;
+          if (state) state.targetPos = null; // 조이스틱 드래그 시 탭 이동 자동 취소
+        }
+      }
     });
+
     const dropStick = (e) => {
       if (state && state.phase === 'cutLesson') {
         onCutPointerUp(e);
         return;
       }
-      if (stick && stick.id === e.pointerId) stick = null;
+      if (stick && stick.id === e.pointerId) {
+        // 드래그 없이 탭(클릭)만 한 경우: 바닥 클릭 이동
+        if (!stick.moved && state && state.phase === 'play') {
+          const mx = (e.offsetX - view.ox) / view.scale;
+          const my = (e.offsetY - view.oy) / view.scale;
+
+          let hitUi = false;
+          for (const h of uiHits) {
+            const r = h.r;
+            if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+              hitUi = true;
+              h.fn();
+              break;
+            }
+          }
+
+          if (!hitUi) {
+            const tx = Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, mx));
+            const ty = Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, my));
+            state.targetPos = { x: tx, y: ty };
+            if (!state.ripples) state.ripples = [];
+            state.ripples.push({ x: tx, y: ty, t: 0 });
+          }
+        }
+        stick = null;
+      }
     };
     cv.addEventListener('pointerup', dropStick);
     cv.addEventListener('pointercancel', dropStick);
-
-    cv.addEventListener('click', (e) => {
-      if (!state || state.phase !== 'play') return;
-      const mx = (e.offsetX - view.ox) / view.scale;
-      const my = (e.offsetY - view.oy) / view.scale;
-      for (const h of uiHits) {
-        const r = h.r;
-        if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
-          h.fn();
-          break;
-        }
-      }
-    });
 
     function moveVector() {
       let dx = 0, dy = 0;
@@ -1024,15 +1046,35 @@
       if (keys.has('r')) dx += 1;
       if (keys.has('u')) dy -= 1;
       if (keys.has('d')) dy += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        if (state) state.targetPos = null; // 키보드 입력 시 탭 이동 취소
+      }
+
       if (stick) {
         const sx = stick.x - stick.bx, sy = stick.y - stick.by;
         const len = Math.hypot(sx, sy);
         if (len > 6) {
+          if (state) state.targetPos = null;
           const k = Math.min(len, STICK_R) / STICK_R;
           dx += (sx / len) * k;
           dy += (sy / len) * k;
         }
       }
+
+      // 조이스틱/키보드 입력이 없고 클릭 목표 위치가 설정된 경우
+      if (dx === 0 && dy === 0 && state && state.targetPos) {
+        const tdx = state.targetPos.x - state.player.x;
+        const tdy = state.targetPos.y - state.player.y;
+        const dist = Math.hypot(tdx, tdy);
+        if (dist < 10) {
+          state.targetPos = null; // 도착 완료
+        } else {
+          dx = tdx / dist;
+          dy = tdy / dist;
+        }
+      }
+
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }
       return [dx, dy];
@@ -1359,6 +1401,9 @@
         d.y += d.vy * dt;
         return d.life < d.max;
       });
+      if (s.ripples) {
+        s.ripples = s.ripples.filter((r) => (r.t += dt * 2.4) < 1);
+      }
       s.shake = Math.max(0, s.shake - dt);
       s.orderFlash = Math.max(0, s.orderFlash - dt * 1.6);
 
@@ -3240,6 +3285,25 @@
       }
     }
 
+    function drawRipples() {
+      if (!state || !state.ripples) return;
+      state.ripples.forEach((r) => {
+        const a = Math.max(0, 1 - r.t);
+        const radius = 6 + r.t * 22;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(240, 195, 106, ${a * 0.85})`;
+        ctx.lineWidth = 2.4 * a;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(240, 195, 106, ${a * 0.9})`;
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
     function draw() {
       if (!state) return;
       const bg = ctx.createLinearGradient(0, 0, 0, view.h);
@@ -3258,6 +3322,7 @@
 
       drawAtmosphere();
       drawYard();
+      drawRipples();
 
       uiHits = [];
       drawMineVein();
