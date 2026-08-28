@@ -318,11 +318,11 @@
     const CAT_SIZE = 52;
     const WALK_FPS = 9;
 
-    // Yard pads — WOS-ad style: stand on dotted square to interact.
+        // Yard pads — WOS-ad style: stand on dotted square to interact.
     const YARD = { x: 56, y: 110, w: 888, h: 470 };
-    const MINE_VEIN = { x: 88, y: 390, w: 120, h: 120 };
-    const MARKET_PAD = { x: 790, y: 390, w: 120, h: 120 };
-    const BAG_PAD = { x: 88, y: 250, w: 120, h: 72 };
+    const MINE_VEIN = { x: 70, y: 370, w: 130, h: 120 };
+    const MARKET_PAD = { x: 790, y: 350, w: 130, h: 120 };
+    const BAG_PAD = { x: 70, y: 220, w: 130, h: 80 };
     const CASH_ANCHOR = {
       x: MARKET_PAD.x - 28,
       y: MARKET_PAD.y + MARKET_PAD.h - 6
@@ -352,38 +352,33 @@
     }
 
     function kioskRect(m) {
-      // First buy: input shelf. Upgrade: dedicated [+] pad beside the shed.
       if (mLv(m.id) < 1) return m.input;
       return m.upgrade;
     }
 
     // body = solid (no walk-through). input/output = walkable shelves.
-    // One shared shed: raw→trap and trap→para (사다리꼴·평행사변형 통일).
+    // Modified layout: Input and Output are side-by-side in front of the body for better visibility.
     const MACHINES = [
       { id: 'parallel', name: '나란히 틀', costs: [100, 120, 200, 320, 480], req: null,
-        body: { x: 268, y: 320, w: 112, h: 68 },
-        input: { x: 246, y: 396, w: 156, h: 48 },
-        output: { x: 246, y: 266, w: 156, h: 48 },
+        body: { x: 300, y: 270, w: 140, h: 72 },
+        input: { x: 280, y: 342, w: 80, h: 56 },
+        output: { x: 380, y: 342, w: 80, h: 56 },
         ops: { raw: 'trap', trap: 'para' }, sign: ['raw', 'para'] },
       { id: 'adjacent', name: '이웃 변 룬', costs: [420, 180, 300, 460, 700], req: 'parallel',
-        body: { x: 538, y: 208, w: 120, h: 68 },
-        input: { x: 516, y: 284, w: 164, h: 48 },
-        output: { x: 516, y: 154, w: 164, h: 48 },
+        body: { x: 570, y: 170, w: 140, h: 72 },
+        input: { x: 550, y: 242, w: 80, h: 56 },
+        output: { x: 650, y: 242, w: 80, h: 56 },
         ops: { para: 'rhombus', rect: 'square' }, sign: ['para', 'rhombus'] },
       { id: 'right', name: '직각 룬', costs: [420, 180, 300, 460, 700], req: 'parallel',
-        body: { x: 538, y: 420, w: 120, h: 68 },
-        input: { x: 516, y: 496, w: 164, h: 48 },
-        output: { x: 516, y: 366, w: 164, h: 48 },
+        body: { x: 570, y: 400, w: 140, h: 72 },
+        input: { x: 550, y: 472, w: 80, h: 56 },
+        output: { x: 650, y: 472, w: 80, h: 56 },
         ops: { para: 'rect', rhombus: 'square' }, sign: ['para', 'rect'] }
     ];
 
     MACHINES.forEach((m) => {
-      // [+] on the OUTER flank of each factory — never in the shared center aisle
-      // (left column → left of shelf, right column → right of shelf).
-      const leftCol = m.body.x < 400;
-      m.upgrade = leftCol
-        ? { x: m.input.x - 56, y: m.input.y, w: 48, h: 48 }
-        : { x: m.input.x + m.input.w + 8, y: m.input.y, w: 48, h: 48 };
+      // Upgrade pad moved to the rear/top of the machine body to separate it from the main input/output path
+      m.upgrade = { x: m.body.x + (m.body.w / 2) - 28, y: m.body.y - 52, w: 56, h: 50 };
       m.area = {
         x: Math.min(m.body.x, m.input.x, m.output.x, m.upgrade.x) - 4,
         y: Math.min(m.body.y, m.input.y, m.output.y, m.upgrade.y) - 8,
@@ -1016,11 +1011,67 @@
           }
 
           if (!hitUi) {
-            const tx = Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, mx));
-            const ty = Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, my));
+            let targetX = mx;
+            let targetY = my;
+            let isSmart = false;
+
+            if (mx >= MINE_VEIN.x && mx <= MINE_VEIN.x + MINE_VEIN.w && my >= MINE_VEIN.y && my <= MINE_VEIN.y + MINE_VEIN.h) {
+              targetX = MINE_VEIN.x + MINE_VEIN.w / 2;
+              targetY = MINE_VEIN.y + MINE_VEIN.h / 2;
+              isSmart = true;
+            } else if (mx >= MARKET_PAD.x && mx <= MARKET_PAD.x + MARKET_PAD.w && my >= MARKET_PAD.y && my <= MARKET_PAD.y + MARKET_PAD.h) {
+              targetX = MARKET_PAD.x + MARKET_PAD.w / 2;
+              targetY = MARKET_PAD.y + MARKET_PAD.h / 2;
+              isSmart = true;
+            } else if (mx >= BAG_PAD.x && mx <= BAG_PAD.x + BAG_PAD.w && my >= BAG_PAD.y && my <= BAG_PAD.y + BAG_PAD.h) {
+              targetX = BAG_PAD.x + BAG_PAD.w / 2;
+              targetY = BAG_PAD.y + BAG_PAD.h / 2;
+              isSmart = true;
+            } else {
+              for (const m of MACHINES) {
+                if (mLv(m.id) >= 1) {
+                  const inInput = (mx >= m.input.x && mx <= m.input.x + m.input.w && my >= m.input.y && my <= m.input.y + m.input.h);
+                  const inOutput = (mx >= m.output.x && mx <= m.output.x + m.output.w && my >= m.output.y && my <= m.output.y + m.output.h);
+                  const inUpgrade = (mx >= m.upgrade.x && mx <= m.upgrade.x + m.upgrade.w && my >= m.upgrade.y && my <= m.upgrade.y + m.upgrade.h);
+                  const inBody = (mx >= m.body.x && mx <= m.body.x + m.body.w && my >= m.body.y && my <= m.body.y + m.body.h);
+                  
+                  if (inUpgrade) {
+                    targetX = m.upgrade.x + m.upgrade.w / 2;
+                    targetY = m.upgrade.y + m.upgrade.h / 2;
+                    isSmart = true;
+                    break;
+                  } else if (inInput || inOutput || inBody) {
+                    let needInput = false;
+                    for (let g of state.carry) {
+                      if (m.ops[g.kind]) { needInput = true; break; }
+                    }
+                    if (needInput) {
+                      targetX = m.input.x + m.input.w / 2;
+                      targetY = m.input.y + m.input.h / 2;
+                    } else {
+                      targetX = m.output.x + m.output.w / 2;
+                      targetY = m.output.y + m.output.h / 2;
+                    }
+                    isSmart = true;
+                    break;
+                  }
+                } else {
+                  const kiosk = kioskRect(m);
+                  if (mx >= kiosk.x && mx <= kiosk.x + kiosk.w && my >= kiosk.y && my <= kiosk.y + kiosk.h) {
+                    targetX = kiosk.x + kiosk.w / 2;
+                    targetY = kiosk.y + kiosk.h / 2;
+                    isSmart = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            const tx = Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, targetX));
+            const ty = Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, targetY));
             state.targetPos = { x: tx, y: ty };
             if (!state.ripples) state.ripples = [];
-            state.ripples.push({ x: tx, y: ty, t: 0 });
+            state.ripples.push({ x: tx, y: ty, t: 0, isSmart: isSmart });
           }
         }
         stick = null;
@@ -1286,7 +1337,7 @@
           return;
         }
         s.buyT[m.id] = (s.buyT[m.id] || 0) + dt;
-        if (s.buyT[m.id] >= 0.75) {
+        if (s.buyT[m.id] >= 1.5) {
           s.buyT[m.id] = 0;
           buy(m);
         }
@@ -1300,7 +1351,7 @@
         const bagCost = BAG_COSTS[s.bagLevel];
         if (s.gold >= bagCost) {
           s.bagT += dt;
-          if (s.bagT >= 0.7) { s.bagT = 0; buyBag(); }
+          if (s.bagT >= 1.5) { s.bagT = 0; buyBag(); }
         } else {
           s.bagT = 0;
           s.poorFlash = Math.max(s.poorFlash, 0.55);
