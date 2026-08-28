@@ -187,7 +187,7 @@
     .buy.owned .cost { color: var(--teal); }
 
     .overlay {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
       padding: 16px; background: rgba(4, 7, 14, 0.88); backdrop-filter: blur(4px); overflow-y: auto;
     }
     .card {
@@ -223,6 +223,102 @@
     .tally { display: grid; gap: 5px; margin-bottom: 12px; }
     .tally div { display: flex; align-items: center; gap: 8px; font: 600 13px Pretendard, sans-serif; }
     .hidden { display: none !important; }
+
+    /* Rotate gate for portrait mobile */
+    .rotate-gate {
+      position: fixed; inset: 0; z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(94, 234, 212, 0.15), transparent 65%), rgba(12, 8, 18, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 24px;
+    }
+    .rotate-gate.hidden { display: none !important; }
+    .rotate-gate-card { text-align: center; max-width: 280px; }
+    .rotate-phone {
+      width: 44px; height: 72px; margin: 0 auto 18px;
+      border: 3px solid #5eead4; border-radius: 10px;
+      box-shadow: 0 0 24px rgba(94, 234, 212, 0.35);
+      position: relative;
+      animation: rotate-phone-hint 1.8s ease-in-out infinite;
+    }
+    .rotate-phone::after {
+      content: ""; position: absolute; left: 50%; bottom: 6px;
+      width: 12px; height: 3px; border-radius: 2px;
+      background: rgba(94, 234, 212, 0.7);
+      transform: translateX(-50%);
+    }
+    @keyframes rotate-phone-hint {
+      0%, 20% { transform: rotate(0deg); }
+      50%, 70% { transform: rotate(-90deg); }
+      90%, 100% { transform: rotate(0deg); }
+    }
+    .rotate-gate-title {
+      font: 800 20px Pretendard, sans-serif;
+      color: #f8fafc; margin: 0 0 8px;
+    }
+    .rotate-gate-desc {
+      font: 600 13px Pretendard, sans-serif;
+      color: var(--muted); line-height: 1.5; margin: 0;
+    }
+
+    @media (max-height: 520px) {
+      .hud-title { display: none !important; }
+      .hud { padding: 4px 10px 4px; }
+      .chip { padding: 3px 8px; gap: 4px; border-radius: 8px; }
+      .chip .label { font-size: 10px; }
+      .chip .value { font-size: 15px; }
+      .chip.gold {
+        padding: 4px 14px 4px 12px;
+        transform: none !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+      .chip.gold .label { font-size: 11px; }
+      .chip.gold .value { font-size: 18px; }
+      .chip.time { min-width: 96px; padding: 3px 8px; }
+      .time-gauge { height: 5px; }
+      .shop { width: min(220px, 60vw); max-height: 36vh; padding: 5px; }
+
+      /* Mobile landscape overlay card optimizations */
+      .overlay { padding: 8px 16px; }
+      .card {
+        width: min(540px, 94vw);
+        padding: 12px 18px;
+        border-radius: 14px;
+        max-height: 94vh;
+        overflow-y: auto;
+      }
+      .card h1 { font-size: 20px; }
+      .card h2 { font-size: 18px; margin: 0 0 4px; }
+      .card .tagline { margin: 2px 0 8px; font-size: 12px; }
+      .flow {
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 12px;
+        margin-bottom: 6px;
+      }
+      .flow div { font-size: 11px; gap: 5px; line-height: 1.35; }
+      .note { font-size: 11px; padding-top: 6px; line-height: 1.4; }
+      .btn-main {
+        margin-top: 8px;
+        padding: 9px 12px;
+        font-size: 15px;
+        border-radius: 10px;
+      }
+      .final {
+        margin: 4px 0 6px;
+        padding: 6px 10px;
+        border-radius: 10px;
+      }
+      .final .big { font-size: 28px; }
+      .final .sub { font-size: 11px; }
+      .tally {
+        grid-template-columns: 1fr 1fr;
+        gap: 3px 10px;
+        margin-bottom: 6px;
+        max-height: 72px;
+        overflow-y: auto;
+      }
+      .tally div { font-size: 11px; gap: 5px; }
+    }
     @media (max-width: 620px) {
       .hud-title { display: none; }
       .chip { padding: 5px 9px; gap: 5px; }
@@ -237,7 +333,15 @@
   <div id="app">
     <canvas id="game"></canvas>
 
-    <div class="hud">
+    <div id="rotate-gate" class="rotate-gate hidden" aria-hidden="true">
+      <div class="rotate-gate-card">
+        <div class="rotate-phone" aria-hidden="true"></div>
+        <p class="rotate-gate-title">가로로 돌려주세요</p>
+        <p class="rotate-gate-desc">PRISM TYCOON은 가로 화면에 최적화되어 있습니다.</p>
+      </div>
+    </div>
+
+    <div class="hud hidden">
       <div class="hud-left">
         <span class="hud-title">PRISM TYCOON</span>
       </div>
@@ -1055,8 +1159,17 @@
       };
 
       BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 20, y1: YARD.y + YARD.h - 20 };
+      checkOrientation();
+    }
+
+    function checkOrientation() {
+      const gate = document.getElementById('rotate-gate');
+      if (!gate) return;
+      const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth < 800;
+      gate.classList.toggle('hidden', !isPortrait);
     }
     window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => { setTimeout(resize, 100); });
 
     function updateCamera(dt) {
       if (!state || !state.player) return;
@@ -3472,7 +3585,7 @@
       ctx.font = '700 15px Pretendard, sans-serif';
       const w = Math.min(320, ctx.measureText(tip.text).width + 28);
       const x = Math.max(40, Math.min(MAP_W - w - 40, p.x - w / 2));
-      const y = p.y - 100;
+      const y = p.y < 240 ? p.y + 40 : p.y - 75;
       ctx.fillStyle = 'rgba(20,12,28,0.92)';
       roundRect(x, y, w, 32, 12);
       ctx.fill();
@@ -3490,10 +3603,12 @@
     function drawAppraisal() {
       const a = state.appraisal;
       if (!a) return;
-      const k = Math.max(0.72, Math.min(1, view.w / 900));
+      const isCompact = view.h < 500;
+      const k = isCompact ? 0.68 : Math.max(0.72, Math.min(1, view.w / 900));
       const W = 248, H = 176;
       ctx.save();
-      ctx.translate(view.w - W * k - 14, view.h - H * k - 14);
+      // Position at bottom-left so the selling stall, conveyor belt, money, and player on the right are never obscured
+      ctx.translate(14, view.h - H * k - 14);
       ctx.scale(k, k);
       ctx.globalAlpha = Math.min(1, (2.8 - a.life) * 2);
 
@@ -3661,6 +3776,7 @@
 
     // ---------- HUD & shop ----------
     const el = {
+      hud: document.querySelector('.hud'),
       time: document.getElementById('hud-time'),
       timeFill: document.getElementById('hud-time-fill'),
       gold: document.getElementById('hud-gold'),
@@ -3759,6 +3875,7 @@
     function startCutLesson(seed) {
       stick = null;
       if (el && el.shop) el.shop.classList.add('hidden');
+      if (el && el.hud) el.hud.classList.add('hidden');
       state.phase = 'cutLesson';
       state.cutLesson = {
         stage: 'cut1',
@@ -3979,6 +4096,7 @@
       state.glow.parallel = 1;
       addFloater(slot.x, slot.y - 22, '사다리꼴 완성!', '#6ee7b7', true);
       addSparks(slot.x, slot.y, GEMS.trap.line, 16);
+      if (el && el.hud) el.hud.classList.remove('hidden');
       state.cutLesson = null;
       state.phase = 'play';
     }
@@ -3996,8 +4114,8 @@
       ctx.fillStyle = 'rgba(8, 6, 16, 0.72)';
       ctx.fillRect(camera.x - 100, camera.y - 100, view.vw + 200, view.vh + 200);
 
-      const cardW = 440, cardH = 400;
-      const cardX = cx - cardW / 2, cardY = cy - cardH / 2 - 16;
+      const cardW = 440, cardH = 370;
+      const cardX = cx - cardW / 2, cardY = cy - cardH / 2;
       ctx.fillStyle = 'rgba(28, 18, 40, 0.96)';
       roundRect(cardX, cardY, cardW, cardH, 18);
       ctx.fill();
@@ -4198,6 +4316,7 @@
       shopSig = '';
       startOverlay.classList.add('hidden');
       resultOverlay.classList.add('hidden');
+      if (el && el.hud) el.hud.classList.remove('hidden');
       updateHud();
     }
 
@@ -4206,6 +4325,7 @@
       stick = null;
       keys.clear();
       el.shop.classList.add('hidden');
+      if (el && el.hud) el.hud.classList.add('hidden');
 
       const best = Number(localStorage.getItem(BEST_KEY) || 0);
       const isRecord = state.gold > best;
