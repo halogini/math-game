@@ -2826,84 +2826,71 @@
       ctx.textAlign = 'left';
     }
 
-    function machineLook(id, lv) {
-      // Base theme colors
-      let p;
-      if (id === 'parallel') p = { b: '#0d9488', h: '#5eead4', m: '#14b8a6', r0: '#0f766e', r1: '#2dd4bf' };
-      else if (id === 'adjacent') p = { b: '#7c3aed', h: '#c4b5fd', m: '#a78bfa', r0: '#6d28d9', r1: '#a855f7' };
-      else p = { b: '#d97706', h: '#fbbf24', m: '#f59e0b', r0: '#b45309', r1: '#fcd34d' };
+    function machineTheme(id) {
+      if (id === 'parallel') return { accent: '#14b8a6', hi: '#5eead4', glow: '45,212,191' };
+      if (id === 'adjacent') return { accent: '#7c3aed', hi: '#c4b5fd', glow: '167,139,250' };
+      return { accent: '#d97706', hi: '#fbbf24', glow: '251,191,36' };
+    }
 
-      // Visual tiers: 0 hut -> 1 wood -> 2 reinforced -> 3 jewel -> 4 ornate -> 5 palace
-      // Colors adjusted to be warmer and slightly brighter
+    function machineLook(id, lv) {
+      const th = machineTheme(id);
       if (lv >= 5) {
         return {
-          side: '#2a1420', slab: p.h, slabHi: 'rgba(255,255,255,0.5)',
-          front0: p.m, front1: p.b, front2: '#4a1824',
-          edge: 'rgba(255,255,255,0.6)', stroke: 'rgba(255,255,255,0.85)',
-          roofL: p.r0, roofR: p.r1, roofTop: p.h,
-          roofStroke: 'rgba(255,255,255,0.95)', chimSide: '#20101a', chimFront: p.r1,
-          counter: p.h, counterEdge: 'rgba(255,255,255,0.9)',
-          winStroke: 'rgba(255,255,255,1)', winGlow: true,
-          roofRise: 48, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
+          side: '#1a0e08', slab: '#d4a06a', slabHi: 'rgba(255,220,160,0.28)',
+          front0: '#a0663c', front1: '#86502c', front2: '#5a3018',
+          edge: 'rgba(255,210,140,0.32)', stroke: 'rgba(255,236,200,0.55)',
+          counter: '#e0b060', counterEdge: 'rgba(255,236,180,0.7)',
+          accent: th.accent, hi: th.hi, glow: th.glow,
+          brass: true, glass: true, lanterns: true, metal: true, signboard: true
         };
       }
       if (lv >= 4) {
         return {
-          side: '#24121a', slab: p.m, slabHi: 'rgba(255,255,255,0.4)',
-          front0: p.b, front1: p.r0, front2: '#3a141c',
-          edge: 'rgba(255,255,255,0.45)', stroke: 'rgba(255,255,255,0.7)',
-          roofL: p.r0, roofR: p.r1, roofTop: p.m,
-          roofStroke: 'rgba(255,255,255,0.8)', chimSide: '#1c0e14', chimFront: p.m,
-          counter: p.m, counterEdge: 'rgba(255,255,255,0.7)',
-          winStroke: 'rgba(255,255,255,0.9)', winGlow: true,
-          roofRise: 45, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
+          side: '#1a0e08', slab: '#c48448', slabHi: 'rgba(255,220,160,0.24)',
+          front0: '#9a5c34', front1: '#7a4424', front2: '#4a2810',
+          edge: 'rgba(255,210,140,0.28)', stroke: 'rgba(255,220,150,0.5)',
+          counter: '#e0b060', counterEdge: 'rgba(255,236,180,0.6)',
+          accent: th.accent, hi: th.hi, glow: th.glow,
+          brass: true, glass: true, lanterns: true, metal: true, signboard: false
         };
       }
       if (lv >= 3) {
         return {
-          side: '#1e0e14', slab: p.b, slabHi: 'rgba(255,255,255,0.3)',
-          front0: p.r0, front1: '#5a2a14', front2: '#301016',
-          edge: 'rgba(255,255,255,0.35)', stroke: 'rgba(255,255,255,0.6)',
-          roofL: p.r0, roofR: p.b, roofTop: p.b,
-          roofStroke: 'rgba(255,255,255,0.7)', chimSide: '#180a10', chimFront: p.b,
-          counter: p.b, counterEdge: 'rgba(255,255,255,0.6)',
-          winStroke: 'rgba(255,255,255,0.8)', winGlow: true,
-          roofRise: 42, chimneys: 2, lanterns: true, banner: true, crystal: true, trim: true
+          side: '#1a0e08', slab: '#c48448', slabHi: 'rgba(255,220,160,0.22)',
+          front0: '#9a5c34', front1: '#7a4424', front2: '#4a2810',
+          edge: 'rgba(255,210,140,0.26)', stroke: 'rgba(255,220,150,0.42)',
+          counter: '#e0b060', counterEdge: 'rgba(255,236,180,0.55)',
+          accent: th.accent, hi: th.hi, glow: th.glow,
+          brass: true, glass: true, lanterns: false, metal: false, signboard: false
         };
       }
       if (lv >= 2) {
         return {
-          side: '#180a0e', slab: p.r0, slabHi: 'rgba(255,255,255,0.2)',
-          front0: '#8a4828', front1: '#6a341c', front2: '#240a10',
-          edge: 'rgba(255,220,160,0.3)', stroke: 'rgba(255,220,160,0.5)',
-          roofL: '#4a2414', roofR: p.r0, roofTop: p.r0,
-          roofStroke: 'rgba(255,236,200,0.55)', chimSide: '#14080a', chimFront: p.r0,
-          counter: p.r0, counterEdge: 'rgba(255,236,190,0.5)',
-          winStroke: 'rgba(250,204,120,0.8)', winGlow: true,
-          roofRise: 36, chimneys: 1, lanterns: true, banner: false, crystal: false, trim: true
+          side: '#1a0e08', slab: '#b07848', slabHi: 'rgba(255,220,160,0.2)',
+          front0: '#8a5230', front1: '#6e3e20', front2: '#3d2410',
+          edge: 'rgba(255,210,140,0.24)', stroke: 'rgba(255,220,150,0.38)',
+          counter: '#d4a060', counterEdge: 'rgba(255,236,180,0.5)',
+          accent: th.accent, hi: th.hi, glow: th.glow,
+          brass: true, glass: false, lanterns: false, metal: false, signboard: false
         };
       }
       if (lv >= 1) {
         return {
-          side: '#1a0e08', slab: '#c48448', slabHi: 'rgba(255,220,160,0.22)',
-          front0: '#9a5c34', front1: '#7a4424', front2: '#4a2810',
-          edge: 'rgba(255,210,140,0.28)', stroke: 'rgba(255,220,150,0.4)',
-          roofL: '#4a2814', roofR: p.r0, roofTop: '#e8a060',
-          roofStroke: 'rgba(255,240,200,0.45)', chimSide: '#2a160c', chimFront: '#8a5428',
-          counter: '#e0b060', counterEdge: 'rgba(255,236,180,0.5)',
-          winStroke: 'rgba(240,195,106,0.65)', winGlow: false,
-          roofRise: 32, chimneys: 1, lanterns: false, banner: false, crystal: false, trim: false
+          side: '#1a0e08', slab: '#b07848', slabHi: 'rgba(255,220,160,0.18)',
+          front0: '#8a5230', front1: '#6e3e20', front2: '#3d2410',
+          edge: 'rgba(255,210,140,0.22)', stroke: 'rgba(255,220,150,0.32)',
+          counter: '#d4a060', counterEdge: 'rgba(255,236,180,0.45)',
+          accent: th.accent, hi: th.hi, glow: th.glow,
+          brass: false, glass: false, lanterns: false, metal: false, signboard: false
         };
       }
       return {
         side: '#18120e', slab: '#6a5444', slabHi: 'rgba(255,255,255,0.08)',
         front0: '#5a463a', front1: '#40342a', front2: '#2a2018',
-        edge: 'rgba(255,255,255,0.1)', stroke: 'rgba(100,80,60,0.45)',
-        roofL: '#28201a', roofR: '#44382e', roofTop: '#7a6654',
-        roofStroke: 'rgba(140,120,95,0.35)', chimSide: '#1c1612', chimFront: '#44382e',
+        edge: 'rgba(255,255,255,0.1)', stroke: 'rgba(100,80,60,0.4)',
         counter: '#7a6654', counterEdge: 'rgba(140,120,95,0.35)',
-        winStroke: 'rgba(140,120,95,0.4)', winGlow: false,
-        roofRise: 32, chimneys: 1, lanterns: false, banner: false, crystal: false, trim: false
+        accent: th.accent, hi: th.hi, glow: th.glow,
+        brass: false, glass: false, lanterns: false, metal: false, signboard: false
       };
     }
 
@@ -2917,14 +2904,14 @@
       const H = 28;
       const x = b.x, y = b.y, w = b.w, h = b.h;
       const tNow = performance.now();
+      const roofLit = look.signboard || (busy && lv >= 3);
+      const cornerR = look.signboard ? 6 : 5;
 
-      // Heavy ground shadow — reads as a volume, not a sticker
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.beginPath();
       ctx.ellipse(x + w / 2 + 14, y + h + 8, w * 0.62, 18, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Right side wall (much darker — depth cue)
       ctx.fillStyle = look.side;
       ctx.beginPath();
       ctx.moveTo(x + w, y);
@@ -2933,11 +2920,7 @@
       ctx.lineTo(x + w, y + h);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
 
-      // Top slab (lighter)
       ctx.fillStyle = look.slab;
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -2955,57 +2938,36 @@
       ctx.closePath();
       ctx.fill();
 
-      // Front wall
       const front = ctx.createLinearGradient(x, y, x + w, y);
       front.addColorStop(0, look.front0);
       front.addColorStop(0.35, look.front1);
       front.addColorStop(1, look.front2);
       ctx.fillStyle = front;
-      roundRect(x, y, w, h, 5);
+      roundRect(x, y, w, h, cornerR);
       ctx.fill();
-      // Left edge highlight
       ctx.fillStyle = look.edge;
       ctx.fillRect(x + 2, y + 4, 5, h - 8);
       ctx.strokeStyle = look.stroke;
-      ctx.lineWidth = lv >= 3 ? 2.8 : 2;
-      roundRect(x, y, w, h, 5);
+      ctx.lineWidth = look.metal ? 2.6 : 2;
+      roundRect(x, y, w, h, cornerR);
       ctx.stroke();
 
-      // Vertical plank / brick hints on front
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-      ctx.lineWidth = 1;
-      const strips = lv >= 2 ? 5 : 4;
-      for (let i = 1; i < strips; i++) {
-        const px = x + (w * i) / strips;
-        ctx.beginPath();
-        ctx.moveTo(px, y + 8);
-        ctx.lineTo(px, y + h - 10);
-        ctx.stroke();
-      }
-      if (lv >= 2) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-        for (let row = 1; row < 3; row++) {
-          const py = y + 10 + row * ((h - 20) / 3);
+      if (look.brass) {
+        ctx.strokeStyle = look.signboard ? look.hi : '#d4a060';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'square';
+        const c = 9;
+        [[x + 5, y + 5, 1], [x + w - 5, y + 5, -1], [x + 5, y + h - 18, 1], [x + w - 5, y + h - 18, -1]].forEach(([cx, cy, dir]) => {
           ctx.beginPath();
-          ctx.moveTo(x + 8, py);
-          ctx.lineTo(x + w - 8, py);
+          ctx.moveTo(cx, cy + c);
+          ctx.lineTo(cx, cy);
+          ctx.lineTo(cx + dir * c, cy);
           ctx.stroke();
-        }
-      }
-      ctx.fillStyle = 'rgba(255,230,180,0.28)';
-      for (let i = 1; i < strips; i++) {
-        const px = x + (w * i) / strips;
-        ctx.beginPath();
-        ctx.arc(px, y + 12, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(px, y + h - 16, 1.6, 0, Math.PI * 2);
-        ctx.fill();
+        });
       }
 
-      // Factory roof: flat cap + pipes (no house peak)
       const roofTopY = y - H;
-      ctx.fillStyle = look.roofTop;
+      ctx.fillStyle = look.slab;
       ctx.beginPath();
       ctx.moveTo(x + 6, y + 2);
       ctx.lineTo(x + D * 0.55, roofTopY + 4);
@@ -3013,83 +2975,80 @@
       ctx.lineTo(x + w - 6, y + 2);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = look.roofStroke;
-      ctx.lineWidth = lv >= 3 ? 2 : 1.4;
+      ctx.strokeStyle = look.stroke;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = look.front1;
-      ctx.fillRect(x + 8, y - 6, w - 16, 7);
-      if (look.trim) {
-        ctx.strokeStyle = lv >= 3 ? 'rgba(253,224,140,0.7)' : 'rgba(200,170,120,0.5)';
-        ctx.lineWidth = 2;
+
+      const rcx = x + w / 2 + D * 0.18;
+      ctx.save();
+      if (m.id === 'parallel') {
+        for (let i = 0; i < 2; i++) {
+          const yy = roofTopY - 2 + i * 8;
+          ctx.fillStyle = roofLit ? (i === 0 ? look.hi : look.accent) : (lv >= 2 ? '#8a6a48' : '#6a4a32');
+          roundRect(rcx - 32, yy, 64, 5, 2);
+          ctx.fill();
+        }
+      } else if (m.id === 'adjacent') {
+        const baseY = roofTopY + 3;
+        const peakY = roofTopY - 9;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = roofLit ? look.hi : (lv >= 2 ? '#7a5030' : '#5a3820');
+        ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.moveTo(x + 10, y - 6);
-        ctx.lineTo(x + w - 10, y - 6);
+        ctx.moveTo(rcx - 38, baseY);
+        ctx.lineTo(rcx, peakY);
+        ctx.lineTo(rcx + 38, baseY);
+        ctx.stroke();
+        ctx.strokeStyle = roofLit ? look.accent : '#c4a078';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(rcx - 16, baseY - 3);
+        ctx.lineTo(rcx - 11, peakY + 6);
+        ctx.moveTo(rcx + 16, baseY - 3);
+        ctx.lineTo(rcx + 11, peakY + 6);
+        ctx.stroke();
+      } else {
+        const by = roofTopY + 3;
+        const rx = x + w / 2 + D * 0.26;
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
+        ctx.strokeStyle = roofLit ? look.accent : (lv >= 2 ? '#6a3a14' : '#4a2810');
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(rx - 2, by - 22);
+        ctx.lineTo(rx - 2, by);
+        ctx.lineTo(rx + 24, by);
+        ctx.stroke();
+        ctx.strokeStyle = roofLit ? look.hi : '#c48448';
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(rx - 2, by - 22);
+        ctx.lineTo(rx - 2, by);
+        ctx.lineTo(rx + 24, by);
         ctx.stroke();
       }
+      ctx.restore();
 
-      // Per-factory roof shapes
-      if (owned) {
-        const rcx = x + w / 2 + D * 0.25;
-        if (m.id === 'parallel') {
-          ctx.fillStyle = look.roofTop;
-          ctx.beginPath();
-          ctx.arc(rcx, roofTopY + 4, 22, Math.PI, 0);
-          ctx.fill();
-          ctx.strokeStyle = look.roofStroke;
-          ctx.stroke();
-        } else if (m.id === 'adjacent') {
-          ctx.fillStyle = look.roofTop;
-          ctx.beginPath();
-          ctx.moveTo(rcx - 18, roofTopY + 4);
-          ctx.lineTo(rcx, roofTopY - 32);
-          ctx.lineTo(rcx + 18, roofTopY + 4);
-          ctx.fill();
-          ctx.strokeStyle = look.roofStroke;
-          ctx.stroke();
-        } else if (m.id === 'right') {
-          ctx.fillStyle = '#2a140a';
-          ctx.beginPath();
-          ctx.moveTo(rcx - 14, roofTopY - 14);
-          ctx.lineTo(rcx + 14, roofTopY - 14);
-          ctx.lineTo(rcx + 10, roofTopY - 6);
-          ctx.lineTo(rcx - 10, roofTopY - 6);
-          ctx.fill();
-          ctx.fillRect(rcx - 8, roofTopY - 6, 16, 10);
-          if (busy) {
-            ctx.fillStyle = '#fb923c';
-            for (let i = 0; i < 4; i++) {
-              const pt = (tNow / (180 + i * 30)) % 1;
-              const px = rcx - 12 + i * 8 + Math.sin(tNow / 100 + i) * 4;
-              const py = roofTopY - 4 - pt * 24;
-              ctx.globalAlpha = 1 - pt;
-              ctx.fillRect(px, py, 2.5, 2.5);
-            }
-            ctx.globalAlpha = 1;
+      if (busy && lv >= 3) {
+        const t = tNow / 220;
+        ctx.fillStyle = `rgba(200,210,230,${0.26 + 0.2 * Math.sin(t)})`;
+        ctx.beginPath();
+        ctx.arc(rcx + 8, roofTopY - 14 - Math.sin(t) * 5, 7, 0, Math.PI * 2);
+        ctx.fill();
+        if (m.id === 'right') {
+          ctx.fillStyle = '#fb923c';
+          for (let i = 0; i < 3; i++) {
+            const pt = (tNow / (180 + i * 40) + i * 0.2) % 1;
+            ctx.globalAlpha = 1 - pt;
+            ctx.fillRect(rcx + 10 + i * 5, roofTopY - 8 - pt * 20, 2.4, 2.4);
           }
+          ctx.globalAlpha = 1;
         }
       }
 
-      const drawPipe = (cx0, cy0, hgt, smokePhase) => {
-        ctx.fillStyle = look.chimSide;
-        ctx.fillRect(cx0 + 9, cy0 - hgt, 7, hgt + 4);
-        ctx.fillStyle = look.chimFront;
-        ctx.fillRect(cx0, cy0 - hgt, 10, hgt + 4);
-        ctx.fillStyle = lv >= 2 ? look.roofTop : '#3a3028';
-        ctx.fillRect(cx0 - 2, cy0 - hgt - 5, 14, 6);
-        if (busy) {
-          const t = tNow / 220 + smokePhase;
-          ctx.fillStyle = `rgba(200,210,230,${0.28 + 0.22 * Math.sin(t)})`;
-          ctx.beginPath();
-          ctx.arc(cx0 + 5, cy0 - hgt - 10 - Math.sin(t) * 6, 7, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      };
-      drawPipe(x + w * 0.62, roofTopY + 2, 28, 0);
-      if (look.chimneys >= 2) drawPipe(x + w * 0.38, roofTopY + 4, 22, 1.3);
-
-      // Side lanterns (lv2+)
       if (look.lanterns) {
-        const glow = 0.45 + 0.35 * Math.sin(tNow / 280);
+        const glow = busy ? (0.55 + 0.35 * Math.sin(tNow / 280)) : 0.28;
         [[x + 6, y + 18], [x + w - 10, y + 18]].forEach(([lx, ly]) => {
           ctx.fillStyle = '#2a1810';
           ctx.fillRect(lx, ly - 10, 3, 12);
@@ -3097,8 +3056,8 @@
           ctx.beginPath();
           ctx.arc(lx + 1.5, ly - 14, 5, 0, Math.PI * 2);
           ctx.fill();
-          if (lv >= 3) {
-            ctx.fillStyle = `rgba(253,186,116,${0.2 + glow * 0.25})`;
+          if (busy) {
+            ctx.fillStyle = `rgba(253,186,116,${0.18 + glow * 0.2})`;
             ctx.beginPath();
             ctx.arc(lx + 1.5, ly - 14, 10, 0, Math.PI * 2);
             ctx.fill();
@@ -3106,53 +3065,38 @@
         });
       }
 
-      // Small roof banner (max level)
-      if (look.banner) {
-        const bx = x + w * 0.12;
-        const by = y - H - 8;
-        ctx.fillStyle = '#1a0a12';
-        ctx.fillRect(bx, by - 18, 3, 22);
-        ctx.fillStyle = '#e879a8';
+      const wx = m.id === 'parallel' ? x + w * 0.13 : x + w * 0.2;
+      const ww = m.id === 'parallel' ? w * 0.72 : w * 0.56;
+      const wy = y + h * 0.26;
+      const wh = h * 0.42;
+      if (busy && lv >= 3) {
+        const pulse = 0.22 + 0.14 * Math.sin(tNow / 320);
+        ctx.fillStyle = `rgba(${look.glow},${pulse})`;
+        roundRect(wx - 5, wy - 5, ww + 10, wh + 10, 6);
+        ctx.fill();
+      }
+      ctx.fillStyle = look.glass ? 'rgba(10,8,6,0.88)' : 'rgba(12,8,6,0.72)';
+      roundRect(wx, wy, ww, wh, 4);
+      ctx.fill();
+      if (look.glass && !busy) {
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
         ctx.beginPath();
-        ctx.moveTo(bx + 3, by - 18);
-        ctx.lineTo(bx + 22, by - 12);
-        ctx.lineTo(bx + 3, by - 6);
+        ctx.moveTo(wx + 8, wy + 4);
+        ctx.lineTo(wx + ww * 0.42, wy + 4);
+        ctx.lineTo(wx + 10, wy + wh - 6);
         ctx.closePath();
         ctx.fill();
       }
-
-      // Recessed machine window
-      const wx = x + w * 0.2, wy = y + h * 0.28, ww = w * 0.58, wh = h * 0.44;
-      if (look.winGlow && owned) {
-        const pulse = 0.2 + 0.15 * Math.sin(tNow / 320);
-        ctx.fillStyle = `rgba(251,191,36,${pulse})`;
-        roundRect(wx - 4, wy - 4, ww + 8, wh + 8, 6);
-        ctx.fill();
-      }
-      ctx.fillStyle = 'rgba(8,4,2,0.78)';
+      ctx.strokeStyle = look.signboard
+        ? (busy ? look.hi : look.accent)
+        : (look.metal ? (busy ? look.hi : '#d4b07a') : '#8a7058');
+      ctx.lineWidth = look.signboard ? 3.6 : (look.metal ? 3 : 2.2);
       roundRect(wx, wy, ww, wh, 4);
-      ctx.fill();
-      ctx.strokeStyle = look.winStroke;
-      ctx.lineWidth = lv >= 3 ? 3.2 : 2.5;
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.strokeRect(wx + 3, wy + 3, ww - 6, wh - 6);
-      if (lv >= 2) {
-        // Cross muntins — more “machine” than open hole
-        ctx.strokeStyle = 'rgba(255,220,160,0.25)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(wx + ww / 2, wy + 4);
-        ctx.lineTo(wx + ww / 2, wy + wh - 4);
-        ctx.moveTo(wx + 4, wy + wh / 2);
-        ctx.lineTo(wx + ww - 4, wy + wh / 2);
-        ctx.stroke();
-      }
 
-      // Front counter ledge (sticks toward the shelf)
       ctx.fillStyle = owned ? '#1a0e08' : '#120e0a';
       ctx.fillRect(x + 4, y + h - 2, w - 8 + D * 0.15, 12);
-      ctx.fillStyle = look.counter;
+      ctx.fillStyle = busy && lv >= 3 ? look.hi : look.counter;
       roundRect(x + 2, y + h - 14, w - 4, 14, 3);
       ctx.fill();
       ctx.fillStyle = owned ? 'rgba(255,240,200,0.35)' : 'rgba(255,255,255,0.08)';
@@ -3161,38 +3105,11 @@
       ctx.lineWidth = 1.5;
       roundRect(x + 2, y + h - 14, w - 4, 14, 3);
       ctx.stroke();
-      if (lv >= 3) {
-        ctx.fillStyle = 'rgba(253,224,140,0.55)';
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc(x + 16 + i * ((w - 28) / 2), y + h - 7, 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
 
-      // Property sign in window — parallel marks / equal / right angle (no gem preview)
       ctx.save();
       ctx.globalAlpha = owned ? 1 : 0.45;
-      drawMachineSign(m.id, x + w / 2, wy + wh * 0.52, owned, owned ? (lv >= 3 ? 1.2 : 1.05) : 0.9);
+      drawMachineSign(m.id, wx + ww / 2, wy + wh * 0.52, lv >= 2, owned ? (lv >= 3 ? 1.18 : 1.02) : 0.9);
       ctx.restore();
-
-      // Roof mark / stars sit on the factory cap, not a house peak
-      if (look.crystal) {
-        const pulse = 0.7 + 0.3 * Math.sin(tNow / 260);
-        ctx.save();
-        ctx.globalAlpha = pulse;
-        drawMachineSign(m.id, x + w / 2 + D * 0.18, roofTopY - 18, true, 0.45);
-        ctx.restore();
-      }
-
-      if (lv >= 1) {
-        ctx.fillStyle = lv >= 4 ? '#fde68a' : '#ffe08a';
-        ctx.font = '800 13px Outfit, sans-serif';
-        ctx.textAlign = 'center';
-        const stars = lv <= 3 ? '★'.repeat(lv) : '★' + lv;
-        ctx.fillText(stars, x + w / 2 + D * 0.18, roofTopY - (look.crystal ? 32 : 14));
-        ctx.textAlign = 'left';
-      }
     }
 
     function drawPad(r, label, hot, fullWarn, themeId) {
@@ -3248,7 +3165,7 @@
       ctx.fillStyle = '#fde047';
       ctx.font = '800 11px Outfit, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('★' + lv, r.x + r.w / 2, r.y + 14);
+      ctx.fillText(String(lv), r.x + r.w / 2, r.y + 14);
 
       // Big [+]
       ctx.fillStyle = '#ffffff';
@@ -4313,6 +4230,15 @@
     function start() {
       state = newState();
       state.phase = 'play';
+      const previewLv = Number((location.search.match(/[?&]preview=(\d+)/) || [])[1] || 0);
+      if (previewLv >= 1) {
+        const lv = Math.min(5, previewLv);
+        state.owned = { parallel: lv, adjacent: lv, right: lv };
+        state.gold = 9999;
+        state.lessons.parallel = true;
+        state.player.x = 470;
+        state.player.y = 330;
+      }
       shopSig = '';
       startOverlay.classList.add('hidden');
       resultOverlay.classList.add('hidden');
