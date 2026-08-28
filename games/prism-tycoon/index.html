@@ -293,7 +293,7 @@
     const cv = document.getElementById('game');
     const ctx = cv.getContext('2d');
 
-    let MAP_W = 1120, MAP_H = 680;
+    let MAP_W = 1120, MAP_H = 560;
     let camera = { x: 0, y: 0, inited: false };
     const GAME_TIME = 300;
     const CAPACITY_BASE = 16;
@@ -353,7 +353,7 @@
     }
 
     function kioskRect(m) {
-      if (mLv(m.id) < 1) return m.input;
+      if (mLv(m.id) < 1) return { x: m.input.x, y: m.input.y, w: m.output.x + m.output.w - m.input.x, h: m.input.h };
       return m.upgrade;
     }
 
@@ -408,18 +408,18 @@
     }
 
     function blockedAt(x, y) {
-      // Collision covers footprint + right-side wall volume so the shed feels solid.
+      // Collision covers the solid upper shed (keeping the front counter fully walkable)
       return MACHINES.some((m) => {
         const b = m.body;
-        return circleHitsRect(x, y, PLAYER_R, { x: b.x, y: b.y, w: b.w + 22, h: b.h });
+        return circleHitsRect(x, y, PLAYER_R, { x: b.x, y: b.y - 8, w: b.w + 14, h: b.h - 10 });
       });
     }
 
     function segmentHitsBox(x0, y0, x1, y1, box) {
-      const minX = box.x - PLAYER_R - 6;
-      const maxX = box.x + box.w + 22 + PLAYER_R + 6;
-      const minY = box.y - PLAYER_R - 6;
-      const maxY = box.y + box.h + PLAYER_R + 6;
+      const minX = box.x - PLAYER_R - 2;
+      const maxX = box.x + box.w + 14 + PLAYER_R + 2;
+      const minY = box.y - PLAYER_R - 8;
+      const maxY = box.y + box.h - 10;
 
       const steps = 18;
       for (let i = 0; i <= steps; i++) {
@@ -448,21 +448,21 @@
       if (blocking.length > 0) {
         for (const b of blocking) {
           const m = b.m;
-          const topY = m.body.y - PLAYER_R - 26;
-          const botY = m.body.y + m.body.h + PLAYER_R + 30;
+          const topY = m.body.y - PLAYER_R - 24;
+          const botY = m.body.y + m.body.h + PLAYER_R + 18;
           const midY = m.body.y + m.body.h / 2;
           
-          const useTop = (fromY < midY && toY < midY + 30) || (fromY <= midY && toY <= midY);
+          const useTop = (fromY < midY && toY < midY + 20) || (fromY <= midY && toY <= midY);
           const bypassY = useTop ? topY : botY;
 
           if (fromX < m.body.x && toX > m.body.x + m.body.w) {
             waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
-            waypoints.push({ x: m.body.x + m.body.w + 22 + PLAYER_R + 14, y: bypassY });
+            waypoints.push({ x: m.body.x + m.body.w + 16 + PLAYER_R + 14, y: bypassY });
           } else if (fromX > m.body.x + m.body.w && toX < m.body.x) {
-            waypoints.push({ x: m.body.x + m.body.w + 22 + PLAYER_R + 14, y: bypassY });
+            waypoints.push({ x: m.body.x + m.body.w + 16 + PLAYER_R + 14, y: bypassY });
             waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
           } else {
-            waypoints.push({ x: m.body.x + (m.body.w + 22) / 2, y: bypassY });
+            waypoints.push({ x: m.body.x + (m.body.w + 16) / 2, y: bypassY });
           }
         }
       }
@@ -1009,7 +1009,7 @@
       cv.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      MAP_H = 680;
+      MAP_H = 560;
       MAP_W = 1120;
 
       const scale = Math.max(h / MAP_H, w / MAP_W);
@@ -1017,35 +1017,35 @@
       const vh = h / scale;
       view = { scale, ox: 0, oy: 0, w, h, vw, vh };
 
-      YARD = { x: 30, y: 110, w: MAP_W - 60, h: MAP_H - 140 };
+      YARD = { x: 30, y: 55, w: MAP_W - 60, h: MAP_H - 75 };
 
       const col1 = 170;
       const col2 = 410;
       const col3 = 650;
       const col4 = 890;
 
-      MINE_VEIN = { x: col1 - 65, y: 390, w: 130, h: 120 };
-      BAG_PAD = { x: col1 - 65, y: 240, w: 130, h: 80 };
-      MARKET_PAD = { x: col4 - 65, y: 370, w: 130, h: 120 };
+      BAG_PAD = { x: col1 - 65, y: 150, w: 130, h: 80 };
+      MINE_VEIN = { x: col1 - 65, y: 285, w: 130, h: 120 };
 
       const m0 = MACHINES[0]; 
-      m0.body = { x: col2 - 70, y: 290, w: 140, h: 72 };
-      m0.input = { x: col2 - 90, y: 362, w: 80, h: 56 };
-      m0.output = { x: col2 + 10, y: 362, w: 80, h: 56 };
+      m0.body = { x: col2 - 70, y: 220, w: 140, h: 72 };
+      m0.input = { x: col2 - 82, y: 292, w: 52, h: 56 };
+      m0.upgrade = { x: col2 - 24, y: 292, w: 48, h: 56 };
+      m0.output = { x: col2 + 30, y: 292, w: 52, h: 56 };
       
       const m1 = MACHINES[1]; 
-      m1.body = { x: col3 - 70, y: 190, w: 140, h: 72 };
-      m1.input = { x: col3 - 90, y: 262, w: 80, h: 56 };
-      m1.output = { x: col3 + 10, y: 262, w: 80, h: 56 };
+      m1.body = { x: col3 - 70, y: 105, w: 140, h: 72 };
+      m1.input = { x: col3 - 82, y: 177, w: 52, h: 56 };
+      m1.upgrade = { x: col3 - 24, y: 177, w: 48, h: 56 };
+      m1.output = { x: col3 + 30, y: 177, w: 52, h: 56 };
       
       const m2 = MACHINES[2]; 
-      m2.body = { x: col3 - 70, y: 420, w: 140, h: 72 };
-      m2.input = { x: col3 - 90, y: 492, w: 80, h: 56 };
-      m2.output = { x: col3 + 10, y: 492, w: 80, h: 56 };
+      m2.body = { x: col3 - 70, y: 335, w: 140, h: 72 };
+      m2.input = { x: col3 - 82, y: 407, w: 52, h: 56 };
+      m2.upgrade = { x: col3 - 24, y: 407, w: 48, h: 56 };
+      m2.output = { x: col3 + 30, y: 407, w: 52, h: 56 };
 
-      MACHINES.forEach(m => {
-        m.upgrade = { x: m.body.x + (m.body.w / 2) - 28, y: m.body.y - 52, w: 56, h: 50 };
-      });
+      MARKET_PAD = { x: col4 - 65, y: 270, w: 130, h: 120 };
 
       CASH_ANCHOR = { x: MARKET_PAD.x - 28, y: MARKET_PAD.y + MARKET_PAD.h - 6 };
       BELT = {
@@ -1054,7 +1054,7 @@
         sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
       };
 
-      BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 25, y1: YARD.y + YARD.h - 25 };
+      BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 20, y1: YARD.y + YARD.h - 20 };
     }
     window.addEventListener('resize', resize);
 
@@ -3111,39 +3111,18 @@
       const cost = m.costs[lv];
       const can = state.gold >= cost;
       const pulse = 0.45 + 0.55 * Math.sin(performance.now() / 220);
-      const leftCol = m.body.x < 400;
-      const shelf = m.input;
-
-      // Ground tether: pad → front shelf so ownership reads at a glance
-      const midY = r.y + r.h * 0.72;
-      const x0 = leftCol ? r.x + r.w : r.x;
-      const x1 = leftCol ? shelf.x : shelf.x + shelf.w;
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-      ctx.lineWidth = 7;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x0, midY);
-      ctx.lineTo(x1, midY);
-      ctx.stroke();
-      ctx.strokeStyle = can ? 'rgba(94,234,212,0.55)' : 'rgba(148,163,184,0.45)';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(x0, midY);
-      ctx.lineTo(x1, midY);
-      ctx.stroke();
-      ctx.lineCap = 'butt';
 
       // Ground plate
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.beginPath();
-      ctx.ellipse(r.x + r.w / 2 + 2, r.y + r.h - 1, r.w * 0.48, 9, 0, 0, Math.PI * 2);
+      ctx.ellipse(r.x + r.w / 2, r.y + r.h - 2, r.w * 0.46, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
       const g = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
-      g.addColorStop(0, can ? '#5eead4' : '#94a3b8');
-      g.addColorStop(1, can ? '#0f766e' : '#475569');
+      g.addColorStop(0, can ? '#34d399' : '#94a3b8');
+      g.addColorStop(1, can ? '#059669' : '#475569');
       ctx.fillStyle = g;
-      roundRect(r.x, r.y, r.w, r.h, 14);
+      roundRect(r.x, r.y, r.w, r.h, 10);
       ctx.fill();
       ctx.strokeStyle = can
         ? `rgba(153,246,228,${0.55 + pulse * 0.45})`
@@ -3152,20 +3131,24 @@
       ctx.stroke();
 
       // Property badge — which factory this [+] belongs to
-      drawMachineSign(m.id, r.x + r.w / 2, r.y + 12, true, 0.42);
+      // Star level badge
+      ctx.fillStyle = '#fde047';
+      ctx.font = '800 11px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('★' + lv, r.x + r.w / 2, r.y + 14);
 
       // Big [+]
       ctx.fillStyle = '#ffffff';
-      ctx.font = '800 26px Outfit, sans-serif';
+      ctx.font = '800 20px Outfit, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('+', r.x + r.w / 2, r.y + r.h / 2 + 10);
+      ctx.fillText('+', r.x + r.w / 2, r.y + r.h / 2 + 6);
       ctx.font = '800 11px Outfit, sans-serif';
       ctx.fillStyle = can ? '#ecfdf5' : '#fecdd3';
       ctx.fillText(String(cost), r.x + r.w / 2, r.y + r.h - 6);
       ctx.textAlign = 'left';
 
       if (hot && can && (state.buyT[m.id] || 0) > 0) {
-        drawProgressRing(r.x + r.w / 2, r.y + r.h / 2, 18, state.buyT[m.id] / 0.75, '#5eead4');
+        drawProgressRing(r.x + r.w / 2, r.y + r.h / 2, 16, state.buyT[m.id] / 0.75, '#34d399');
       }
     }
 
