@@ -293,7 +293,7 @@
     const cv = document.getElementById('game');
     const ctx = cv.getContext('2d');
 
-    const MAP_W = 1000, MAP_H = 640;
+    let MAP_W = 1000, MAP_H = 640;
     const GAME_TIME = 300;
     const CAPACITY_BASE = 16;
     const BAG_STEP = 10;
@@ -319,16 +319,16 @@
     const WALK_FPS = 9;
 
         // Yard pads — WOS-ad style: stand on dotted square to interact.
-    const YARD = { x: 56, y: 110, w: 888, h: 470 };
-    const MINE_VEIN = { x: 70, y: 370, w: 130, h: 120 };
-    const MARKET_PAD = { x: 790, y: 350, w: 130, h: 120 };
-    const BAG_PAD = { x: 70, y: 220, w: 130, h: 80 };
-    const CASH_ANCHOR = {
+    let YARD = { x: 56, y: 110, w: 888, h: 470 };
+    let MINE_VEIN = { x: 70, y: 370, w: 130, h: 120 };
+    let MARKET_PAD = { x: 790, y: 350, w: 130, h: 120 };
+    let BAG_PAD = { x: 70, y: 220, w: 130, h: 80 };
+    let CASH_ANCHOR = {
       x: MARKET_PAD.x - 28,
       y: MARKET_PAD.y + MARKET_PAD.h - 6
     };
     // Sell conveyor: intake on pad → ride into stall → sink (then bills spawn)
-    const BELT = {
+    let BELT = {
       start: { x: MARKET_PAD.x + 18, y: MARKET_PAD.y + MARKET_PAD.h - 16 },
       end: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 10 },
       sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
@@ -337,7 +337,7 @@
     const CONVEY_BELT = 0.78;
     const CONVEY_DROP = 0.32;
 
-    const BOUNDS = { x0: 70, x1: 930, y0: 140, y1: 560 };
+    let BOUNDS = { x0: 70, x1: 930, y0: 140, y1: 560 };
 
     function carryCap(s) {
       return CAPACITY_BASE + s.bagLevel * BAG_STEP;
@@ -414,14 +414,89 @@
       });
     }
 
+    function segmentHitsBox(x0, y0, x1, y1, box) {
+      const minX = box.x - PLAYER_R - 6;
+      const maxX = box.x + box.w + 22 + PLAYER_R + 6;
+      const minY = box.y - PLAYER_R - 6;
+      const maxY = box.y + box.h + PLAYER_R + 6;
+
+      const steps = 18;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const px = x0 + (x1 - x0) * t;
+        const py = y0 + (y1 - y0) * t;
+        if (px >= minX && px <= maxX && py >= minY && py <= maxY) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function findPath(fromX, fromY, toX, toY) {
+      const waypoints = [];
+      const blocking = [];
+      for (const m of MACHINES) {
+        const box = { x: m.body.x, y: m.body.y, w: m.body.w, h: m.body.h };
+        if (segmentHitsBox(fromX, fromY, toX, toY, box)) {
+          const dist = Math.hypot(m.body.x + m.body.w / 2 - fromX, m.body.y + m.body.h / 2 - fromY);
+          blocking.push({ m, box, dist });
+        }
+      }
+      blocking.sort((a, b) => a.dist - b.dist);
+
+      if (blocking.length > 0) {
+        for (const b of blocking) {
+          const m = b.m;
+          const topY = m.body.y - PLAYER_R - 26;
+          const botY = m.body.y + m.body.h + PLAYER_R + 30;
+          const midY = m.body.y + m.body.h / 2;
+          
+          const useTop = (fromY < midY && toY < midY + 30) || (fromY <= midY && toY <= midY);
+          const bypassY = useTop ? topY : botY;
+
+          if (fromX < m.body.x && toX > m.body.x + m.body.w) {
+            waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
+            waypoints.push({ x: m.body.x + m.body.w + 22 + PLAYER_R + 14, y: bypassY });
+          } else if (fromX > m.body.x + m.body.w && toX < m.body.x) {
+            waypoints.push({ x: m.body.x + m.body.w + 22 + PLAYER_R + 14, y: bypassY });
+            waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
+          } else {
+            waypoints.push({ x: m.body.x + (m.body.w + 22) / 2, y: bypassY });
+          }
+        }
+      }
+      waypoints.push({ x: toX, y: toY });
+      return waypoints;
+    }
+
     function movePlayer(dx, dy, dt) {
       const p = state.player;
       let nx = p.x + dx * SPEED * dt;
       let ny = p.y + dy * SPEED * dt;
       nx = Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, nx));
       ny = Math.max(BOUNDS.y0, Math.min(BOUNDS.y1, ny));
-      if (!blockedAt(nx, p.y)) p.x = nx;
-      if (!blockedAt(p.x, ny)) p.y = ny;
+
+      const canX = !blockedAt(nx, p.y);
+      const canY = !blockedAt(p.x, ny);
+
+      if (canX) p.x = nx;
+      if (canY) p.y = ny;
+
+      // Smart Wall-Sliding: if blocked in one direction while navigating, slide along the perpendicular edge
+      if (state && state.waypoints && state.waypoints.length > 0) {
+        const wp = state.waypoints[0];
+        if (!canX && canY && Math.abs(dy) < 0.3) {
+          const tryUp = p.y - SPEED * dt * 0.8;
+          const tryDown = p.y + SPEED * dt * 0.8;
+          if (wp.y < p.y && !blockedAt(p.x, tryUp)) p.y = tryUp;
+          else if (wp.y >= p.y && !blockedAt(p.x, tryDown)) p.y = tryDown;
+        } else if (!canY && canX && Math.abs(dx) < 0.3) {
+          const tryLeft = p.x - SPEED * dt * 0.8;
+          const tryRight = p.x + SPEED * dt * 0.8;
+          if (wp.x < p.x && !blockedAt(tryLeft, p.y)) p.x = tryLeft;
+          else if (wp.x >= p.x && !blockedAt(tryRight, p.y)) p.x = tryRight;
+        }
+      }
     }
 
     function easeOutCubic(t) {
@@ -932,7 +1007,50 @@
       cv.width = Math.round(w * dpr);
       cv.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const scale = Math.min(w / MAP_W, h / MAP_H) * 0.94;
+
+      MAP_H = 680;
+      MAP_W = Math.max(1000, Math.min(1800, MAP_H * (w / h)));
+
+      YARD = { x: 30, y: 110, w: MAP_W - 60, h: MAP_H - 140 };
+
+      const col1 = MAP_W * 0.12;
+      const col2 = MAP_W * 0.38;
+      const col3 = MAP_W * 0.64;
+      const col4 = MAP_W * 0.88;
+
+      MINE_VEIN = { x: col1 - 65, y: 390, w: 130, h: 120 };
+      BAG_PAD = { x: col1 - 65, y: 240, w: 130, h: 80 };
+      MARKET_PAD = { x: col4 - 65, y: 370, w: 130, h: 120 };
+
+      const m0 = MACHINES[0]; 
+      m0.body = { x: col2 - 70, y: 290, w: 140, h: 72 };
+      m0.input = { x: col2 - 90, y: 362, w: 80, h: 56 };
+      m0.output = { x: col2 + 10, y: 362, w: 80, h: 56 };
+      
+      const m1 = MACHINES[1]; 
+      m1.body = { x: col3 - 70, y: 190, w: 140, h: 72 };
+      m1.input = { x: col3 - 90, y: 262, w: 80, h: 56 };
+      m1.output = { x: col3 + 10, y: 262, w: 80, h: 56 };
+      
+      const m2 = MACHINES[2]; 
+      m2.body = { x: col3 - 70, y: 420, w: 140, h: 72 };
+      m2.input = { x: col3 - 90, y: 492, w: 80, h: 56 };
+      m2.output = { x: col3 + 10, y: 492, w: 80, h: 56 };
+
+      MACHINES.forEach(m => {
+        m.upgrade = { x: m.body.x + (m.body.w / 2) - 28, y: m.body.y - 52, w: 56, h: 50 };
+      });
+
+      CASH_ANCHOR = { x: MARKET_PAD.x - 28, y: MARKET_PAD.y + MARKET_PAD.h - 6 };
+      BELT = {
+        start: { x: MARKET_PAD.x + 18, y: MARKET_PAD.y + MARKET_PAD.h - 16 },
+        end: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 10 },
+        sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
+      };
+
+        BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 25, y1: YARD.y + YARD.h - 25 };
+
+        const scale = Math.min(w / MAP_W, h / MAP_H) * 0.99;
       view = { scale, ox: (w - MAP_W * scale) / 2, oy: (h - MAP_H * scale) / 2, w, h };
     }
     window.addEventListener('resize', resize);
@@ -1070,6 +1188,7 @@
             const tx = Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, targetX));
             const ty = Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, targetY));
             state.targetPos = { x: tx, y: ty };
+            state.waypoints = findPath(state.player.x, state.player.y, tx, ty);
             if (!state.ripples) state.ripples = [];
             state.ripples.push({ x: tx, y: ty, t: 0, isSmart: isSmart });
           }
@@ -1088,30 +1207,53 @@
       if (keys.has('d')) dy += 1;
 
       if (dx !== 0 || dy !== 0) {
-        if (state) state.targetPos = null; // 키보드 입력 시 탭 이동 취소
+        if (state) {
+          state.targetPos = null;
+          state.waypoints = null;
+        }
       }
 
       if (stick) {
         const sx = stick.x - stick.bx, sy = stick.y - stick.by;
         const len = Math.hypot(sx, sy);
         if (len > 6) {
-          if (state) state.targetPos = null;
+          if (state) {
+            state.targetPos = null;
+            state.waypoints = null;
+          }
           const k = Math.min(len, STICK_R) / STICK_R;
           dx += (sx / len) * k;
           dy += (sy / len) * k;
         }
       }
 
-      // 조이스틱/키보드 입력이 없고 클릭 목표 위치가 설정된 경우
-      if (dx === 0 && dy === 0 && state && state.targetPos) {
-        const tdx = state.targetPos.x - state.player.x;
-        const tdy = state.targetPos.y - state.player.y;
-        const dist = Math.hypot(tdx, tdy);
-        if (dist < 10) {
-          state.targetPos = null; // 도착 완료
-        } else {
-          dx = tdx / dist;
-          dy = tdy / dist;
+      // 조이스틱/키보드 입력이 없고 경유지(Waypoint) 또는 목표 위치가 설정된 경우
+      if (dx === 0 && dy === 0 && state) {
+        let curTarget = null;
+        if (state.waypoints && state.waypoints.length > 0) {
+          curTarget = state.waypoints[0];
+        } else if (state.targetPos) {
+          curTarget = state.targetPos;
+        }
+
+        if (curTarget) {
+          const tdx = curTarget.x - state.player.x;
+          const tdy = curTarget.y - state.player.y;
+          const dist = Math.hypot(tdx, tdy);
+          if (dist < 14) {
+            if (state.waypoints && state.waypoints.length > 0) {
+              state.waypoints.shift(); // 현재 경유지 완료
+              if (state.waypoints.length === 0) {
+                state.targetPos = null;
+                state.waypoints = null;
+              }
+            } else {
+              state.targetPos = null;
+            }
+          } else {
+            dx = tdx / dist;
+            dy = tdy / dist;
+          }
         }
       }
 
@@ -1968,17 +2110,38 @@
         ctx.stroke();
       }
 
+      const m0 = MACHINES[0], m1 = MACHINES[1], m2 = MACHINES[2];
       ctx.strokeStyle = 'rgba(90,68,50,0.6)';
       ctx.lineWidth = 36;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(150, 450);
-      ctx.lineTo(310, 450);
-      ctx.lineTo(310, 300);
-      ctx.lineTo(600, 300);
-      ctx.lineTo(600, 450);
-      ctx.lineTo(850, 450);
+      // Mine to Machine 0
+      ctx.moveTo(MINE_VEIN.x + MINE_VEIN.w * 0.6, MINE_VEIN.y + MINE_VEIN.h * 0.5);
+      ctx.lineTo(m0.input.x + m0.input.w * 0.3, m0.input.y + m0.input.h * 0.5);
+      
+      // Machine 0 to Machine 1 & 2 fork
+      const forkX = (m0.output.x + m1.input.x) * 0.5;
+      ctx.moveTo(m0.output.x + m0.output.w * 0.6, m0.output.y + m0.output.h * 0.5);
+      ctx.lineTo(forkX, m0.output.y + m0.output.h * 0.5);
+      ctx.lineTo(forkX, m1.input.y + m1.input.h * 0.5);
+      ctx.lineTo(m1.input.x + m1.input.w * 0.3, m1.input.y + m1.input.h * 0.5);
+
+      ctx.moveTo(forkX, m0.output.y + m0.output.h * 0.5);
+      ctx.lineTo(forkX, m2.input.y + m2.input.h * 0.5);
+      ctx.lineTo(m2.input.x + m2.input.w * 0.3, m2.input.y + m2.input.h * 0.5);
+
+      // Machine 1 & 2 to Market merge
+      const mergeX = (m1.output.x + MARKET_PAD.x) * 0.5;
+      ctx.moveTo(m1.output.x + m1.output.w * 0.6, m1.output.y + m1.output.h * 0.5);
+      ctx.lineTo(mergeX, m1.output.y + m1.output.h * 0.5);
+      ctx.lineTo(mergeX, MARKET_PAD.y + MARKET_PAD.h * 0.5);
+      ctx.lineTo(MARKET_PAD.x + MARKET_PAD.w * 0.3, MARKET_PAD.y + MARKET_PAD.h * 0.5);
+
+      ctx.moveTo(m2.output.x + m2.output.w * 0.6, m2.output.y + m2.output.h * 0.5);
+      ctx.lineTo(mergeX, m2.output.y + m2.output.h * 0.5);
+      ctx.lineTo(mergeX, MARKET_PAD.y + MARKET_PAD.h * 0.5);
       ctx.stroke();
+
       ctx.strokeStyle = 'rgba(140,110,75,0.4)';
       ctx.lineWidth = 22;
       ctx.stroke();
@@ -1987,16 +2150,16 @@
       // Cave walls instead of a house-yard fence
       [
         [18, 70, 90, 70, '#2a1a32'], [80, 48, 120, 64, '#241628'],
-        [220, 40, 110, 58, '#2e1c38'], [420, 36, 140, 54, '#261830'],
-        [700, 42, 130, 60, '#2c1a36'], [860, 58, 120, 80, '#241428'],
+        [220, 40, 110, 58, '#2e1c38'], [MAP_W * 0.45, 36, 140, 54, '#261830'],
+        [MAP_W * 0.72, 42, 130, 60, '#2c1a36'], [MAP_W - 140, 58, 120, 80, '#241428'],
         [8, 200, 70, 110, '#201426'], [8, 400, 64, 130, '#261830'],
-        [920, 180, 80, 120, '#221428'], [910, 400, 86, 150, '#1e1224'],
-        [40, 540, 140, 80, '#281830'], [820, 540, 150, 86, '#241628']
+        [MAP_W - 80, 200, 80, 120, '#221428'], [MAP_W - 90, 420, 86, 150, '#1e1224'],
+        [40, MAP_H - 120, 140, 80, '#281830'], [MAP_W - 180, MAP_H - 120, 150, 86, '#241628']
       ].forEach(([x, y, w, h, c]) => drawCaveRock(x, y, w, h, c));
 
-      [[80, 128, 1.05], [210, 96, 0.78], [470, 88, 0.7], [880, 108, 1],
-        [48, 310, 0.85], [956, 300, 0.9], [70, 560, 1.15], [940, 548, 1],
-        [280, 575, 0.65], [700, 572, 0.72]
+      [[80, 128, 1.05], [210, 96, 0.78], [MAP_W * 0.48, 88, 0.7], [MAP_W - 120, 108, 1],
+        [48, 310, 0.85], [MAP_W - 44, 300, 0.9], [70, MAP_H - 100, 1.15], [MAP_W - 60, MAP_H - 110, 1],
+        [280, MAP_H - 85, 0.65], [MAP_W * 0.7, MAP_H - 88, 0.72]
       ].forEach(([x, y, s]) => drawCrystalCluster(x, y, s));
 
       [[108, 176, 9, 3], [168, 198, 7, 8], [92, 328, 8, 12],
@@ -3097,7 +3260,9 @@
     }
 
     function drawOrderBoard() {
-      const bx = 780, by = 118, bw = 150, bh = 128;
+      const bw = 150, bh = 128;
+      const bx = Math.min(MAP_W - bw - 50, MARKET_PAD.x - 10);
+      const by = YARD.y + 16;
 
       ctx.strokeStyle = 'rgba(180,120,60,0.55)';
       ctx.lineWidth = 3;
@@ -4067,8 +4232,8 @@
       requestAnimationFrame(loop);
     }
 
-    state = newState();
     resize();
+    state = newState();
     updateHud();
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
