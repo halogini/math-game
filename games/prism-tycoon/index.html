@@ -293,7 +293,8 @@
     const cv = document.getElementById('game');
     const ctx = cv.getContext('2d');
 
-    let MAP_W = 1000, MAP_H = 640;
+    let MAP_W = 1120, MAP_H = 680;
+    let camera = { x: 0, y: 0, inited: false };
     const GAME_TIME = 300;
     const CAPACITY_BASE = 16;
     const BAG_STEP = 10;
@@ -998,8 +999,8 @@
       s.orderFlash = 1;
     }
 
-    // ---------- view ----------
-    let view = { scale: 1, ox: 0, oy: 0, w: 0, h: 0 };
+    // ---------- view & camera ----------
+    let view = { scale: 1, ox: 0, oy: 0, w: 0, h: 0, vw: 1600, vh: 680 };
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1009,14 +1010,19 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       MAP_H = 680;
-      MAP_W = Math.max(1000, Math.min(1800, MAP_H * (w / h)));
+      MAP_W = 1120;
+
+      const scale = Math.max(h / MAP_H, w / MAP_W);
+      const vw = w / scale;
+      const vh = h / scale;
+      view = { scale, ox: 0, oy: 0, w, h, vw, vh };
 
       YARD = { x: 30, y: 110, w: MAP_W - 60, h: MAP_H - 140 };
 
-      const col1 = MAP_W * 0.12;
-      const col2 = MAP_W * 0.38;
-      const col3 = MAP_W * 0.64;
-      const col4 = MAP_W * 0.88;
+      const col1 = 170;
+      const col2 = 410;
+      const col3 = 650;
+      const col4 = 890;
 
       MINE_VEIN = { x: col1 - 65, y: 390, w: 130, h: 120 };
       BAG_PAD = { x: col1 - 65, y: 240, w: 130, h: 80 };
@@ -1048,12 +1054,38 @@
         sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
       };
 
-        BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 25, y1: YARD.y + YARD.h - 25 };
-
-        const scale = Math.min(w / MAP_W, h / MAP_H) * 0.99;
-      view = { scale, ox: (w - MAP_W * scale) / 2, oy: (h - MAP_H * scale) / 2, w, h };
+      BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 25, y1: YARD.y + YARD.h - 25 };
     }
     window.addEventListener('resize', resize);
+
+    function updateCamera(dt) {
+      if (!state || !state.player) return;
+      const p = state.player;
+      let targetX = 0;
+      let targetY = 0;
+
+      if (view.vw >= MAP_W) {
+        targetX = (MAP_W - view.vw) / 2;
+      } else {
+        targetX = Math.max(0, Math.min(MAP_W - view.vw, p.x - view.vw / 2));
+      }
+
+      if (view.vh >= MAP_H) {
+        targetY = (MAP_H - view.vh) / 2;
+      } else {
+        targetY = Math.max(0, Math.min(MAP_H - view.vh, p.y - view.vh / 2));
+      }
+
+      if (!camera.inited) {
+        camera.x = targetX;
+        camera.y = targetY;
+        camera.inited = true;
+      } else {
+        const lerp = Math.min(1, (dt || 0.016) * 7);
+        camera.x += (targetX - camera.x) * lerp;
+        camera.y += (targetY - camera.y) * lerp;
+      }
+    }
 
     // ---------- input ----------
     const keys = new Set();
@@ -1076,8 +1108,8 @@
 
     function mapPointer(e) {
       return {
-        x: (e.offsetX - view.ox) / view.scale,
-        y: (e.offsetY - view.oy) / view.scale
+        x: e.offsetX / view.scale + camera.x,
+        y: e.offsetY / view.scale + camera.y
       };
     }
 
@@ -1115,8 +1147,9 @@
       if (stick && stick.id === e.pointerId) {
         // 드래그 없이 탭(클릭)만 한 경우: 바닥 클릭 이동
         if (!stick.moved && state && state.phase === 'play') {
-          const mx = (e.offsetX - view.ox) / view.scale;
-          const my = (e.offsetY - view.oy) / view.scale;
+          const p = mapPointer(e);
+          const mx = p.x;
+          const my = p.y;
 
           let hitUi = false;
           for (const h of uiHits) {
@@ -3621,8 +3654,8 @@
       const sh = state.shake || 0;
       const jx = sh ? (Math.random() - 0.5) * 10 * sh : 0;
       const jy = sh ? (Math.random() - 0.5) * 8 * sh : 0;
-      ctx.translate(view.ox + jx, view.oy + jy);
       ctx.scale(view.scale, view.scale);
+      ctx.translate(-camera.x + jx, -camera.y + jy);
 
       drawAtmosphere();
       drawYard();
@@ -3755,8 +3788,8 @@
         failFlash: 0,
         sparkCd: 0,
         revealT: 0,
-        cx: MAP_W / 2,
-        cy: MAP_H / 2 - 4
+        cx: camera.x + view.vw / 2,
+        cy: camera.y + view.vh / 2 - 4
       };
     }
 
@@ -3978,7 +4011,7 @@
       const border = lesson.cuts >= 2 ? GEMS.trap.line : GEMS.raw.line;
 
       ctx.fillStyle = 'rgba(8, 6, 16, 0.72)';
-      ctx.fillRect(0, 0, MAP_W, MAP_H);
+      ctx.fillRect(camera.x - 100, camera.y - 100, view.vw + 200, view.vh + 200);
 
       const cardW = 440, cardH = 400;
       const cardX = cx - cardW / 2, cardY = cy - cardH / 2 - 16;
@@ -4225,6 +4258,7 @@
         if (state && state.phase === 'play') update(dt);
         else if (state && state.phase === 'cutLesson') updateCutLesson(dt);
         if (state) tickOreSpill(state, dt);
+        updateCamera(dt);
         draw();
       } catch (err) {
         console.error('PRISM TYCOON draw error:', err);
