@@ -654,9 +654,10 @@
     // ---------- 냥순이 sprites ----------
     const ASSET_DIR = (function() {
       let path = window.location.pathname || '';
-      if (!path.endsWith('/')) {
-        const last = path.lastIndexOf('/');
-        path = last >= 0 ? path.substring(0, last + 1) : '';
+      if (path.endsWith('.html')) {
+        path = path.substring(0, path.lastIndexOf('/') + 1);
+      } else if (!path.endsWith('/')) {
+        path += '/';
       }
       return path + 'assets/';
     })();
