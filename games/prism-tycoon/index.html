@@ -50,7 +50,25 @@
       align-items: center;
       gap: 6px;
     }
-    .hud-right { min-width: 0; }
+    .hud-right { min-width: 48px; height: 40px; }
+    .btn-sound {
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + 10px);
+      right: 12px;
+      z-index: 60;
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(22, 12, 32, 0.88);
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+    }
+    .btn-sound:hover { border-color: var(--gold); }
+    .btn-sound.muted { opacity: 0.55; }
     .hud-title { font: 800 16px Outfit, sans-serif; color: var(--gold); letter-spacing: 0.06em; }
     .chip {
       display: flex; align-items: center; gap: 7px;
@@ -262,6 +280,45 @@
       background: linear-gradient(135deg, #f0c36a, #e8a54b); border: none; border-radius: 14px;
       color: #2a1608;
     }
+    .btn-main:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+      filter: grayscale(0.25);
+      background: linear-gradient(135deg, #8a7a62, #6b5a48);
+      color: #2a241c;
+    }
+    .load-wrap {
+      margin-top: 14px;
+    }
+    .load-track {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(240, 195, 106, 0.45);
+      overflow: hidden;
+      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.45);
+    }
+    .load-fill {
+      display: block;
+      height: 100%;
+      width: 100%;
+      border-radius: inherit;
+      transform: scaleX(0);
+      transform-origin: left center;
+      background: linear-gradient(90deg, #c4b5fd 0%, #f0c36a 55%, #86efac 100%);
+      transition: transform 0.18s ease-out;
+    }
+    .load-label {
+      margin: 8px 0 0;
+      text-align: center;
+      font: 700 12px Outfit, Pretendard, sans-serif;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+    }
+    .load-wrap.ready .load-fill {
+      background: linear-gradient(90deg, #34d399, #86efac);
+    }
+    .load-wrap.ready .load-label { color: #86efac; }
     .final {
       text-align: center; margin: 10px 0 14px; padding: 14px;
       background: rgba(232, 195, 106, 0.1); border: 1px solid var(--line); border-radius: 14px;
@@ -355,6 +412,9 @@
         font-size: 15px;
         border-radius: 10px;
       }
+      .load-wrap { margin-top: 8px; }
+      .load-track { height: 10px; }
+      .load-label { margin-top: 5px; font-size: 11px; }
       .final {
         margin: 4px 0 6px;
         padding: 6px 10px;
@@ -383,6 +443,8 @@
 <body>
   <div id="app">
     <canvas id="game"></canvas>
+
+    <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
 
     <div id="rotate-gate" class="rotate-gate hidden" aria-hidden="true">
       <div class="rotate-gate-card">
@@ -421,7 +483,13 @@
           <div><span>⬆️</span><b>업그레이드</b><span>기계 앞에서 사고 강화합니다</span></div>
         </div>
         <div class="note">어떤 기계가 어떤 모양을 만드는지는 직접 알아내세요. WASD·드래그로 이동.</div>
-        <button class="btn-main" id="btn-start">게임 시작</button>
+        <div class="load-wrap" id="load-wrap" aria-live="polite">
+          <div class="load-track">
+            <div class="load-fill" id="load-fill"></div>
+          </div>
+          <p class="load-label" id="load-label">공방 차리는 중… 0%</p>
+        </div>
+        <button class="btn-main" id="btn-start" disabled>불러오는 중…</button>
       </div>
     </div>
 
@@ -447,6 +515,234 @@
 
     const cv = document.getElementById('game');
     const ctx = cv.getContext('2d');
+
+    const SOUND_KEY = 'prism-tycoon-muted';
+    const KIND_STEP = { raw: 0, trap: 1, para: 2, rhombus: 3, rect: 3, square: 5 };
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = localStorage.getItem(SOUND_KEY) === '1';
+        this._denyAt = 0;
+        this._grindAt = 0;
+        this._chargeAt = 0;
+        this._cashAt = 0;
+        this._mineAt = 0;
+        this._fullAt = 0;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+      }
+      now() { return this.ctx ? this.ctx.currentTime : 0; }
+      tone(freq, dur, type, vol, when, slideTo) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const t0 = this.now() + (when || 0);
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = type === 'square' || type === 'sawtooth' ? 2400 : 4800;
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(Math.max(40, freq), t0);
+        if (slideTo != null) {
+          osc.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t0 + dur);
+        }
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol), t0 + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+      }
+      noiseBurst(dur, vol, when, hp, lp) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const t0 = this.now() + (when || 0);
+        const len = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
+        const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const hpF = this.ctx.createBiquadFilter();
+        hpF.type = 'highpass';
+        hpF.frequency.value = hp == null ? 400 : hp;
+        const lpF = this.ctx.createBiquadFilter();
+        lpF.type = 'lowpass';
+        lpF.frequency.value = lp == null ? 2800 : lp;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(Math.max(0.0001, vol), t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        src.connect(hpF);
+        hpF.connect(lpF);
+        lpF.connect(gain);
+        gain.connect(this.ctx.destination);
+        src.start(t0);
+        src.stop(t0 + dur + 0.02);
+      }
+      click() {
+        this.noiseBurst(0.03, 0.04, 0, 1400, 5200);
+        this.tone(880, 0.04, 'sine', 0.035);
+      }
+      mine(stack) {
+        const t = this.now();
+        if (t - this._mineAt < 0.07) return;
+        this._mineAt = t;
+        const n = Math.min(12, stack || 1);
+        this.noiseBurst(0.06, 0.08, 0, 900, 6200);
+        this.tone(560 + n * 24 + Math.random() * 40, 0.09, 'triangle', 0.11);
+        this.tone(820 + n * 32, 0.07, 'sine', 0.07, 0.02);
+        this.tone(300, 0.07, 'sine', 0.04, 0.03, 180);
+      }
+      oreLand() {
+        this.noiseBurst(0.04, 0.04, 0, 500, 2800);
+        this.tone(360 + Math.random() * 80, 0.06, 'triangle', 0.045);
+      }
+      deposit() {
+        this.noiseBurst(0.04, 0.03, 0, 300, 1800);
+        this.tone(420, 0.06, 'sine', 0.035, 0, 280);
+      }
+      collect(kind) {
+        const step = KIND_STEP[kind] || 0;
+        this.tone(520 + step * 70, 0.06, 'sine', 0.055);
+        this.tone(680 + step * 80, 0.09, 'sine', 0.04, 0.035);
+      }
+      craft(kind) {
+        const step = KIND_STEP[kind] || 0;
+        this.noiseBurst(0.08, 0.035, 0, 400, 2600);
+        this.tone(392 + step * 50, 0.09, 'triangle', 0.07);
+        this.tone(523 + step * 70, 0.12, 'sine', 0.06, 0.06);
+        if (kind === 'square') {
+          this.tone(784, 0.16, 'sine', 0.07, 0.12);
+          this.tone(1046, 0.18, 'sine', 0.05, 0.18);
+        }
+      }
+      sellHop() {
+        this.noiseBurst(0.05, 0.03, 0, 500, 2400);
+        this.tone(640, 0.07, 'sine', 0.03, 0, 820);
+      }
+      bills(wanted) {
+        this.tone(wanted ? 784 : 659, 0.08, 'triangle', 0.06);
+        this.tone(wanted ? 988 : 784, 0.12, 'sine', 0.05, 0.05);
+        this.noiseBurst(0.07, 0.03, 0.02, 700, 3200);
+      }
+      cash(combo, wanted) {
+        const t = this.now();
+        if (combo > 18 && combo % 2) return;
+        if (combo > 40 && combo % 3) return;
+        if (t - this._cashAt < 0.012) return;
+        this._cashAt = t;
+        const pitch = Math.min(1480, 620 + combo * 16 + (wanted ? 80 : 0));
+        this.tone(pitch, 0.045, 'sine', 0.028 + Math.min(0.02, combo * 0.0006));
+      }
+      charge(p) {
+        const t = this.now();
+        if (t - this._chargeAt < 0.12) return;
+        this._chargeAt = t;
+        this.tone(260 + p * 480, 0.07, 'sine', 0.04 + p * 0.035);
+      }
+      install() {
+        this.tone(392, 0.1, 'triangle', 0.09);
+        this.tone(523, 0.12, 'sine', 0.08, 0.08);
+        this.tone(659, 0.16, 'sine', 0.09, 0.16);
+        this.noiseBurst(0.12, 0.04, 0.04, 300, 2200);
+      }
+      upgrade() {
+        this.tone(523, 0.08, 'sine', 0.08);
+        this.tone(659, 0.1, 'sine', 0.07, 0.07);
+        this.tone(784, 0.14, 'sine', 0.08, 0.14);
+      }
+      bag() {
+        this.tone(330, 0.1, 'triangle', 0.07, 0, 520);
+        this.tone(440, 0.12, 'sine', 0.06, 0.08, 660);
+        this.noiseBurst(0.1, 0.035, 0, 200, 1600);
+      }
+      deny() {
+        const t = this.now();
+        if (t - this._denyAt < 0.85) return;
+        this._denyAt = t;
+        this.tone(220, 0.16, 'square', 0.05, 0, 140);
+        this.noiseBurst(0.1, 0.03, 0.02, 80, 700);
+      }
+      full() {
+        const t = this.now();
+        if (t - this._fullAt < 1.1) return;
+        this._fullAt = t;
+        this.tone(180, 0.12, 'triangle', 0.06);
+        this.noiseBurst(0.1, 0.04, 0, 120, 900);
+      }
+      order() {
+        this.tone(523, 0.08, 'sine', 0.07);
+        this.tone(659, 0.09, 'sine', 0.07, 0.08);
+        this.tone(784, 0.14, 'sine', 0.08, 0.16);
+      }
+      orderDone() {
+        this.tone(587, 0.09, 'sine', 0.09);
+        this.tone(740, 0.1, 'sine', 0.08, 0.08);
+        this.tone(880, 0.12, 'sine', 0.09, 0.16);
+        this.tone(1174, 0.18, 'sine', 0.08, 0.26);
+      }
+      footstep() {
+        this.noiseBurst(0.04, 0.022, 0, 70, 650);
+      }
+      grind() {
+        const t = this.now();
+        if (t - this._grindAt < 0.042) return;
+        this._grindAt = t;
+        this.noiseBurst(0.055, 0.05, 0, 700, 3800);
+        this.tone(170 + Math.random() * 50, 0.05, 'sawtooth', 0.018);
+      }
+      slice() {
+        this.noiseBurst(0.1, 0.07, 0, 900, 5000);
+        this.tone(880, 0.08, 'sine', 0.07, 0, 1320);
+        this.tone(1175, 0.12, 'sine', 0.05, 0.05);
+      }
+      cutFail() {
+        this.tone(277, 0.16, 'sine', 0.08, 0, 180);
+        this.noiseBurst(0.12, 0.04, 0.02, 120, 900);
+      }
+      lesson() {
+        this.tone(440, 0.1, 'sine', 0.06, 0, 660);
+        this.noiseBurst(0.12, 0.03, 0.02, 300, 2200);
+      }
+      success() {
+        this.tone(523, 0.09, 'sine', 0.09);
+        this.tone(659, 0.1, 'sine', 0.08, 0.08);
+        this.tone(784, 0.14, 'sine', 0.09, 0.16);
+        this.tone(1046, 0.2, 'sine', 0.07, 0.26);
+      }
+      finish(record) {
+        this.tone(392, 0.16, 'sine', 0.08);
+        this.tone(330, 0.2, 'sine', 0.07, 0.12);
+        this.tone(262, 0.28, 'triangle', 0.07, 0.26);
+        if (record) {
+          this.tone(523, 0.12, 'sine', 0.08, 0.4);
+          this.tone(659, 0.14, 'sine', 0.08, 0.5);
+          this.tone(784, 0.22, 'sine', 0.09, 0.62);
+        }
+      }
+      timeWarn() {
+        this.tone(880, 0.1, 'square', 0.06);
+        this.tone(660, 0.14, 'square', 0.05, 0.12);
+      }
+      tick() {
+        this.tone(720, 0.05, 'sine', 0.04);
+      }
+    }
+
+    const sound = new SoundEngine();
+    let walkSoundFrame = -1;
 
     let MAP_W = 1120, MAP_H = 560;
     let camera = { x: 0, y: 0, inited: false };
@@ -902,7 +1198,7 @@
     // Same crystal body — kinds differ by silhouette and border only (fill never changes).
     const GEM_FILL = '#e9d5ff';
     const GEMS = {
-      // props = [이등분, 직교, 등변]
+      // props = [이등분, 직교, 등변] — more specific shapes keep all of a parent’s props
       raw:     { name: '원석',       price: 9,   fill: GEM_FILL, line: '#1c1917', props: [0, 0, 0],
         diag: '특별한 성질 없음' },
       trap:    { name: '사다리꼴',   price: 22,  fill: GEM_FILL, line: '#15803d', props: [0, 0, 0],
@@ -916,6 +1212,20 @@
       square:  { name: '정사각형',   price: 240, fill: GEM_FILL, line: '#db2777', props: [1, 1, 1],
         diag: '대각선이 이등분·직교·길이 같음' }
     };
+
+    // 포함관계: 주문 도형의 성질을 모두 갖춘 더 특수한 사각형도 인정
+    // 예) 사다리꼴 요청 → 평행사변형·마름모·직사각형·정사각형 OK
+    function fulfillsOrder(gemKind, orderKind) {
+      if (!gemKind || gemKind === 'raw') return false;
+      if (!GEMS[gemKind] || !GEMS[orderKind]) return false;
+      if (orderKind === 'trap') return true;
+      const need = GEMS[orderKind].props;
+      const have = GEMS[gemKind].props;
+      for (let i = 0; i < need.length; i++) {
+        if (need[i] && !have[i]) return false;
+      }
+      return true;
+    }
 
     // ---------- shapes ----------
     // Every gem is a quad with the same vertex order so morphing is a plain lerp.
@@ -1038,6 +1348,39 @@
       return out;
     }
 
+    const loadTrack = { total: 0, done: 0, ready: false, tracking: false };
+    const loadFillEl = document.getElementById('load-fill');
+    const loadLabelEl = document.getElementById('load-label');
+    const loadWrapEl = document.getElementById('load-wrap');
+    const btnStart = document.getElementById('btn-start');
+
+    function updateLoadUi() {
+      const p = loadTrack.total ? Math.min(1, loadTrack.done / loadTrack.total) : 0;
+      if (loadFillEl) loadFillEl.style.transform = `scaleX(${p})`;
+      if (loadLabelEl && !loadTrack.ready) {
+        loadLabelEl.textContent = `공방 차리는 중… ${Math.round(p * 100)}%`;
+      }
+    }
+
+    function noteAsset() {
+      if (!loadTrack.tracking) return;
+      loadTrack.done = Math.min(loadTrack.total, loadTrack.done + 1);
+      updateLoadUi();
+    }
+
+    function setArtReady() {
+      if (loadTrack.ready) return;
+      loadTrack.ready = true;
+      loadTrack.tracking = false;
+      if (loadFillEl) loadFillEl.style.transform = 'scaleX(1)';
+      if (loadWrapEl) loadWrapEl.classList.add('ready');
+      if (loadLabelEl) loadLabelEl.textContent = '준비 완료';
+      if (btnStart) {
+        btnStart.disabled = false;
+        btnStart.textContent = '게임 시작';
+      }
+    }
+
     function loadImg(src) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -1067,10 +1410,12 @@
               frames.push(c);
             }
           }
+          noteAsset();
           resolve({ idle: frames[0], walk: frames.slice(cols) });
         };
         img.onerror = () => {
           console.warn('loadSheet error loading:', src);
+          noteAsset();
           resolve(null);
         };
         img.src = src;
@@ -1113,8 +1458,8 @@
     function loadPng(src) {
       return new Promise((resolve) => {
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
+        img.onload = () => { noteAsset(); resolve(img); };
+        img.onerror = () => { noteAsset(); resolve(null); };
         img.src = src;
       });
     }
@@ -1339,6 +1684,11 @@
     }
 
     async function loadArt() {
+      const SHEET_COUNT = 5;
+      loadTrack.total = 6 + SHEET_COUNT + FACTORY_IDS.length * 5;
+      loadTrack.done = 0;
+      loadTrack.tracking = true;
+      updateLoadUi();
       const [hall, bill, billWanted, stall, mine, bagIcon] = await Promise.all([
         loadPng(ASSET_DIR + 'hall-bg.png?v=kit12'),
         loadPng(ASSET_DIR + 'bill.png'),
@@ -1356,6 +1706,7 @@
       art.mine = mine;
       art.bagIcon = bagIcon;
       layoutMarketBelt();
+      setArtReady();
     }
 
     // catImg: { img, mirror } 반환. mirror=true 이면 drawPlayer에서 ctx.scale(-1,1) 적용.
@@ -1421,6 +1772,10 @@
 
     function collectRate(id) {
       return COLLECT_INTERVAL / (1 + 0.25 * Math.max(0, mLv(id) - 1));
+    }
+
+    function mineRate(s) {
+      return MINE_INTERVAL / (1 + 0.32 * (s.bagLevel || 0));
     }
 
     function stackStep(index) {
@@ -1569,6 +1924,7 @@
           o.settled = true;
           o.vx = 0;
           o.vy = 0;
+          sound.oreLand();
         }
       });
       let settled = 0;
@@ -1640,6 +1996,7 @@
       const maxT = 18 + Math.random() * 14;
       s.order = { kind, need, got: 0, mult, t: maxT, maxT };
       s.orderFlash = 1;
+      sound.order();
     }
 
     // ---------- view & camera ----------
@@ -1983,8 +2340,9 @@
       const p = state.player;
       const x = p.x - p.facing * 10;
       const y = p.y - 32;
+      const n = state.cashCombo > 24 ? 2 : 5;
 
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < n; i++) {
         const a = -0.4 + Math.random() * (Math.PI + 0.8);
         const sp = 45 + Math.random() * 95;
         state.sparks.push({
@@ -2002,8 +2360,12 @@
 
     function update(dt) {
       const s = state;
+      const prevTime = s.time;
       s.time -= dt;
       if (s.time <= 0) { s.time = 0; finish(); return; }
+      if (prevTime > 30 && s.time <= 30) sound.timeWarn();
+      else if (prevTime > 10 && s.time <= 10) sound.timeWarn();
+      if (s.time <= 10 && s.time > 0 && Math.floor(prevTime) !== Math.floor(s.time)) sound.tick();
 
       if (s.order) {
         s.order.t -= dt;
@@ -2023,8 +2385,12 @@
         const idx = Math.round(((angle / (Math.PI * 2)) + 1) * 8) % 8;
         s.player.dir = DIRS_8[idx];
         s.player.walkT += dt;
+        const wf = Math.floor(s.player.walkT * WALK_FPS);
+        if (wf !== walkSoundFrame && wf % 2 === 0) sound.footstep();
+        walkSoundFrame = wf;
       } else {
         s.player.walkT = 0;
+        walkSoundFrame = -1;
       }
       if (s.player.moving && Math.random() < dt * 14) {
         s.dust.push({
@@ -2038,8 +2404,9 @@
 
       if (inRect(s.player, MINE_VEIN)) {
         s.mineT += dt;
-        while (s.mineT >= MINE_INTERVAL) {
-          s.mineT -= MINE_INTERVAL;
+        const rate = mineRate(s);
+        while (s.mineT >= rate) {
+          s.mineT -= rate;
           const cap = carryCap(s);
           if (s.carry.length >= cap) {
             s.mineT = 0;
@@ -2050,6 +2417,7 @@
           pluckOreFromPile(s);
           spawnOreFromCave(s, Math.random() < 0.4 ? 2 : 1);
           addSparks(MINE_VEIN.x + MINE_VEIN.w / 2, MINE_VEIN.y + 20, '#a5b4fc', 3);
+          sound.mine(s.carry.length);
         }
       } else s.mineT = 0;
 
@@ -2100,6 +2468,7 @@
             startFly(g, from.x, from.y, slot.x, slot.y);
             ws.queue.push(g);
             addSparks(slot.x, slot.y, '#a5b4fc', 4);
+            sound.deposit();
           }
         }
 
@@ -2131,6 +2500,7 @@
             ws.output.push(out);
             s.glow[m.id] = 1;
             addSparks(slot.x, slot.y, GEMS[out.kind].line, 8);
+            sound.craft(out.kind);
             return false;
           }
           return true;
@@ -2153,6 +2523,7 @@
             startFly(g, from.x, from.y, to.x, to.y);
             s.carry.push(g);
             addSparks(to.x, to.y, '#fde68a', 5);
+            sound.collect(g.kind);
           }
         }
       });
@@ -2171,10 +2542,12 @@
         const cost = m.costs[lv];
         if (s.gold < cost) {
           s.buyT[m.id] = 0;
+          if (s.poorFlash <= 0) sound.deny();
           s.poorFlash = Math.max(s.poorFlash, 0.55);
           return;
         }
         s.buyT[m.id] = (s.buyT[m.id] || 0) + dt;
+        sound.charge(s.buyT[m.id] / 1.5);
         if (s.buyT[m.id] >= 1.5) {
           s.buyT[m.id] = 0;
           buy(m);
@@ -2189,9 +2562,11 @@
         const bagCost = BAG_COSTS[s.bagLevel];
         if (s.gold >= bagCost) {
           s.bagT += dt;
+          sound.charge(s.bagT / 1.5);
           if (s.bagT >= 1.5) { s.bagT = 0; buyBag(); }
         } else {
           s.bagT = 0;
+          if (s.poorFlash <= 0) sound.deny();
           s.poorFlash = Math.max(s.poorFlash, 0.55);
         }
       } else s.bagT = 0;
@@ -2203,7 +2578,7 @@
           if (!s.carry.length) { s.sellT = 0; break; }
           const gem = s.carry.shift();
           const ord = s.order;
-          const wanted = ord && gem.kind === ord.kind && ord.got < ord.need;
+          const wanted = ord && fulfillsOrder(gem.kind, ord.kind) && ord.got < ord.need;
           const mult = wanted ? ord.mult : 1;
           const value = GEMS[gem.kind].price * mult;
           s.sold[gem.kind] = (s.sold[gem.kind] || 0) + 1;
@@ -2222,6 +2597,7 @@
             if (ord.got >= ord.need) {
               bonus = Math.floor(GEMS[ord.kind].price * ord.mult * 0.5);
               addFloater(s.player.x, s.player.y - 72, '완료!', '#f472b6', true);
+              sound.orderDone();
               s.order = null;
               s.eventWait = EVENT_GAP_MIN + Math.random() * 12;
             }
@@ -2241,6 +2617,7 @@
             }
           });
           addSparks(s.player.x, s.player.y - 20, wanted ? '#f9a8d4' : '#fde68a', wanted ? 8 : 4);
+          sound.sellHop();
         }
       } else s.sellT = 0;
 
@@ -2293,6 +2670,7 @@
       if (state.bagLevel >= bagMax()) return;
       const cost = BAG_COSTS[state.bagLevel];
       if (state.gold < cost) {
+        if (state.poorFlash <= 0) sound.deny();
         state.poorFlash = Math.max(state.poorFlash, 0.7);
         return;
       }
@@ -2300,6 +2678,7 @@
       state.bagLevel++;
       addFloater(state.player.x, state.player.y - 50, '가방+' + carryCap(state), '#5eead4', true);
       addSparks(state.player.x, state.player.y - 30, '#5eead4', 10);
+      sound.bag();
     }
 
     // Stuck / blocked feedback: blink red ~1s, rest ~0.9s, repeat.
@@ -2342,6 +2721,7 @@
         s.warnKey = sig;
         s.fullFlash = 1.0;
         s.fullRest = 0;
+        sound.full();
         return;
       }
       if (s.fullFlash > 0) {
@@ -2457,7 +2837,7 @@
           },
           settle: 0
         });
-        stagger += 0.045;
+        stagger += 0.038;
       }
     }
 
@@ -2506,6 +2886,7 @@
             spawnBills(c.value, c.wanted);
             if (c.bonus > 0) spawnBills(c.bonus, true);
             addSparks(BELT.sink.x, BELT.sink.y, c.wanted ? '#f9a8d4' : '#86efac', c.wanted ? 10 : 5);
+            sound.bills(c.wanted);
             continue;
           }
           kept.push(c);
@@ -2543,36 +2924,60 @@
 
       // Eat landed bills while more are still flying in — walk over during the
       // stack-up. Carry OK; never vacuum while standing on the sell pad.
-      const hasLanded = s.bills.some((b) => !b.fly && (b.settle || 0) >= 0.05);
+      const SETTLED = 0.012;
+      const hasLanded = s.bills.some((b) => !b.fly && (b.settle || 0) >= SETTLED);
       const selling = inRect(p, MARKET_PAD);
       const near = !selling
         && hasLanded
-        && Math.hypot(p.x - CASH_ANCHOR.x, p.y - CASH_ANCHOR.y) < 72;
+        && Math.hypot(p.x - CASH_ANCHOR.x, p.y - CASH_ANCHOR.y) < 76;
       if (!near) {
         s.cashT = 0;
         s.cashCombo = 0;
+        s.cashPile0 = 0;
         return;
       }
+
+      let remaining = 0;
+      for (let i = 0; i < s.bills.length; i++) remaining += s.bills[i].value;
+      s.cashPile0 = Math.max(s.cashPile0 || 0, remaining);
+
+      // Small piles: ~60 bills/s (first frame already eats). Extra rate only after ~250.
+      // 3000–6000 still clears in ~2s, without the instant gulp.
+      const combo = s.cashCombo || 0;
+      const extra = Math.max(0, s.cashPile0 - 250) / 14;
+      const bps = (62 + Math.min(260, extra)) * (1 + Math.min(0.45, combo * 0.012));
+      const gulp = s.cashPile0 >= 2500 ? Math.max(2, Math.min(5, Math.round(bps / 55))) : 1;
+      const interval = gulp / bps;
+
       s.cashT = (s.cashT || 0) + dt;
-      // Accelerate: start ~12/s, ramp toward ~90/s as combo grows.
       while (s.bills.length) {
-        const combo = s.cashCombo || 0;
-        const interval = Math.max(0.011, 0.085 / (1 + combo * 0.22));
         if (s.cashT < interval) break;
-        let idx = -1;
-        for (let i = s.bills.length - 1; i >= 0; i--) {
-          const b = s.bills[i];
-          if (!b.fly && (b.settle || 0) >= 0.05) { idx = i; break; }
+        let eaten = 0;
+        let lastWanted = false;
+        let lastIdx = 0;
+        for (let g = 0; g < gulp; g++) {
+          let idx = -1;
+          for (let i = s.bills.length - 1; i >= 0; i--) {
+            const b = s.bills[i];
+            if (!b.fly && (b.settle || 0) >= SETTLED) { idx = i; break; }
+          }
+          if (idx < 0) break;
+          const b = s.bills.splice(idx, 1)[0];
+          s.gold += b.value;
+          s.lastEarn = (s.earnFlash > 0 ? s.lastEarn : 0) + b.value;
+          eaten++;
+          lastWanted = b.wanted;
+          lastIdx = idx;
         }
-        if (idx < 0) break;
+        if (!eaten) break;
         s.cashT -= interval;
-        s.cashCombo = combo + 1;
-        const b = s.bills.splice(idx, 1)[0];
-        s.gold += b.value;
-        s.lastEarn = (s.earnFlash > 0 ? s.lastEarn : 0) + b.value;
+        s.cashCombo = (s.cashCombo || 0) + eaten;
         s.earnFlash = 1.0;
-        const pos = cashSlot(idx);
-        addCashEatFx(pos.x, pos.y, b.wanted ? '#f9a8d4' : '#86efac');
+        if (s.cashCombo < 12 || s.cashCombo % 2 === 0) {
+          const pos = cashSlot(lastIdx);
+          addCashEatFx(pos.x, pos.y, lastWanted ? '#f9a8d4' : '#86efac');
+        }
+        sound.cash(s.cashCombo, lastWanted);
       }
     }
 
@@ -4452,6 +4857,7 @@
       if (m.req && mLv(m.req) < 1) return;
       const cost = m.costs[lv];
       if (state.gold < cost) {
+        if (state.poorFlash <= 0) sound.deny();
         state.poorFlash = Math.max(state.poorFlash, 0.7);
         return;
       }
@@ -4462,6 +4868,8 @@
       addSparks(state.player.x, state.player.y - 30, '#c4b5fd', 12);
       state.glow[m.id] = 1;
       state.shake = Math.max(state.shake, 0.12);
+      if (lv === 0) sound.install();
+      else sound.upgrade();
     }
 
     // ---------- cut lesson: irregular quad + two parallel cuts → trapezoid ----------
@@ -4488,6 +4896,7 @@
         cx: camera.x + view.vw / 2,
         cy: camera.y + view.vh / 2 - 4
       };
+      sound.lesson();
     }
 
     function lessonHit(p, q, y) {
@@ -4565,6 +4974,7 @@
       lesson.revealT = 0.55;
       addSparks((g.x0 + g.x1) / 2, (g.y0 + g.y1) / 2, '#fde68a', 12);
       state.shake = Math.max(state.shake, 0.2);
+      sound.slice();
       if (lesson.cuts >= 2) {
         lesson.stage = 'done';
         lesson.revealT = 0.7;
@@ -4611,6 +5021,7 @@
         const t = Math.max(0, Math.min(1, guideAlong(p.x, p.y, lesson)));
         lesson.progress = Math.max(lesson.progress, t);
         lesson.grind = 1;
+        sound.grind();
         state.shake = Math.max(state.shake, 0.08 + lesson.progress * 0.14);
         if (lesson.sparkCd <= 0) {
           lesson.sparkCd = 0.025;
@@ -4660,7 +5071,10 @@
         lesson.holdDismiss = false;
       } else if (lesson.progress < 0.85) {
         const len = Math.hypot(d.x1 - d.x0, d.y1 - d.y0);
-        if (len > 35) lesson.failFlash = 0.75;
+        if (len > 35) {
+          lesson.failFlash = 0.75;
+          sound.cutFail();
+        }
       }
     }
 
@@ -4708,6 +5122,7 @@
       state.glow.parallel = 1;
       addFloater(slot.x, slot.y - 22, '사다리꼴 완성!', '#6ee7b7', true);
       addSparks(slot.x, slot.y, GEMS.trap.line, 16);
+      sound.success();
       if (el && el.hud) el.hud.classList.remove('hidden');
       state.cutLesson = null;
       state.phase = 'play';
@@ -4931,6 +5346,9 @@
     const resultOverlay = document.getElementById('result-overlay');
 
     function start() {
+      if (!loadTrack.ready) return;
+      sound.init();
+      sound.click();
       state = newState();
       state.phase = 'play';
       const previewLv = Number((location.search.match(/[?&]preview=(\d+)/) || [])[1] || 0);
@@ -4978,10 +5396,33 @@
 
       resultOverlay.classList.remove('hidden');
       updateHud();
+      sound.finish(isRecord);
     }
 
-    document.getElementById('btn-start').addEventListener('click', start);
+    btnStart.addEventListener('click', start);
     document.getElementById('btn-restart').addEventListener('click', start);
+
+    const btnSound = document.getElementById('btn-sound-toggle');
+    function syncMuteBtn() {
+      if (!btnSound) return;
+      btnSound.textContent = sound.muted ? '🔇' : '🔊';
+      btnSound.classList.toggle('muted', sound.muted);
+      btnSound.title = sound.muted ? '소리 켜기' : '음소거';
+    }
+    syncMuteBtn();
+    if (btnSound) {
+      btnSound.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sound.muted = !sound.muted;
+        try { localStorage.setItem(SOUND_KEY, sound.muted ? '1' : '0'); } catch (_) {}
+        syncMuteBtn();
+        if (!sound.muted) {
+          sound.init();
+          sound.click();
+        }
+      });
+    }
+    window.addEventListener('pointerdown', () => sound.init(), { once: true });
 
     function loop(ts) {
       try {
@@ -5007,7 +5448,10 @@
         .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}</b> <img class="ico-bill" src="${ASSET_DIR}bill.png" alt="">`);
     }
     requestAnimationFrame(loop);
-    loadArt().catch((err) => console.warn('PRISM TYCOON art load:', err));
+    loadArt().catch((err) => {
+      console.warn('PRISM TYCOON art load:', err);
+      setArtReady();
+    });
   })();
   </script>
 </body>

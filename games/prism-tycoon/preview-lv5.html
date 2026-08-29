@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>공장 1–5단계 시안 — 마감이 시대</title>
+  <style>
+    html, body { margin: 0; background: #efe8dc; color: #3b2a1a; font-family: Pretendard, sans-serif; }
+    header { padding: 16px 20px 4px; }
+    h1 { font-size: 17px; margin: 0 0 6px; }
+    p { margin: 0 0 8px; font-size: 13px; color: #6b5344; max-width: 920px; }
+    h2 { font-size: 12px; margin: 10px 20px 4px; letter-spacing: 0.06em; }
+    .row { display: flex; gap: 10px; padding: 4px 16px 12px; justify-content: center; flex-wrap: wrap; }
+    figure { margin: 0; text-align: center; }
+    figcaption { margin-top: 4px; font-size: 11px; font-weight: 700; }
+    canvas { background: #fff; border-radius: 8px; box-shadow: 0 4px 14px rgba(40,20,10,0.1); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>1–5단계 — 같은 상자, 마감이 세련·시대로</h1>
+    <p>민나무 구멍 → 놋쇠 → 유리 점등 → 금속 테두리 → 공정색 간판. 꼬깔 없음. 직각 기호는 창 한가운데 ⌞만. 별 없음. 게임에 붙이지 않음.</p>
+  </header>
+  <div id="grid"></div>
+  <h2>5단계 가동</h2>
+  <div class="row" id="run-row"></div>
+  <script>
+    const IDS = ['parallel', 'adjacent', 'right'];
+    const NAMES = { parallel: '나란히', adjacent: '이웃 변', right: '직각' };
+    const THEME = {
+      parallel: { accent: '#14b8a6', hi: '#5eead4', glow: 'rgba(45,212,191,0.42)' },
+      adjacent: { accent: '#7c3aed', hi: '#c4b5fd', glow: 'rgba(167,139,250,0.42)' },
+      right: { accent: '#d97706', hi: '#fbbf24', glow: 'rgba(251,191,36,0.42)' }
+    };
+    const BODY = { w: 140, h: 72 };
+    const D = 38, RH = 28, SCALE = 1.32;
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function drawMarkedSeg(ctx, x1, y1, x2, y2, arrows, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const dx = x2 - x1, dy = y2 - y1;
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L, px = -uy, py = ux;
+      for (let i = 0; i < arrows; i++) {
+        const along = (i - (arrows - 1) / 2) * 5.5;
+        const ax = mx + ux * along, ay = my + uy * along;
+        ctx.beginPath();
+        ctx.moveTo(ax - ux * 3.5 + px * 5, ay - uy * 3.5 + py * 5);
+        ctx.lineTo(ax + ux * 2.5, ay + uy * 2.5);
+        ctx.lineTo(ax - ux * 3.5 - px * 5, ay - uy * 3.5 - py * 5);
+        ctx.stroke();
+      }
+    }
+
+    function drawSign(ctx, id, cx, cy, scale, col) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      if (id === 'parallel') {
+        drawMarkedSeg(ctx, -18, -7, 18, -7, 1, col);
+        drawMarkedSeg(ctx, -18, 7, 18, 7, 1, col);
+      } else if (id === 'adjacent') {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-15, 10);
+        ctx.lineTo(0, -13);
+        ctx.lineTo(15, 10);
+        ctx.stroke();
+        ctx.lineWidth = 2.3;
+        ctx.beginPath();
+        ctx.moveTo(-11.2, -4.6);
+        ctx.lineTo(-4.2, 0.4);
+        ctx.moveTo(11.2, -4.6);
+        ctx.lineTo(4.2, 0.4);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(-10, 12);
+        ctx.lineTo(-10, -12);
+        ctx.lineTo(12, -12);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-10, -4);
+        ctx.lineTo(-2, -4);
+        ctx.lineTo(-2, -12);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function look(lv) {
+      const wood = lv >= 5
+        ? { f0: '#a0663c', f1: '#86502c', f2: '#5a3018' }
+        : lv >= 3
+          ? { f0: '#9a5c34', f1: '#7a4424', f2: '#4a2810' }
+          : { f0: '#8a5230', f1: '#6e3e20', f2: '#3d2410' };
+      return {
+        ...wood,
+        brass: lv >= 2,
+        glass: lv >= 3,
+        lanterns: lv >= 4,
+        metal: lv >= 4,
+        signboard: lv >= 5,
+        roofFinish: lv
+      };
+    }
+
+    function signColor(id, lv, busy) {
+      const t = THEME[id];
+      if (busy && lv >= 3) return t.hi;
+      if (lv >= 5) return t.hi;
+      if (lv >= 2) return t.accent;
+      return '#b8a090';
+    }
+
+    function frameColor(id, lv, busy) {
+      const t = THEME[id];
+      if (lv >= 5) return busy ? t.hi : t.accent;
+      if (lv >= 4) return busy ? t.hi : '#d4b07a';
+      if (lv >= 3) return busy ? t.accent : '#c4a070';
+      return '#8a7058';
+    }
+
+    function drawLantern(ctx, lx, ly, on) {
+      ctx.fillStyle = '#2a1810';
+      ctx.fillRect(lx, ly - 8, 2.5, 10);
+      ctx.fillStyle = on ? 'rgba(253,224,71,1)' : 'rgba(253,224,71,0.28)';
+      ctx.beginPath();
+      ctx.arc(lx + 1.2, ly - 12, 4.2, 0, Math.PI * 2);
+      ctx.fill();
+      if (on) {
+        ctx.fillStyle = 'rgba(253,186,116,0.28)';
+        ctx.beginPath();
+        ctx.arc(lx + 1.2, ly - 12, 9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawSmoke(ctx, cx, cy) {
+      ctx.fillStyle = 'rgba(180,190,210,0.34)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(200,210,230,0.24)';
+      ctx.beginPath();
+      ctx.arc(cx + 6, cy - 9, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawHousing(ctx, x, y, w, h, lv, busy, id) {
+      const L = look(lv);
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2 + 8, y + h + 9, w * 0.56, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1a0e08';
+      ctx.beginPath();
+      ctx.moveTo(x + w, y);
+      ctx.lineTo(x + w + D * 0.7, y - RH);
+      ctx.lineTo(x + w + D * 0.7, y + h - RH);
+      ctx.lineTo(x + w, y + h);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = lv >= 5 ? '#d4a06a' : '#c48448';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + D * 0.7, y - RH);
+      ctx.lineTo(x + w + D * 0.7, y - RH);
+      ctx.lineTo(x + w, y);
+      ctx.closePath();
+      ctx.fill();
+
+      const front = ctx.createLinearGradient(x, y, x + w, y);
+      front.addColorStop(0, L.f0);
+      front.addColorStop(0.4, L.f1);
+      front.addColorStop(1, L.f2);
+      ctx.fillStyle = front;
+      roundRect(ctx, x, y, w, h, lv >= 5 ? 6 : 4);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,210,140,0.26)';
+      ctx.fillRect(x + 2, y + 4, 4, h - 8);
+      ctx.strokeStyle = lv >= 5 ? 'rgba(255,236,200,0.55)' : 'rgba(255,220,150,0.4)';
+      ctx.lineWidth = lv >= 4 ? 2.4 : 1.8;
+      roundRect(ctx, x, y, w, h, lv >= 5 ? 6 : 4);
+      ctx.stroke();
+
+      if (L.brass) {
+        ctx.strokeStyle = lv >= 5 ? THEME[id].hi : '#d4a060';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'square';
+        const c = 9;
+        [[x + 5, y + 5], [x + w - 5, y + 5], [x + 5, y + h - 18], [x + w - 5, y + h - 18]].forEach(([cx, cy], i) => {
+          ctx.beginPath();
+          if (i % 2 === 0) {
+            ctx.moveTo(cx, cy + c); ctx.lineTo(cx, cy); ctx.lineTo(cx + c, cy);
+          } else {
+            ctx.moveTo(cx, cy + c); ctx.lineTo(cx, cy); ctx.lineTo(cx - c, cy);
+          }
+          ctx.stroke();
+        });
+      }
+
+      ctx.fillStyle = '#1a0e08';
+      ctx.fillRect(x + 4, y + h - 2, w - 8 + D * 0.12, 10);
+      ctx.fillStyle = busy && lv >= 3 ? THEME[id].hi : '#e0b060';
+      roundRect(ctx, x + 2, y + h - 13, w - 4, 13, 3);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,200,0.4)';
+      ctx.fillRect(x + 6, y + h - 11, w - 12, 2.5);
+    }
+
+    function roofBase(ctx, x, y, w) {
+      const roofTopY = y - RH;
+      ctx.fillStyle = '#c48448';
+      ctx.beginPath();
+      ctx.moveTo(x + 6, y + 2);
+      ctx.lineTo(x + D * 0.55, roofTopY + 4);
+      ctx.lineTo(x + w + D * 0.55, roofTopY + 4);
+      ctx.lineTo(x + w - 6, y + 2);
+      ctx.closePath();
+      ctx.fill();
+      return roofTopY;
+    }
+
+    function drawParallelRoof(ctx, x, y, w, id, lv, busy) {
+      const roofTopY = roofBase(ctx, x, y, w);
+      const rcx = x + w / 2 + D * 0.16;
+      const lit = lv >= 5 || (busy && lv >= 3);
+      for (let i = 0; i < 2; i++) {
+        const yy = roofTopY - 2 + i * 8;
+        ctx.fillStyle = lit ? (i === 0 ? THEME[id].hi : THEME[id].accent) : (lv >= 2 ? '#8a6a48' : '#6a4a32');
+        roundRect(ctx, rcx - 32, yy, 64, 5, 2);
+        ctx.fill();
+      }
+      if (busy && lv >= 3) drawSmoke(ctx, rcx + 10, roofTopY - 16);
+    }
+
+    function drawAdjacentRoof(ctx, x, y, w, id, lv, busy) {
+      const roofTopY = roofBase(ctx, x, y, w);
+      const rcx = x + w / 2 + D * 0.16;
+      const baseY = roofTopY + 3;
+      const peakY = roofTopY - 9;
+      const lit = lv >= 5 || (busy && lv >= 3);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = lit ? THEME[id].hi : (lv >= 2 ? '#7a5030' : '#5a3820');
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(rcx - 38, baseY);
+      ctx.lineTo(rcx, peakY);
+      ctx.lineTo(rcx + 38, baseY);
+      ctx.stroke();
+      ctx.strokeStyle = lit ? THEME[id].accent : '#c4a078';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(rcx - 16, baseY - 3);
+      ctx.lineTo(rcx - 11, peakY + 6);
+      ctx.moveTo(rcx + 16, baseY - 3);
+      ctx.lineTo(rcx + 11, peakY + 6);
+      ctx.stroke();
+      if (busy && lv >= 3) drawSmoke(ctx, rcx, peakY - 8);
+    }
+
+    function drawRightRoof(ctx, x, y, w, id, lv, busy) {
+      const roofTopY = roofBase(ctx, x, y, w);
+      const rcx = x + w / 2 + D * 0.26;
+      const by = roofTopY + 3;
+      const lit = lv >= 5 || (busy && lv >= 3);
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
+      ctx.strokeStyle = lit ? THEME[id].accent : (lv >= 2 ? '#6a3a14' : '#4a2810');
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(rcx - 2, by - 22);
+      ctx.lineTo(rcx - 2, by);
+      ctx.lineTo(rcx + 24, by);
+      ctx.stroke();
+      ctx.strokeStyle = lit ? THEME[id].hi : '#c48448';
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(rcx - 2, by - 22);
+      ctx.lineTo(rcx - 2, by);
+      ctx.lineTo(rcx + 24, by);
+      ctx.stroke();
+      if (busy && lv >= 3) {
+        ctx.fillStyle = '#fb923c';
+        ctx.fillRect(rcx + 8, by - 32, 2.5, 2.5);
+        drawSmoke(ctx, rcx + 16, by - 28);
+      }
+    }
+
+    function drawWindow(ctx, x, y, w, h, id, lv, busy) {
+      const L = look(lv);
+      const wx = id === 'parallel' ? x + w * 0.13 : x + w * 0.2;
+      const ww = id === 'parallel' ? w * 0.72 : w * 0.56;
+      const wy = y + h * 0.26;
+      const wh = h * 0.42;
+      if (busy && lv >= 3) {
+        ctx.fillStyle = THEME[id].glow;
+        roundRect(ctx, wx - 5, wy - 5, ww + 10, wh + 10, 6);
+        ctx.fill();
+      }
+      ctx.fillStyle = lv >= 3 ? 'rgba(10,8,6,0.88)' : 'rgba(12,8,6,0.72)';
+      roundRect(ctx, wx, wy, ww, wh, 4);
+      ctx.fill();
+      if (L.glass && !busy) {
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath();
+        ctx.moveTo(wx + 8, wy + 4);
+        ctx.lineTo(wx + ww * 0.42, wy + 4);
+        ctx.lineTo(wx + 10, wy + wh - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.strokeStyle = frameColor(id, lv, busy);
+      ctx.lineWidth = L.signboard ? 3.6 : (L.metal ? 3 : 2.2);
+      roundRect(ctx, wx, wy, ww, wh, 4);
+      ctx.stroke();
+      drawSign(ctx, id, wx + ww / 2, wy + wh * 0.52, lv >= 3 ? 1.15 : 1.0, signColor(id, lv, busy));
+    }
+
+    function paint(canvas, id, lv, busy) {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(42, 78);
+      ctx.scale(SCALE, SCALE);
+      const x = 0, y = 0, w = BODY.w, h = BODY.h;
+      drawHousing(ctx, x, y, w, h, lv, busy, id);
+      if (id === 'parallel') drawParallelRoof(ctx, x, y, w, id, lv, busy);
+      else if (id === 'adjacent') drawAdjacentRoof(ctx, x, y, w, id, lv, busy);
+      else drawRightRoof(ctx, x, y, w, id, lv, busy);
+      if (look(lv).lanterns) {
+        drawLantern(ctx, x + 8, y + 18, busy);
+        drawLantern(ctx, x + w - 12, y + 18, busy);
+      }
+      drawWindow(ctx, x, y, w, h, id, lv, busy);
+      ctx.restore();
+    }
+
+    const grid = document.getElementById('grid');
+    IDS.forEach((id) => {
+      const h2 = document.createElement('h2');
+      h2.textContent = NAMES[id];
+      grid.appendChild(h2);
+      const row = document.createElement('div');
+      row.className = 'row';
+      for (let lv = 1; lv <= 5; lv++) {
+        const fig = document.createElement('figure');
+        const c = document.createElement('canvas');
+        c.width = 270;
+        c.height = 210;
+        c.id = id + '-lv' + lv;
+        fig.appendChild(c);
+        const cap = document.createElement('figcaption');
+        cap.textContent = lv + '단계';
+        fig.appendChild(cap);
+        row.appendChild(fig);
+        paint(c, id, lv, false);
+      }
+      grid.appendChild(row);
+    });
+
+    const runRow = document.getElementById('run-row');
+    IDS.forEach((id) => {
+      const fig = document.createElement('figure');
+      const c = document.createElement('canvas');
+      c.width = 270;
+      c.height = 210;
+      c.id = id + '-run';
+      fig.appendChild(c);
+      const cap = document.createElement('figcaption');
+      cap.textContent = NAMES[id] + ' 가동';
+      fig.appendChild(cap);
+      runRow.appendChild(fig);
+      paint(c, id, 5, true);
+    });
+
+    window.exportSprites = function () {
+      const out = {};
+      IDS.forEach((id) => {
+        for (let lv = 1; lv <= 5; lv++) {
+          out[id + '-lv' + lv] = document.getElementById(id + '-lv' + lv).toDataURL('image/png');
+        }
+        out[id + '-run'] = document.getElementById(id + '-run').toDataURL('image/png');
+      });
+      return out;
+    };
+  </script>
+</body>
+</html>
