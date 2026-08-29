@@ -6333,8 +6333,12 @@
       return active === appEl;
     }
 
+    function wantsMobileFullscreen() {
+      return isTouchDevice();
+    }
+
     function requestAppFullscreen() {
-      if (!fullscreenSupported() || isAppFullscreen()) return;
+      if (!wantsMobileFullscreen() || !fullscreenSupported() || isAppFullscreen()) return;
       const req = appEl.requestFullscreen
         ? appEl.requestFullscreen()
         : appEl.webkitRequestFullscreen();
@@ -6343,7 +6347,8 @@
 
     function syncFullscreenBtn() {
       if (!btnFullscreen) return;
-      const show = fullscreenSupported()
+      const show = wantsMobileFullscreen()
+        && fullscreenSupported()
         && state && state.phase === 'play'
         && !isAppFullscreen();
       btnFullscreen.classList.toggle('hidden', !show);
