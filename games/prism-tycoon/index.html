@@ -54,33 +54,60 @@
     .chip .label { font: 700 11px Pretendard, sans-serif; color: var(--muted); }
     .chip .value { font: 800 20px Outfit, sans-serif; color: #f8fafc; }
 
+    .ico-bill {
+      width: 22px; height: 22px; object-fit: contain;
+      vertical-align: middle; flex-shrink: 0;
+    }
+    .ico-bill-lg { width: 42px; height: 42px; }
+    .flow .ico-bill { width: 20px; height: 20px; margin-top: 1px; }
+    .buy .cost {
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .buy .cost .ico-bill { width: 18px; height: 18px; }
+    .final .big {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+
     .chip.gold {
       justify-self: center;
-      border-color: rgba(240, 195, 106, 0.85);
-      background: linear-gradient(160deg, rgba(120, 80, 24, 0.98), rgba(40, 24, 8, 0.95));
-      padding: 8px 22px 8px 16px;
-      box-shadow: 0 0 0 1px rgba(240, 195, 106, 0.35), 0 8px 24px rgba(0, 0, 0, 0.45);
-      transform: scale(1.05);
+      border: 2px solid #2a3038;
+      border-color: #2a3038;
+      background: linear-gradient(180deg, #7b8494, #4b5563);
+      padding: 2px 18px 2px 4px;
+      box-shadow: 0 4px 0 #1f242c, 0 8px 18px rgba(0, 0, 0, 0.4);
+      transform: none;
+      gap: 6px;
     }
-    .chip.gold .label { color: #f0c36a; font-size: 12px; }
-    .chip.gold .value { color: #ffe08a; font-size: 30px; letter-spacing: 0.02em; }
+    .chip.gold .label { display: none; }
+    .chip.gold .ico-bill {
+      width: 44px; height: 34px;
+      margin: -4px 0 -4px -2px;
+      filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.45));
+    }
+    .chip.gold .value {
+      color: #fff;
+      font-size: 30px;
+      letter-spacing: 0.02em;
+      -webkit-text-stroke: 4px #141414;
+      paint-order: stroke fill;
+      text-shadow: 0 2px 0 #141414;
+    }
     .chip.gold.pulse {
       border-color: rgba(74, 222, 128, 0.95);
-      background: linear-gradient(160deg, rgba(20, 90, 50, 0.98), rgba(40, 60, 20, 0.95));
+      background: linear-gradient(180deg, #5a8f6a, #2f5a3c);
       box-shadow:
         0 0 0 3px rgba(134, 239, 172, 0.85),
         0 0 22px rgba(74, 222, 128, 0.65),
         0 0 40px rgba(34, 197, 94, 0.35);
-      transform: scale(1.12);
+      transform: scale(1.06);
       animation: goldEarn 0.45s ease-out;
     }
-    .chip.gold.pulse .label { color: #86efac; }
     .chip.gold.pulse .value {
       color: #bbf7d0;
+      -webkit-text-stroke: 4px #052e16;
       text-shadow:
-        0 0 8px rgba(134, 239, 172, 1),
-        0 0 18px rgba(74, 222, 128, 0.9),
-        0 0 28px rgba(34, 197, 94, 0.6);
+        0 2px 0 #052e16,
+        0 0 8px rgba(134, 239, 172, 1);
       animation: goldSparkle 0.35s ease-in-out infinite alternate;
     }
     @keyframes goldEarn {
@@ -98,7 +125,10 @@
       background: linear-gradient(160deg, rgba(120, 30, 40, 0.98), rgba(50, 12, 18, 0.96));
     }
     .chip.gold.poor .label { color: #fecdd3; }
-    .chip.gold.poor .value { color: #fb7185; }
+    .chip.gold.poor .value {
+      color: #fb7185;
+      -webkit-text-stroke-color: #4c0519;
+    }
     @keyframes goldPoor {
       0%, 100% { transform: scale(1.05) translateX(0); box-shadow: 0 0 0 2px rgba(251,113,133,0.45); }
       25% { transform: scale(1.08) translateX(-5px); box-shadow: 0 0 0 4px rgba(251,113,133,0.7); }
@@ -179,7 +209,7 @@
     .buy .pic { display: flex; align-items: center; gap: 3px; }
     .buy .pic i { font-style: normal; font-size: 11px; color: var(--muted); }
     .buy .txt { flex: 1; font: 800 14px Pretendard, sans-serif; }
-    .buy .cost { font: 800 14px Outfit, sans-serif; color: var(--gold); white-space: nowrap; }
+    .buy .cost { font: 800 14px Outfit, sans-serif; color: #86efac; white-space: nowrap; }
     .buy.poor { background: rgba(30, 41, 59, 0.6); border-color: rgba(148, 163, 184, 0.3); cursor: not-allowed; }
     .buy.poor .cost { color: #fb7185; }
     .buy.locked { background: rgba(30, 41, 59, 0.6); border-color: rgba(148, 163, 184, 0.25); cursor: not-allowed; opacity: 0.7; }
@@ -268,12 +298,12 @@
       .chip .label { font-size: 10px; }
       .chip .value { font-size: 15px; }
       .chip.gold {
-        padding: 4px 14px 4px 12px;
+        padding: 1px 12px 1px 2px;
         transform: none !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 3px 0 #1f242c, 0 6px 12px rgba(0, 0, 0, 0.4);
       }
-      .chip.gold .label { font-size: 11px; }
-      .chip.gold .value { font-size: 18px; }
+      .chip.gold .ico-bill { width: 32px; height: 24px; }
+      .chip.gold .value { font-size: 18px; -webkit-text-stroke-width: 3px; }
       .chip.time { min-width: 96px; padding: 3px 8px; }
       .time-gauge { height: 5px; }
       .shop { width: min(220px, 60vw); max-height: 36vh; padding: 5px; }
@@ -345,7 +375,7 @@
       <div class="hud-left">
         <span class="hud-title">PRISM TYCOON</span>
       </div>
-      <div class="chip gold" id="chip-gold"><span class="label">금화</span><span class="value" id="hud-gold">0</span></div>
+      <div class="chip gold" id="chip-gold"><img class="ico-bill" src="assets/bill.png" alt=""><span class="value" id="hud-gold">0</span></div>
       <div class="hud-right">
         <div class="chip time" id="chip-time">
           <div class="time-top">
@@ -365,8 +395,8 @@
         <p class="tagline">줍고 · 넣고 · 꺼내고 · 팔아서 공장을 키우세요</p>
         <div class="flow">
           <div><span>⛏️</span><b>광맥</b><span>밟으면 원석이 등에 쌓입니다</span></div>
-          <div><span>🏭</span><b>기계</b><span>↓에 넣고 ↑에서 꺼냅니다</span></div>
-          <div><span>💰</span><b>판매대</b><span>쌓인 보석을 팝니다</span></div>
+          <div><span>🏭</span><b>기계</b><span>↑(입구)에 넣고 ↓(출구)에서 꺼냅니다</span></div>
+          <div><img class="ico-bill" src="assets/bill.png" alt=""><b>판매대</b><span>쌓인 보석을 팝니다</span></div>
           <div><span>⬆️</span><b>업그레이드</b><span>기계 앞에서 사고 강화합니다</span></div>
         </div>
         <div class="note">어떤 기계가 어떤 모양을 만드는지는 직접 알아내세요. WASD·드래그로 이동.</div>
@@ -378,10 +408,10 @@
       <div class="card">
         <h2>공방 마감!</h2>
         <div class="final">
-          <div class="big" id="final-gold">0💰</div>
-          <div class="sub">5분간 모은 금화</div>
+          <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
+          <div class="sub">5분간 모은 금액</div>
           <div class="record hidden" id="record-badge">🏆 최고 기록 달성!</div>
-          <div class="sub" id="best-line">최고 기록 0💰</div>
+          <div class="sub" id="best-line">최고 기록 0</div>
         </div>
         <div class="tally" id="tally"></div>
         <div class="note" id="closing-note"></div>
@@ -435,8 +465,8 @@
     // Sell conveyor: intake on pad → ride into stall → sink (then bills spawn)
     let BELT = {
       start: { x: MARKET_PAD.x + 18, y: MARKET_PAD.y + MARKET_PAD.h - 16 },
-      end: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 10 },
-      sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
+      end: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 28 },
+      sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 4 }
     };
     const CONVEY_HOP = 0.42;
     const CONVEY_BELT = 0.78;
@@ -511,62 +541,95 @@
       return dx * dx + dy * dy < r * r;
     }
 
-    function blockedAt(x, y) {
-      // Collision covers the solid upper shed (keeping the front counter fully walkable)
-      return MACHINES.some((m) => {
-        const b = m.body;
-        return circleHitsRect(x, y, PLAYER_R, { x: b.x, y: b.y - 8, w: b.w + 14, h: b.h - 10 });
-      });
+    function machineSolid(m) {
+      const b = m.body;
+      // Cover the full shed plus the front counter lip. Input/output pads sit south of this.
+      return { x: b.x, y: b.y - 8, w: b.w + 14, h: b.h + 8 };
     }
 
-    function segmentHitsBox(x0, y0, x1, y1, box) {
-      const minX = box.x - PLAYER_R - 2;
-      const maxX = box.x + box.w + 14 + PLAYER_R + 2;
-      const minY = box.y - PLAYER_R - 8;
-      const maxY = box.y + box.h - 10;
+    // Wooden kiosk footprint. Roof/awning is visual-only; the front selling pad stays walkable.
+    function stallSolid() {
+      const s = stallBox();
+      const top = s.y + s.h * 0.22;
+      const bot = s.y + s.h * 0.82;
+      return {
+        x: s.x + s.w * 0.08,
+        y: top,
+        w: s.w * 0.84,
+        h: Math.max(28, bot - top)
+      };
+    }
 
+    function solidBoxes() {
+      return MACHINES.map(machineSolid).concat([stallSolid()]);
+    }
+
+    function blockedAt(x, y) {
+      return solidBoxes().some((b) => circleHitsRect(x, y, PLAYER_R, b));
+    }
+
+    function clampPoint(x, y) {
+      return {
+        x: Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, x)),
+        y: Math.max(BOUNDS.y0, Math.min(BOUNDS.y1, y))
+      };
+    }
+
+    function walkablePoint(x, y) {
+      let p = clampPoint(x, y);
+      if (!blockedAt(p.x, p.y)) return p;
+      const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+      for (let dist = 8; dist <= 88; dist += 8) {
+        for (const [dx, dy] of dirs) {
+          const q = clampPoint(x + dx * dist, y + dy * dist);
+          if (!blockedAt(q.x, q.y)) return q;
+        }
+      }
+      return p;
+    }
+
+    function segmentHitsSolid(x0, y0, x1, y1, box) {
       const steps = 18;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const px = x0 + (x1 - x0) * t;
         const py = y0 + (y1 - y0) * t;
-        if (px >= minX && px <= maxX && py >= minY && py <= maxY) {
-          return true;
-        }
+        if (circleHitsRect(px, py, PLAYER_R, box)) return true;
       }
       return false;
     }
 
     function findPath(fromX, fromY, toX, toY) {
+      const dest = walkablePoint(toX, toY);
+      toX = dest.x;
+      toY = dest.y;
       const waypoints = [];
       const blocking = [];
-      for (const m of MACHINES) {
-        const box = { x: m.body.x, y: m.body.y, w: m.body.w, h: m.body.h };
-        if (segmentHitsBox(fromX, fromY, toX, toY, box)) {
-          const dist = Math.hypot(m.body.x + m.body.w / 2 - fromX, m.body.y + m.body.h / 2 - fromY);
-          blocking.push({ m, box, dist });
+      for (const box of solidBoxes()) {
+        if (segmentHitsSolid(fromX, fromY, toX, toY, box)) {
+          const dist = Math.hypot(box.x + box.w / 2 - fromX, box.y + box.h / 2 - fromY);
+          blocking.push({ box, dist });
         }
       }
       blocking.sort((a, b) => a.dist - b.dist);
 
       if (blocking.length > 0) {
         for (const b of blocking) {
-          const m = b.m;
-          const topY = m.body.y - PLAYER_R - 24;
-          const botY = m.body.y + m.body.h + PLAYER_R + 18;
-          const midY = m.body.y + m.body.h / 2;
-          
+          const box = b.box;
+          const topY = box.y - PLAYER_R - 16;
+          const botY = box.y + box.h + PLAYER_R + 16;
+          const midY = box.y + box.h / 2;
           const useTop = (fromY < midY && toY < midY + 20) || (fromY <= midY && toY <= midY);
           const bypassY = useTop ? topY : botY;
 
-          if (fromX < m.body.x && toX > m.body.x + m.body.w) {
-            waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
-            waypoints.push({ x: m.body.x + m.body.w + 16 + PLAYER_R + 14, y: bypassY });
-          } else if (fromX > m.body.x + m.body.w && toX < m.body.x) {
-            waypoints.push({ x: m.body.x + m.body.w + 16 + PLAYER_R + 14, y: bypassY });
-            waypoints.push({ x: m.body.x - PLAYER_R - 14, y: bypassY });
+          if (fromX < box.x && toX > box.x + box.w) {
+            waypoints.push(clampPoint(box.x - PLAYER_R - 14, bypassY));
+            waypoints.push(clampPoint(box.x + box.w + PLAYER_R + 14, bypassY));
+          } else if (fromX > box.x + box.w && toX < box.x) {
+            waypoints.push(clampPoint(box.x + box.w + PLAYER_R + 14, bypassY));
+            waypoints.push(clampPoint(box.x - PLAYER_R - 14, bypassY));
           } else {
-            waypoints.push({ x: m.body.x + (m.body.w + 16) / 2, y: bypassY });
+            waypoints.push(clampPoint(box.x + box.w / 2, bypassY));
           }
         }
       }
@@ -581,8 +644,9 @@
       nx = Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, nx));
       ny = Math.max(BOUNDS.y0, Math.min(BOUNDS.y1, ny));
 
-      const canX = !blockedAt(nx, p.y);
-      const canY = !blockedAt(p.x, ny);
+      const trapped = blockedAt(p.x, p.y);
+      const canX = trapped || !blockedAt(nx, p.y);
+      const canY = trapped || !blockedAt(p.x, ny);
 
       if (canX) p.x = nx;
       if (canY) p.y = ny;
@@ -838,13 +902,217 @@
     })();
 
     const DIRS_8 = ['right','down-right','down','down-left','left','up-left','up','up-right'];
+    const FACTORY_IDS = ['parallel', 'adjacent', 'right'];
     const art = {
       dirs: Object.fromEntries(DIRS_8.map((d) => [d, { idle: null, walk: [] }])),
       catAspect: 1,
       hall: null,
+      bill: null,
+      billWanted: null,
+      stall: null,
+      factories: {},
       idle: null,
       walk: []
     };
+
+    function loadPng(src) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    }
+
+    function billSrc(wanted) {
+      return (wanted && art.billWanted) || art.bill;
+    }
+
+    function drawBillSprite(x, y, w, wanted, rot) {
+      const img = billSrc(wanted);
+      if (!img) {
+        ctx.fillStyle = wanted ? '#f472b6' : '#4ade80';
+        roundRect(x - w / 2, y - 7, w, 14, 2);
+        ctx.fill();
+        return;
+      }
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const h = w * (ih / iw);
+      ctx.save();
+      ctx.translate(x, y);
+      if (rot) ctx.rotate(rot);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+
+    // Hopper void from sprite scan: fully dark at ~66–78% height, below the gold lip (~62%).
+    const STALL_SLOT_UV = { x: 0.30, y: 0.655, w: 0.40, h: 0.125 };
+
+    // Factory sprites share one booth layout. Window sits in the gold/iron frame;
+    // bench UV is the protruding counter lip, aligned to m.input (input coords stay put).
+    const MACHINE_WINDOW_UV = { x: 0.24, y: 0.34, w: 0.52, h: 0.30 };
+    const MACHINE_BENCH_UV = 0.70;
+    const MACHINE_FOOT_UV = 0.99;
+    const MACHINE_LANTERN_UV = { x: 0.10, y: 0.42 };
+
+    async function loadFactoryArt() {
+      art.factories = {};
+      await Promise.all(FACTORY_IDS.map(async (id) => {
+        art.factories[id] = {};
+        const rows = await Promise.all(
+          [1, 2, 3, 4, 5].map((lv) =>
+            loadPng(`${ASSET_DIR}factory-${id}-lv${lv}.png?v=style2`).then((img) => ({ lv, img }))
+          )
+        );
+        rows.forEach(({ lv, img }) => { art.factories[id][lv] = img; });
+      }));
+    }
+
+    function factorySprite(id, lv) {
+      const row = art.factories[id];
+      if (!row) return null;
+      const tier = Math.max(1, Math.min(5, lv || 1));
+      return row[tier] || null;
+    }
+
+    function machineSpriteBox(m, lv) {
+      const img = factorySprite(m.id, lv);
+      if (!img) return null;
+      const b = m.body;
+      const destW = b.w + 52;
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const destH = destW * (ih / iw);
+      const benchWorldY = m.input.y + 10;
+      return {
+        x: b.x + b.w / 2 - destW / 2,
+        y: benchWorldY - destH * MACHINE_BENCH_UV,
+        w: destW,
+        h: destH,
+        img
+      };
+    }
+
+    function machineWindowRect(box) {
+      return {
+        x: box.x + box.w * MACHINE_WINDOW_UV.x,
+        y: box.y + box.h * MACHINE_WINDOW_UV.y,
+        w: box.w * MACHINE_WINDOW_UV.w,
+        h: box.h * MACHINE_WINDOW_UV.h
+      };
+    }
+
+    function drawMachineSpriteOverlays(m, lv, box, look, busy, owned, tNow) {
+      const win = machineWindowRect(box);
+      const roofLit = look.signboard || (busy && lv >= 3);
+
+      if (busy && lv >= 3) {
+        const pulse = 0.22 + 0.14 * Math.sin(tNow / 320);
+        ctx.fillStyle = `rgba(${look.glow},${pulse})`;
+        roundRect(win.x - 4, win.y - 4, win.w + 8, win.h + 8, 6);
+        ctx.fill();
+      }
+
+      if (look.glass && !busy && owned) {
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.beginPath();
+        ctx.moveTo(win.x + 8, win.y + 4);
+        ctx.lineTo(win.x + win.w * 0.42, win.y + 4);
+        ctx.lineTo(win.x + 10, win.y + win.h - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (look.lanterns) {
+        const lx = box.x + box.w * MACHINE_LANTERN_UV.x;
+        const ly = box.y + box.h * MACHINE_LANTERN_UV.y;
+        const glow = busy ? (0.55 + 0.35 * Math.sin(tNow / 280)) : 0.22;
+        if (busy || roofLit) {
+          ctx.fillStyle = `rgba(253,186,116,${0.12 + glow * 0.25})`;
+          ctx.beginPath();
+          ctx.arc(lx, ly, 14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (busy && lv >= 3 && m.id === 'right') {
+        const rx = box.x + box.w * 0.55;
+        const ry = box.y + box.h * 0.12;
+        ctx.fillStyle = '#fb923c';
+        for (let i = 0; i < 3; i++) {
+          const pt = (tNow / (180 + i * 40) + i * 0.2) % 1;
+          ctx.globalAlpha = 1 - pt;
+          ctx.fillRect(rx + i * 5, ry - pt * 18, 2.4, 2.4);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      if (roofLit && lv >= 3) {
+        const t = tNow / 220;
+        const rcx = box.x + box.w * 0.52;
+        const roofY = box.y + box.h * 0.08;
+        ctx.fillStyle = `rgba(200,210,230,${0.2 + 0.18 * Math.sin(t)})`;
+        ctx.beginPath();
+        ctx.arc(rcx, roofY - Math.sin(t) * 4, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function stallBox() {
+      const r = MARKET_PAD;
+      const img = art.stall;
+      const destW = r.w + 48;
+      const destH = img
+        ? destW * ((img.naturalHeight || img.height) / (img.naturalWidth || img.width))
+        : 92;
+      const mouthY = STALL_SLOT_UV.y + STALL_SLOT_UV.h;
+      return {
+        x: r.x + r.w / 2 - destW / 2,
+        y: r.y + 16 - destH * mouthY,
+        w: destW,
+        h: destH
+      };
+    }
+
+    function orderBoardBox() {
+      const s = stallBox();
+      const bw = 150, bh = 108;
+      return {
+        x: Math.round(s.x + s.w / 2 - bw / 2),
+        y: Math.max(YARD.y - 4, Math.round(s.y - bh + 18)),
+        w: bw,
+        h: bh
+      };
+    }
+
+    function stallSlot() {
+      const s = stallBox();
+      return {
+        x: s.x + s.w * STALL_SLOT_UV.x,
+        y: s.y + s.h * STALL_SLOT_UV.y,
+        w: s.w * STALL_SLOT_UV.w,
+        h: s.h * STALL_SLOT_UV.h
+      };
+    }
+
+    function hopperPos() {
+      const slot = stallSlot();
+      return { x: slot.x + slot.w / 2, y: slot.y + slot.h * 0.55 };
+    }
+
+    function layoutMarketBelt() {
+      const slot = stallSlot();
+      const mouthX = slot.x + slot.w / 2;
+      BELT.start = { x: MARKET_PAD.x + 18, y: MARKET_PAD.y + MARKET_PAD.h - 16 };
+      BELT.end = { x: mouthX, y: slot.y + slot.h * 0.55 };
+      BELT.sink = { x: mouthX, y: slot.y + slot.h * 0.62 };
+      CASH_ANCHOR = { x: MARKET_PAD.x - 36, y: MARKET_PAD.y + MARKET_PAD.h - 8 };
+    }
+
+    function costHtml(label) {
+      return label + '<img class="ico-bill" src="' + ASSET_DIR + 'bill.png" alt="">';
+    }
 
     const MIRROR_MAP = { 'left': 'right', 'down-left': 'down-right', 'up-left': 'up-right' };
 
@@ -879,8 +1147,19 @@
         img.src = ASSET_DIR + 'hall-bg.png';
       });
 
-      const [hall] = await Promise.all([hallPromise, loadArt8Dir()]);
+      const [hall, bill, billWanted, stall] = await Promise.all([
+        hallPromise,
+        loadPng(ASSET_DIR + 'bill.png'),
+        loadPng(ASSET_DIR + 'bill-wanted.png'),
+        loadPng(ASSET_DIR + 'stall-register.png'),
+        loadArt8Dir(),
+        loadFactoryArt()
+      ]);
       art.hall = hall;
+      art.bill = bill;
+      art.billWanted = billWanted;
+      art.stall = stall;
+      layoutMarketBelt();
     }
 
     // catImg: { img, mirror } 반환. mirror=true 이면 drawPlayer에서 ctx.scale(-1,1) 적용.
@@ -1150,13 +1429,7 @@
       m2.output = { x: col3 + 30, y: 407, w: 52, h: 56 };
 
       MARKET_PAD = { x: col4 - 65, y: 270, w: 130, h: 120 };
-
-      CASH_ANCHOR = { x: MARKET_PAD.x - 28, y: MARKET_PAD.y + MARKET_PAD.h - 6 };
-      BELT = {
-        start: { x: MARKET_PAD.x + 18, y: MARKET_PAD.y + MARKET_PAD.h - 16 },
-        end: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y + 10 },
-        sink: { x: MARKET_PAD.x + MARKET_PAD.w * 0.58, y: MARKET_PAD.y - 22 }
-      };
+      layoutMarketBelt();
 
       BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 20, y1: YARD.y + YARD.h - 20 };
       checkOrientation();
@@ -1279,11 +1552,17 @@
             let targetY = my;
             let isSmart = false;
 
+            const stall = stallBox();
+            const wanted = orderBoardBox();
+            const onMarketPad = mx >= MARKET_PAD.x && mx <= MARKET_PAD.x + MARKET_PAD.w && my >= MARKET_PAD.y && my <= MARKET_PAD.y + MARKET_PAD.h;
+            const onStall = mx >= stall.x && mx <= stall.x + stall.w && my >= stall.y && my <= stall.y + stall.h;
+            const onWanted = mx >= wanted.x && mx <= wanted.x + wanted.w && my >= wanted.y && my <= wanted.y + wanted.h;
+
             if (mx >= MINE_VEIN.x && mx <= MINE_VEIN.x + MINE_VEIN.w && my >= MINE_VEIN.y && my <= MINE_VEIN.y + MINE_VEIN.h) {
               targetX = MINE_VEIN.x + MINE_VEIN.w / 2;
               targetY = MINE_VEIN.y + MINE_VEIN.h / 2;
               isSmart = true;
-            } else if (mx >= MARKET_PAD.x && mx <= MARKET_PAD.x + MARKET_PAD.w && my >= MARKET_PAD.y && my <= MARKET_PAD.y + MARKET_PAD.h) {
+            } else if (onMarketPad || onStall || onWanted) {
               targetX = MARKET_PAD.x + MARKET_PAD.w / 2;
               targetY = MARKET_PAD.y + MARKET_PAD.h / 2;
               isSmart = true;
@@ -1331,12 +1610,14 @@
               }
             }
 
-            const tx = Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, targetX));
-            const ty = Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, targetY));
-            state.targetPos = { x: tx, y: ty };
-            state.waypoints = findPath(state.player.x, state.player.y, tx, ty);
+            const dest = walkablePoint(
+              Math.max(BOUNDS.x0 + 12, Math.min(BOUNDS.x1 - 12, targetX)),
+              Math.max(BOUNDS.y0 + 12, Math.min(BOUNDS.y1 - 12, targetY))
+            );
+            state.targetPos = dest;
+            state.waypoints = findPath(state.player.x, state.player.y, dest.x, dest.y);
             if (!state.ripples) state.ripples = [];
-            state.ripples.push({ x: tx, y: ty, t: 0, isSmart: isSmart });
+            state.ripples.push({ x: dest.x, y: dest.y, t: 0, isSmart: isSmart });
           }
         }
         stick = null;
@@ -1915,7 +2196,7 @@
       }
       const u = Math.min(1, c.t / CONVEY_DROP);
       const ease = u * u * (3 - 2 * u);
-      return parabolaPos(BELT.end, BELT.sink, ease, 34);
+      return parabolaPos(BELT.end, BELT.sink, ease, 8);
     }
 
     function updateConvey(dt) {
@@ -2025,6 +2306,15 @@
     // ---------- drawing helpers ----------
     function roundRect(x, y, w, h, r) {
       ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function addRoundRect(x, y, w, h, r) {
       ctx.moveTo(x + r, y);
       ctx.arcTo(x + w, y, x + w, y + h, r);
       ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -2384,61 +2674,95 @@
     function drawMarketPad() {
       const r = MARKET_PAD;
       const hot = inRect(state.player, r);
-      const D = 22, H = 14;
-      const x = r.x - 8, y = r.y - 48, w = r.w + 16, h = 40;
+      const s = stallBox();
 
-      // Iso stall booth behind the sell pad
       ctx.fillStyle = 'rgba(8,4,2,0.45)';
       ctx.beginPath();
-      ctx.ellipse(x + w / 2 + 8, y + h + 8, w * 0.5, 12, 0, 0, Math.PI * 2);
+      ctx.ellipse(s.x + s.w / 2 + 6, s.y + s.h - 2, s.w * 0.42, 12, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#2a180e';
-      ctx.beginPath();
-      ctx.moveTo(x + w, y);
-      ctx.lineTo(x + w + D * 0.55, y - H);
-      ctx.lineTo(x + w + D * 0.55, y + h - H);
-      ctx.lineTo(x + w, y + h);
-      ctx.closePath();
-      ctx.fill();
+      if (art.stall) {
+        ctx.drawImage(art.stall, s.x, s.y, s.w, s.h);
+      } else {
+        const D = 22, H = 14;
+        const x = r.x - 8, y = r.y - 66, w = r.w + 16, h = 56;
+        ctx.fillStyle = '#2a180e';
+        ctx.beginPath();
+        ctx.moveTo(x + w, y);
+        ctx.lineTo(x + w + D * 0.55, y - H);
+        ctx.lineTo(x + w + D * 0.55, y + h - H);
+        ctx.lineTo(x + w, y + h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#a86a38';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + D * 0.55, y - H);
+        ctx.lineTo(x + w + D * 0.55, y - H);
+        ctx.lineTo(x + w, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#6b3c1c';
+        roundRect(x, y, w, h, 4);
+        ctx.fill();
+        const hop = hopperPos();
+        ctx.fillStyle = '#0f172a';
+        roundRect(hop.x - 22, hop.y - 10, 44, 20, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        roundRect(hop.x - 22, hop.y - 10, 44, 20, 4);
+        ctx.stroke();
+        drawBillSprite(x + w / 2, y + 28, 36, false, 0);
+      }
 
-      ctx.fillStyle = '#a86a38';
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + D * 0.55, y - H);
-      ctx.lineTo(x + w + D * 0.55, y - H);
-      ctx.lineTo(x + w, y);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#6b3c1c';
-      roundRect(x, y, w, h, 4);
-      ctx.fill();
-      ctx.fillStyle = '#c48448';
-      ctx.fillRect(x + 8, y - 8, w - 16, 8);
-      ctx.fillStyle = '#8a5428';
-      ctx.fillRect(x + w * 0.62, y - 26, 10, 20);
-      ctx.fillStyle = '#6a4020';
-      ctx.fillRect(x + w * 0.62 + 8, y - 26, 6, 20);
-      ctx.fillStyle = '#fde68a';
-      ctx.font = '800 15px Pretendard, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('판매', x + w / 2, y + h / 2 + 6);
-      ctx.textAlign = 'left';
-
-      drawDottedPad(r, hot, 'rgba(251,191,36,0.28)', '#fbbf24', '판매');
+      drawDottedPad(r, hot, 'rgba(251,191,36,0.28)', '#fbbf24', null);
       drawSellConveyor();
       drawConveyGems();
+      coverStallExceptSlot();
+    }
 
-      ctx.fillStyle = '#c9a227';
+    function coverStallExceptSlot() {
+      if (!art.stall) return;
+      const s = stallBox();
+      const slot = stallSlot();
+      // Only restamp the facade ABOVE the hopper so the belt stays
+      // continuous across the stall base and into the opening.
+      ctx.save();
       ctx.beginPath();
-      ctx.ellipse(r.x + r.w / 2, r.y + 62, 18, 14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fde68a';
-      ctx.font = '800 16px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('💰', r.x + r.w / 2, r.y + 68);
-      ctx.textAlign = 'left';
+      ctx.rect(s.x - 4, s.y - 4, s.w + 8, Math.max(8, slot.y - s.y));
+      ctx.clip();
+      ctx.drawImage(art.stall, s.x, s.y, s.w, s.h);
+      ctx.restore();
+    }
+
+    function beltEdgeAtY(y, ax, ay, bx, by) {
+      const t = (by === ay) ? 0 : (y - ay) / (by - ay);
+      return ax + (bx - ax) * t;
+    }
+
+    function beltQuad(a, b, nx, ny, half) {
+      const yTop = Math.min(a.y, b.y);
+      const yBot = Math.max(a.y, b.y);
+      const l0x = beltEdgeAtY(yBot, a.x + nx * half, a.y + ny * half, b.x + nx * half, b.y + ny * half);
+      const r0x = beltEdgeAtY(yBot, a.x - nx * half, a.y - ny * half, b.x - nx * half, b.y - ny * half);
+      const l1x = beltEdgeAtY(yTop, a.x + nx * half, a.y + ny * half, b.x + nx * half, b.y + ny * half);
+      const r1x = beltEdgeAtY(yTop, a.x - nx * half, a.y - ny * half, b.x - nx * half, b.y - ny * half);
+      return [
+        { x: l0x, y: yBot },
+        { x: l1x, y: yTop },
+        { x: r1x, y: yTop },
+        { x: r0x, y: yBot }
+      ];
+    }
+
+    function pathBeltQuad(q) {
+      ctx.beginPath();
+      ctx.moveTo(q[0].x, q[0].y);
+      ctx.lineTo(q[1].x, q[1].y);
+      ctx.lineTo(q[2].x, q[2].y);
+      ctx.lineTo(q[3].x, q[3].y);
+      ctx.closePath();
     }
 
     function drawSellConveyor() {
@@ -2451,79 +2775,60 @@
       const ny = dx / len;
       const half = 11;
       const now = performance.now() / 1000;
+      const q = beltQuad(a, b, nx, ny, half);
+      const qSh = beltQuad(
+        { x: a.x + 3, y: a.y + 4 },
+        { x: b.x + 3, y: b.y + 4 },
+        nx, ny, half
+      );
 
-      // Shadow under belt
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath();
-      ctx.moveTo(a.x + nx * half + 3, a.y + ny * half + 4);
-      ctx.lineTo(b.x + nx * half + 3, b.y + ny * half + 4);
-      ctx.lineTo(b.x - nx * half + 3, b.y - ny * half + 4);
-      ctx.lineTo(a.x - nx * half + 3, a.y - ny * half + 4);
-      ctx.closePath();
+      pathBeltQuad(qSh);
       ctx.fill();
 
-      // Belt body
       const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
       g.addColorStop(0, '#3a4558');
       g.addColorStop(0.5, '#4b5568');
       g.addColorStop(1, '#334155');
       ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(a.x + nx * half, a.y + ny * half);
-      ctx.lineTo(b.x + nx * half, b.y + ny * half);
-      ctx.lineTo(b.x - nx * half, b.y - ny * half);
-      ctx.lineTo(a.x - nx * half, a.y - ny * half);
-      ctx.closePath();
+      pathBeltQuad(q);
       ctx.fill();
 
-      // Scrolling cleats
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(a.x + nx * half, a.y + ny * half);
-      ctx.lineTo(b.x + nx * half, b.y + ny * half);
-      ctx.lineTo(b.x - nx * half, b.y - ny * half);
-      ctx.lineTo(a.x - nx * half, a.y - ny * half);
-      ctx.closePath();
+      pathBeltQuad(q);
       ctx.clip();
-      ctx.strokeStyle = 'rgba(226,232,240,0.35)';
-      ctx.lineWidth = 3;
-      const scroll = (now * 55) % 18;
-      for (let d = -18 + scroll; d < len + 18; d += 18) {
-        const px = a.x + (dx / len) * d;
-        const py = a.y + (dy / len) * d;
+      const y0 = Math.min(a.y, b.y);
+      const y1 = Math.max(a.y, b.y);
+      const rungGap = 14;
+      const scroll = rungGap - ((now * 28) % rungGap);
+      ctx.strokeStyle = 'rgba(226,232,240,0.38)';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'butt';
+      const xL = Math.min(q[0].x, q[1].x, q[2].x, q[3].x) - 8;
+      const xR = Math.max(q[0].x, q[1].x, q[2].x, q[3].x) + 8;
+      for (let y = y0 + scroll; y <= y1; y += rungGap) {
         ctx.beginPath();
-        ctx.moveTo(px + nx * half, py + ny * half);
-        ctx.lineTo(px - nx * half, py - ny * half);
+        ctx.moveTo(xL, y);
+        ctx.lineTo(xR, y);
         ctx.stroke();
       }
       ctx.restore();
 
-      // Rails
       ctx.strokeStyle = '#94a3b8';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(a.x + nx * half, a.y + ny * half);
-      ctx.lineTo(b.x + nx * half, b.y + ny * half);
-      ctx.moveTo(a.x - nx * half, a.y - ny * half);
-      ctx.lineTo(b.x - nx * half, b.y - ny * half);
+      ctx.moveTo(q[0].x, q[0].y);
+      ctx.lineTo(q[1].x, q[1].y);
+      ctx.moveTo(q[3].x, q[3].y);
+      ctx.lineTo(q[2].x, q[2].y);
       ctx.stroke();
 
-      // Intake hopper
       ctx.fillStyle = '#1e293b';
       roundRect(a.x - 14, a.y - 8, 28, 16, 4);
       ctx.fill();
       ctx.strokeStyle = '#fbbf24';
       ctx.lineWidth = 1.5;
       roundRect(a.x - 14, a.y - 8, 28, 16, 4);
-      ctx.stroke();
-
-      // Register chute under stall
-      ctx.fillStyle = '#0f172a';
-      roundRect(BELT.sink.x - 16, BELT.sink.y - 6, 32, 18, 5);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(253,224,71,0.65)';
-      ctx.lineWidth = 1.5;
-      roundRect(BELT.sink.x - 16, BELT.sink.y - 6, 32, 18, 5);
       ctx.stroke();
     }
 
@@ -2572,7 +2877,6 @@
           const tilt = Math.sin((b.fly.t < 0 ? 0 : b.fly.t) * Math.PI) * 0.35;
           ctx.rotate(tilt);
         }
-        // Bill — flat green note, stacked like gem plates
         const g = ctx.createLinearGradient(-18, -6, 18, 6);
         if (b.wanted) {
           g.addColorStop(0, '#fbcfe8');
@@ -2589,7 +2893,6 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.55)';
         ctx.lineWidth = 1.2;
         ctx.stroke();
-        // Center seal
         ctx.fillStyle = b.wanted ? 'rgba(131,24,67,0.55)' : 'rgba(20,83,45,0.55)';
         ctx.beginPath();
         ctx.arc(0, 0, 4, 0, Math.PI * 2);
@@ -2617,9 +2920,9 @@
       }
     }
 
-    function drawMarkedSeg(x1, y1, x2, y2, arrows, color) {
+    function drawMarkedSeg(x1, y1, x2, y2, arrows, color, lw) {
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = lw || 2.4;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -2644,51 +2947,68 @@
 
     // Geometry property signs on machines — never preview the output gem shape.
     // parallel: one pair ∥ · adjacent: ^ equal arms · right: right angle
-    function drawMachineSign(id, cx, cy, on, scale) {
+    function signPaintColor(id) {
+      return id === 'right' ? '#fbbf24' : id === 'adjacent' ? '#c4b5fd' : '#5eead4';
+    }
+
+    function signCarveColor(id) {
+      return id === 'right' ? '#e0a83a' : id === 'adjacent' ? '#b8a0ee' : '#5ec4b4';
+    }
+
+    function drawMachineSign(id, cx, cy, on, scale, finish) {
       const s = scale || 1;
-      const col = on
-        ? (id === 'right' ? '#fbbf24' : id === 'adjacent' ? '#c4b5fd' : '#5eead4')
-        : 'rgba(148,163,184,0.45)';
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(s, s);
 
-      if (id === 'trapezoid' || id === 'parallel') {
-        // One pair of parallels — this machine's first cut makes a trapezoid
-        drawMarkedSeg(-18, -7, 18, -7, 1, col);
-        drawMarkedSeg(-18, 7, 18, 7, 1, col);
-      } else if (id === 'adjacent') {
-        // Peak (^) of two adjacent equal sides, with matching ticks
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 2.8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-15, 10);
-        ctx.lineTo(0, -13);
-        ctx.lineTo(15, 10);
-        ctx.stroke();
-        ctx.lineWidth = 2.3;
-        ctx.beginPath();
-        ctx.moveTo(-11.2, -4.6);
-        ctx.lineTo(-4.2, 0.4);
-        ctx.moveTo(11.2, -4.6);
-        ctx.lineTo(4.2, 0.4);
-        ctx.stroke();
-      } else if (id === 'right') {
-        // Right-angle mark
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 2.6;
-        ctx.beginPath();
-        ctx.moveTo(-10, 12);
-        ctx.lineTo(-10, -12);
-        ctx.lineTo(12, -12);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-10, -4);
-        ctx.lineTo(-2, -4);
-        ctx.lineTo(-2, -12);
-        ctx.stroke();
+      const paint = (col, lwMul) => {
+        const m = lwMul || 1;
+        if (id === 'trapezoid' || id === 'parallel') {
+          drawMarkedSeg(-18, -7, 18, -7, 1, col, 2.4 * m);
+          drawMarkedSeg(-18, 7, 18, 7, 1, col, 2.4 * m);
+        } else if (id === 'adjacent') {
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2.8 * m;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-15, 10);
+          ctx.lineTo(0, -13);
+          ctx.lineTo(15, 10);
+          ctx.stroke();
+          ctx.lineWidth = 2.3 * m;
+          ctx.beginPath();
+          ctx.moveTo(-11.2, -4.6);
+          ctx.lineTo(-4.2, 0.4);
+          ctx.moveTo(11.2, -4.6);
+          ctx.lineTo(4.2, 0.4);
+          ctx.stroke();
+        } else if (id === 'right') {
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2.6 * m;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-10, 12);
+          ctx.lineTo(-10, -12);
+          ctx.lineTo(12, -12);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-10, -4);
+          ctx.lineTo(-2, -4);
+          ctx.lineTo(-2, -12);
+          ctx.stroke();
+        }
+      };
+
+      if (finish === 'carve') {
+        ctx.save();
+        ctx.translate(1, 1.4);
+        paint('#2a140c', 1.45);
+        ctx.restore();
+        paint(signCarveColor(id), 1.28);
+      } else {
+        paint(on ? signPaintColor(id) : 'rgba(148,163,184,0.45)', 1);
       }
 
       ctx.restore();
@@ -2808,20 +3128,11 @@
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.fillStyle = can ? '#f59e0b' : '#fb7185';
-      ctx.beginPath();
-      ctx.arc(cx - bw / 2 + 20, cy, 13, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = can ? '#78350f' : '#9f1239';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = can ? '#78350f' : '#fff';
-      ctx.font = '800 14px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('$', cx - bw / 2 + 20, cy + 5);
+      drawBillSprite(cx - bw / 2 + 20, cy, 26, false, 0);
 
       ctx.fillStyle = can ? '#422006' : '#fff1f2';
       ctx.font = '800 24px Outfit, sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillText(label, cx + 10, cy + 8);
       ctx.textAlign = 'left';
     }
@@ -2911,6 +3222,31 @@
       ctx.beginPath();
       ctx.ellipse(x + w / 2 + 14, y + h + 8, w * 0.62, 18, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      const sprBox = machineSpriteBox(m, lv);
+      if (sprBox && sprBox.img) {
+        if (!owned) ctx.globalAlpha = 0.48;
+        ctx.drawImage(sprBox.img, sprBox.x, sprBox.y, sprBox.w, sprBox.h);
+        if (!owned) ctx.globalAlpha = 1;
+
+        drawMachineSpriteOverlays(m, lv, sprBox, look, busy, owned, tNow);
+
+        const win = machineWindowRect(sprBox);
+        if (owned) {
+          const painted = lv >= 2;
+          drawMachineSign(
+            m.id, win.x + win.w / 2, win.y + win.h * 0.52, painted,
+            lv >= 3 ? 1.18 : 1.14,
+            painted ? 'paint' : 'carve'
+          );
+        } else {
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          drawMachineSign(m.id, win.x + win.w / 2, win.y + win.h * 0.52, false, 0.9);
+          ctx.restore();
+        }
+        return;
+      }
 
       ctx.fillStyle = look.side;
       ctx.beginPath();
@@ -3106,13 +3442,45 @@
       roundRect(x + 2, y + h - 14, w - 4, 14, 3);
       ctx.stroke();
 
+      if (owned) {
+        const painted = lv >= 2;
+        drawMachineSign(
+          m.id, wx + ww / 2, wy + wh * 0.52, painted,
+          lv >= 3 ? 1.18 : 1.14,
+          painted ? 'paint' : 'carve'
+        );
+      } else {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        drawMachineSign(m.id, wx + ww / 2, wy + wh * 0.52, false, 0.9);
+        ctx.restore();
+      }
+    }
+
+    function drawPadArrow(cx, cy, pointingUp, color) {
       ctx.save();
-      ctx.globalAlpha = owned ? 1 : 0.45;
-      drawMachineSign(m.id, wx + ww / 2, wy + wh * 0.52, lv >= 2, owned ? (lv >= 3 ? 1.18 : 1.02) : 0.9);
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'rgba(20, 10, 4, 0.75)';
+      ctx.lineWidth = 1.7;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (pointingUp) {
+        ctx.moveTo(cx, cy - 7);
+        ctx.lineTo(cx - 8, cy + 6);
+        ctx.lineTo(cx + 8, cy + 6);
+      } else {
+        ctx.moveTo(cx, cy + 7);
+        ctx.lineTo(cx - 8, cy - 6);
+        ctx.lineTo(cx + 8, cy - 6);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
       ctx.restore();
     }
 
-    function drawPad(r, label, hot, fullWarn, themeId) {
+    function drawPad(r, pointingUp, hot, fullWarn, themeId) {
       if (fullWarn) {
         const pulse = warnPulse();
         ctx.fillStyle = `rgba(220,40,60,${0.28 + pulse * 0.4})`;
@@ -3124,13 +3492,10 @@
         ctx.stroke();
       }
       drawShelfBoard(r, hot || fullWarn, themeId);
-      ctx.fillStyle = fullWarn
-        ? `rgba(254,202,202,${0.75 + 0.25 * warnPulse()})`
-        : (hot ? 'rgba(253,230,138,0.85)' : 'rgba(240,195,106,0.45)');
-      ctx.font = '800 14px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, r.x + r.w / 2, r.y + 16);
-      ctx.textAlign = 'left';
+      const col = fullWarn
+        ? `rgba(254,202,202,${0.85 + 0.15 * warnPulse()})`
+        : (hot ? '#fde68a' : '#fbbf24');
+      drawPadArrow(r.x + r.w / 2, r.y + 13, pointingUp, col);
     }
 
     function drawUpgradePad(m) {
@@ -3196,7 +3561,7 @@
       const inWarn = warnOn('in:' + m.id);
 
       if (owned) {
-        drawPad(m.input, '↓', onIn, inWarn, m.id);
+        drawPad(m.input, true, onIn, inWarn, m.id);
         if (ws) ws.queue.forEach((g, i) => drawGemOnShelf(g, m.input, i, inWarn));
         drawUpgradePad(m);
       } else {
@@ -3226,7 +3591,7 @@
       if (lv < 1) return;
       const onOut = inRect(state.player, m.output);
       const outWarn = warnOn('out:' + m.id);
-      drawPad(m.output, '↑', onOut, outWarn, m.id);
+      drawPad(m.output, false, onOut, outWarn, m.id);
       const ws = state.workshops[m.id];
       if (ws) ws.output.forEach((g, i) => drawGemOnShelf(g, m.output, i, outWarn));
     }
@@ -3256,12 +3621,10 @@
     }
 
     function drawLanes() {
-      // Rear shelves sit on the ground behind every shed.
-      MACHINES.forEach((m) => drawMachineRear(m));
-
       // Y-sort: when the cat is behind a shed, draw the cat first so the roof covers them.
       const layers = MACHINES.map((m) => ({ kind: 'machine', m, y: machineDepthY(m) }));
-      layers.push({ kind: 'market', y: MARKET_PAD.y - 8 });
+      layers.push({ kind: 'market', y: stallBox().y + stallBox().h * 0.72 });
+      layers.push({ kind: 'orders', y: stallBox().y + stallBox().h * 0.72 + 1 });
       layers.push({ kind: 'bills', y: CASH_ANCHOR.y });
       layers.push({ kind: 'player', y: state.player.y });
       layers.sort((a, b) => a.y - b.y || (a.kind === 'player' ? -1 : 1));
@@ -3275,6 +3638,10 @@
           drawBills();
           return;
         }
+        if (layer.kind === 'orders') {
+          drawOrderBoard();
+          return;
+        }
         if (layer.kind === 'market') {
           drawMarketPad();
           return;
@@ -3283,6 +3650,7 @@
         drawMachineBuilding(m, mLv(m.id));
         drawMachineProcess(m);
         drawMachineFrontUI(m);
+        drawMachineRear(m);
       });
     }
 
@@ -3306,9 +3674,7 @@
     }
 
     function drawOrderBoard() {
-      const bw = 150, bh = 128;
-      const bx = Math.min(MAP_W - bw - 50, MARKET_PAD.x - 10);
-      const by = YARD.y + 16;
+      const { x: bx, y: by, w: bw, h: bh } = orderBoardBox();
 
       ctx.strokeStyle = 'rgba(180,120,60,0.55)';
       ctx.lineWidth = 3;
@@ -3558,13 +3924,11 @@
       ctx.fillStyle = '#fde68a';
       ctx.font = '800 28px Outfit, sans-serif';
       ctx.fillText(String(a.value), 112, 62);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '700 12px Outfit, sans-serif';
-      ctx.fillText('💰', 112, 80);
+      drawBillSprite(168, 52, 24, a.wanted, 0);
       if (a.wanted) {
         ctx.fillStyle = '#f9a8d4';
         ctx.font = '800 15px Outfit, sans-serif';
-        ctx.fillText('주문 ×' + (a.mult || 1), 150, 80);
+        ctx.fillText('주문 ×' + (a.mult || 1), 112, 82);
       }
 
       // Diagonal verdict — the educational sell feedback
@@ -3680,7 +4044,6 @@
       drawMineVein();
       drawBagPad();
       drawLanes();
-      drawOrderBoard();
       drawSparks();
       drawFloaters();
       if (state.phase === 'cutLesson') drawCutLesson();
@@ -3726,7 +4089,7 @@
       btn.className = 'buy';
       btn.innerHTML = `<span class="pic">${svgFor(m.sign[1], 26)}</span>
         <span class="txt">${m.name}</span>
-        <span class="cost">${m.costs[0]}💰</span>`;
+        <span class="cost">${costHtml(String(m.costs[0]))}</span>`;
       btn.addEventListener('click', () => buy(m));
       el.shopList.appendChild(btn);
       buttons[m.id] = btn;
@@ -3749,8 +4112,8 @@
         btn.classList.toggle('poor', lv < max && !(lv < 1 && locked) && state.gold < cost);
         const costEl = btn.querySelector('.cost');
         if (lv >= max) costEl.textContent = '★' + max;
-        else if (lv >= 1) costEl.textContent = '강화 ' + cost + '💰';
-        else costEl.textContent = locked ? '🔒' : cost + '💰';
+        else if (lv >= 1) costEl.innerHTML = '강화 ' + costHtml(String(cost));
+        else costEl.innerHTML = locked ? '🔒' : costHtml(String(cost));
       });
     }
 
@@ -3805,6 +4168,8 @@
         failFlash: 0,
         sparkCd: 0,
         revealT: 0,
+        holdDismiss: false,
+        tapToClose: false,
         cx: camera.x + view.vw / 2,
         cy: camera.y + view.vh / 2 - 4
       };
@@ -3888,6 +4253,9 @@
       if (lesson.cuts >= 2) {
         lesson.stage = 'done';
         lesson.revealT = 0.7;
+        // 절단 드래그가 끝나기 전엔 닫히지 않게 — 다음 탭/클릭으로만 닫음
+        lesson.holdDismiss = true;
+        lesson.tapToClose = false;
       } else {
         lesson.stage = 'cut2';
       }
@@ -3895,7 +4263,14 @@
 
     function onCutPointerDown(e) {
       const lesson = state.cutLesson;
-      if (!lesson || (lesson.stage !== 'cut1' && lesson.stage !== 'cut2')) return;
+      if (!lesson) return;
+      if (lesson.stage === 'done') {
+        if (lesson.revealT > 0) return;
+        lesson.holdDismiss = false;
+        lesson.tapToClose = true;
+        return;
+      }
+      if (lesson.stage !== 'cut1' && lesson.stage !== 'cut2') return;
       if (lesson.revealT > 0) return;
       const p = mapPointer(e);
       lesson.drag = {
@@ -3950,7 +4325,15 @@
 
     function onCutPointerUp(e) {
       const lesson = state.cutLesson;
-      if (!lesson || !lesson.drag || lesson.drag.id !== e.pointerId) return;
+      if (!lesson) return;
+      if (lesson.stage === 'done') {
+        const wasHolding = lesson.holdDismiss;
+        lesson.holdDismiss = false;
+        if (lesson.drag && lesson.drag.id === e.pointerId) lesson.drag = null;
+        if (lesson.tapToClose && !wasHolding && lesson.revealT <= 0) finishCutLesson();
+        return;
+      }
+      if (!lesson.drag || lesson.drag.id !== e.pointerId) return;
       const d = lesson.drag;
       const t = guideAlong(d.x1, d.y1, lesson);
       lesson.drag = null;
@@ -3959,6 +4342,7 @@
 
       if (nearCutGuide(d.x1, d.y1, lesson) && t >= 0.88) {
         completeOneCut(lesson);
+        lesson.holdDismiss = false;
       } else if (lesson.progress < 0.85) {
         const len = Math.hypot(d.x1 - d.x0, d.y1 - d.y0);
         if (len > 35) lesson.failFlash = 0.75;
@@ -3975,10 +4359,6 @@
 
       if (lesson.revealT > 0) {
         lesson.revealT -= dt;
-        if (lesson.stage === 'done' && lesson.revealT <= 0) {
-          finishCutLesson();
-          return;
-        }
       }
 
       state.sparks = state.sparks.filter((sp) => {
@@ -4055,7 +4435,9 @@
         ? (lesson.cuts === 0 ? '왼쪽에서 오른쪽 끝까지!' : '평행선을 오른쪽 끝까지!')
         : (lesson.cuts === 0
           ? '아래를 가로로 잘라 평평한 면을 만드세요'
-          : '위쪽을 첫 절단면과 평행하게 자르세요');
+          : lesson.cuts === 1
+            ? '위쪽을 첫 절단면과 평행하게 자르세요'
+            : '화면을 눌러 계속하세요');
       ctx.fillText(hint, cx, cardY + 78);
       ctx.textAlign = 'left';
 
@@ -4218,7 +4600,10 @@
         ctx.fillStyle = '#6ee7b7';
         ctx.font = '800 20px Pretendard, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('사다리꼴 — 한 쌍이 평행!', cx, cardY + cardH - 28);
+        ctx.fillText('사다리꼴 — 한 쌍이 평행!', cx, cardY + cardH - 44);
+        ctx.fillStyle = `rgba(226,232,240,${0.55 + 0.45 * (0.5 + 0.5 * Math.sin(lesson.pulse * 4))})`;
+        ctx.font = '700 13px Pretendard, sans-serif';
+        ctx.fillText(lesson.holdDismiss ? '손을 떼고 화면을 누르세요' : '화면을 눌러 닫기', cx, cardY + cardH - 22);
         ctx.textAlign = 'left';
       }
     }
@@ -4257,9 +4642,9 @@
       const isRecord = state.gold > best;
       if (isRecord) localStorage.setItem(BEST_KEY, String(state.gold));
 
-      document.getElementById('final-gold').textContent = state.gold + '💰';
+      document.getElementById('final-gold').textContent = state.gold;
       document.getElementById('record-badge').classList.toggle('hidden', !isRecord);
-      document.getElementById('best-line').textContent = '최고 기록 ' + Math.max(best, state.gold) + '💰';
+      document.getElementById('best-line').innerHTML = '최고 기록 ' + Math.max(best, state.gold);
 
       const tally = document.getElementById('tally');
       tally.innerHTML = '';
@@ -4301,7 +4686,7 @@
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
       document.querySelector('#start-overlay .note')
-        .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}💰</b>`);
+        .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}</b> <img class="ico-bill" src="assets/bill.png" alt="">`);
     }
     requestAnimationFrame(loop);
     loadArt().catch((err) => console.warn('PRISM TYCOON art load:', err));
