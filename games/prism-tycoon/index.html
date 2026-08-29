@@ -69,6 +69,23 @@
     }
     .btn-sound:hover { border-color: var(--gold); }
     .btn-sound.muted { opacity: 0.55; }
+    .btn-fullscreen {
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + 10px);
+      right: 60px;
+      z-index: 60;
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(22, 12, 32, 0.88);
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+    }
+    .btn-fullscreen:hover { border-color: var(--gold); }
     .hud-title { font: 800 16px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.02em; }
     .chip {
       display: flex; align-items: center; gap: 7px;
@@ -481,6 +498,7 @@
   <div id="app">
     <canvas id="game"></canvas>
 
+    <button id="btn-fullscreen" class="btn-fullscreen hidden" type="button" title="전체화면" aria-label="전체화면">⛶</button>
     <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
 
     <div id="rotate-gate" class="rotate-gate hidden" aria-hidden="true">
@@ -6267,6 +6285,8 @@
       resultOverlay.classList.add('hidden');
       if (el && el.hud) el.hud.classList.remove('hidden');
       updateHud();
+      requestAppFullscreen();
+      syncFullscreenBtn();
     }
 
     function finish() {
@@ -6296,7 +6316,56 @@
 
       resultOverlay.classList.remove('hidden');
       updateHud();
+      syncFullscreenBtn();
       sound.finish(isRecord);
+    }
+
+    const appEl = document.getElementById('app');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+
+    function fullscreenSupported() {
+      if (!appEl) return false;
+      return !!(appEl.requestFullscreen || appEl.webkitRequestFullscreen);
+    }
+
+    function isAppFullscreen() {
+      const active = document.fullscreenElement || document.webkitFullscreenElement;
+      return active === appEl;
+    }
+
+    function requestAppFullscreen() {
+      if (!fullscreenSupported() || isAppFullscreen()) return;
+      const req = appEl.requestFullscreen
+        ? appEl.requestFullscreen()
+        : appEl.webkitRequestFullscreen();
+      if (req && typeof req.catch === 'function') req.catch(() => {});
+    }
+
+    function syncFullscreenBtn() {
+      if (!btnFullscreen) return;
+      const show = fullscreenSupported()
+        && state && state.phase === 'play'
+        && !isAppFullscreen();
+      btnFullscreen.classList.toggle('hidden', !show);
+    }
+
+    function onViewportChange() {
+      resize();
+      syncFullscreenBtn();
+    }
+
+    document.addEventListener('fullscreenchange', onViewportChange);
+    document.addEventListener('webkitfullscreenchange', onViewportChange);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onViewportChange);
+    }
+
+    if (btnFullscreen) {
+      btnFullscreen.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sound.init();
+        requestAppFullscreen();
+      });
     }
 
     btnStart.addEventListener('click', start);
@@ -6342,6 +6411,7 @@
     resize();
     state = newState();
     updateHud();
+    syncFullscreenBtn();
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
       document.querySelector('#start-overlay .note')
