@@ -514,6 +514,14 @@ html, body {
   color: var(--ink);
   font-size: 1rem;
 }
+body.mode-dorms #label-student-id,
+body.mode-dorms #display-profile-id,
+body.mode-dorms #result-locked-id-wrap,
+body.mode-dorms #th-leaderboard-id,
+body.mode-dorms #th-opening-id,
+body.mode-dorms #opening-champ-id {
+  display: none !important;
+}
 
 .quiz-header, .result-header, .gameover-header { text-align: center; margin-bottom: 12px; }
 .quiz-header h2, .result-header h2, .gameover-header h2 {

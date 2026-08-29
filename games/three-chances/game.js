@@ -206,6 +206,7 @@ function resolveActiveMode() {
 }
 
 const activeMode = resolveActiveMode();
+if (document.body) document.body.classList.toggle("mode-dorms", activeMode === "dorms");
 /** URL ?test=a1s2 | sas | angle1 → 각1·변2만 바로 플레이 */
 const TEST_A1S2 = (() => {
   try {
@@ -265,6 +266,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const coarsePointerMq = window.matchMedia("(pointer: coarse)");
   const rotateGate = document.getElementById("rotate-gate");
   let portraitBlocked = false;
+  // Declared before MobileFullscreen() — its constructor calls isPlaying() immediately.
+  let running = false;
 
   function tryLockLandscape() {
     const orient = screen.orientation;
@@ -360,7 +363,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let bestClearTimeMs = Number(localStorage.getItem(
     activeMode === "dorms" ? "hm_three_chances_best_dorms" : "hm_three_chances_best"
   ) || 0);
-  let running = false;
   let pendingStartAfterIntro = false;
   let pendingGameOverAfterSuccess = false;
   let pendingGameOverAfterTimeout = false;
@@ -5009,14 +5011,33 @@ document.addEventListener("DOMContentLoaded", () => {
     return id === GAME_ID || id === "three_chances";
   }
 
-  function isDormsEntry(v) {
-    const sid = String((v && v.studentId) || "").trim();
-    const ch = String((v && v.channel) || "").trim();
-    return sid === "DORMS" || sid === "DOREMS" || ch === "dorms" || ch === "dorems";
+  function isDormsEntry(v, key, isDormsSubtree) {
+    const sid = String((v && v.studentId) || "").trim().toUpperCase();
+    const ch = String((v && v.channel) || "").trim().toLowerCase();
+    return !!(isDormsSubtree
+      || sid === "DORMS" || sid === "DOREMS"
+      || ch === "dorms" || ch === "dorems"
+      || key === "dorms" || key === "dorems");
   }
 
-  function matchesMode(v) {
-    return activeMode === "dorms" ? isDormsEntry(v) : !isDormsEntry(v);
+  function matchesMode(v, key, isDormsSubtree) {
+    return activeMode === "dorms" ? isDormsEntry(v, key, isDormsSubtree) : !isDormsEntry(v, key, isDormsSubtree);
+  }
+
+  function visitScoreRecords(data, onRecord) {
+    const walk = (obj, isDormsSubtree = false) => {
+      if (!obj || typeof obj !== "object") return;
+      Object.keys(obj).forEach((key) => {
+        const item = obj[key];
+        if (!item || typeof item !== "object" || Array.isArray(item)) return;
+        if (item.name) {
+          onRecord(key, item, isDormsSubtree || key === "dorms" || key === "dorems");
+        } else {
+          walk(item, isDormsSubtree || key === "dorms" || key === "dorems");
+        }
+      });
+    };
+    walk(data);
   }
 
   function renderLeaderboardSkeleton(tbody, rowCount = 5) {
@@ -5052,19 +5073,35 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const SCORES_URL = "https://math-game-halogini-default-rtdb.firebaseio.com/scores.json";
+  const DORMS_SCORES_URL = "https://math-game-halogini-default-rtdb.firebaseio.com/scores/dorms.json";
 
   function playerRecordKey(name, sid) {
     return activeMode === "dorms" ? name : `${name}_${sid}`;
   }
 
+  function mergeScoreMaps(root, dorms) {
+    const combined = {};
+    if (root && typeof root === "object") Object.assign(combined, root);
+    if (dorms && typeof dorms === "object") {
+      combined.dorms = (combined.dorms && typeof combined.dorms === "object")
+        ? Object.assign({}, combined.dorms, dorms)
+        : dorms;
+    }
+    return combined;
+  }
+
   async function fetchScoresMap() {
     if (firebaseDb) {
       try {
-        const snap = await Promise.race([
+        const snapPromise = Promise.all([
           firebaseDb.ref(LB_PATH).once("value"),
+          firebaseDb.ref(`${LB_PATH}/dorms`).once("value")
+        ]);
+        const [snapScores, snapDorms] = await Promise.race([
+          snapPromise,
           new Promise((_, reject) => setTimeout(() => reject(new Error("lb-timeout")), 2500))
         ]);
-        return snap.val() || {};
+        return mergeScoreMaps(snapScores.val(), snapDorms.val());
       } catch (err) {
         console.warn("three-chances SDK leaderboard failed:", err);
       }
@@ -5072,10 +5109,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
-      const res = await fetch(SCORES_URL, { signal: controller.signal });
+      const [resRoot, resDorms] = await Promise.all([
+        fetch(SCORES_URL, { signal: controller.signal }),
+        fetch(DORMS_SCORES_URL, { signal: controller.signal }).catch(() => null)
+      ]);
       clearTimeout(timeoutId);
-      if (!res.ok) return null;
-      return (await res.json()) || {};
+      if (!resRoot || !resRoot.ok) return null;
+      const root = (await resRoot.json()) || {};
+      const dorms = resDorms && resDorms.ok ? (await resDorms.json()) : null;
+      return mergeScoreMaps(root, dorms);
     } catch (err) {
       clearTimeout(timeoutId);
       console.error("three-chances REST leaderboard failed:", err);
@@ -5107,13 +5149,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const best = new Map();
-      Object.keys(data).forEach((key) => {
-        const v = data[key];
-        if (!v || typeof v !== "object" || Array.isArray(v)) return;
-        if (!isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
+      visitScoreRecords(data, (key, v, isDormsSubtree) => {
+        if (!isThreeChancesEntry(v) || !matchesMode(v, key, isDormsSubtree) || v.clearTimeMs == null) return;
         const name = sanitizeInput(v.name || "", 12);
         const sid = sanitizeInput(v.studentId || "", 10);
-        const mapKey = activeMode === "dorms" ? name : `${name}_${sid}`;
+        const mapKey = playerRecordKey(name, sid);
         const clearMs = Number(v.clearTimeMs);
         if (!Number.isFinite(clearMs) || clearMs <= 0) return;
         const prev = best.get(mapKey);
@@ -5277,10 +5317,8 @@ document.addEventListener("DOMContentLoaded", () => {
       let existingBest = null;
       let otherSameTime = false;
       if (data) {
-        Object.keys(data).forEach((key) => {
-          const v = data[key];
-          if (!v || typeof v !== "object" || Array.isArray(v)) return;
-          if (!isThreeChancesEntry(v) || !matchesMode(v) || v.clearTimeMs == null) return;
+        visitScoreRecords(data, (key, v, isDormsSubtree) => {
+          if (!isThreeChancesEntry(v) || !matchesMode(v, key, isDormsSubtree) || v.clearTimeMs == null) return;
           const name = sanitizeInput(v.name || "", 12);
           const sid = sanitizeInput(v.studentId || "", 10);
           const clearMs = Number(v.clearTimeMs);
@@ -5572,7 +5610,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   profileForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    if (portraitBlocked) return;
     playerName = sanitizeInput(document.getElementById("input-player-name").value) || "도전자";
     if (activeMode === "dorms") {
       studentId = "";
@@ -5612,6 +5649,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applyDormsModeUi() {
+    document.body.classList.toggle("mode-dorms", activeMode === "dorms");
     const lbTitle = document.getElementById("result-leaderboard-title");
     if (lbTitle) {
       lbTitle.textContent = activeMode === "dorms"
@@ -5629,6 +5667,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (labelId) labelId.style.display = "none";
     if (inputId) {
       inputId.removeAttribute("required");
+      inputId.disabled = true;
       inputId.value = "";
     }
     if (idWrap) idWrap.style.display = "none";
