@@ -36,15 +36,21 @@
       position: absolute; top: 0; left: 0; right: 0;
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      align-items: center;
+      align-items: start;
       gap: 8px;
       padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
       background: linear-gradient(180deg, rgba(18, 8, 26, 0.94), rgba(18, 8, 26, 0));
       pointer-events: none;
       z-index: 5;
     }
-    .hud-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .hud-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+    .hud-left { display: flex; align-items: center; gap: 8px; min-width: 0; padding-top: 4px; }
+    .hud-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-right { min-width: 0; }
     .hud-title { font: 800 16px Outfit, sans-serif; color: var(--gold); letter-spacing: 0.06em; }
     .chip {
       display: flex; align-items: center; gap: 7px;
@@ -135,36 +141,49 @@
       75% { transform: scale(1.08) translateX(5px); box-shadow: 0 0 0 4px rgba(251,113,133,0.7); }
     }
 
-    .chip.time {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 4px;
-      min-width: 132px;
-      padding: 6px 10px 8px;
-    }
-    .chip.time .time-top {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-    }
-    .chip.time .label { color: var(--muted); }
-    .chip.time .value { font-size: 15px; color: #e2e8f0; }
     .time-gauge {
-      position: relative;
-      height: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 280px;
+      max-width: min(280px, 46vw);
+      padding: 5px 10px 5px 8px;
+      background: rgba(12, 8, 18, 0.78);
+      border: 1px solid rgba(240, 195, 106, 0.38);
       border-radius: 999px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
     }
-    .time-gauge > b {
-      display: block; height: 100%; width: 100%;
-      transform-origin: left center;
-      background: linear-gradient(90deg, #34d399, #f0c36a 55%, #fb7185);
+    .time-gauge-track {
+      flex: 1;
+      height: 12px;
       border-radius: 999px;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(240, 195, 106, 0.45);
+      overflow: hidden;
+      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.45);
+    }
+    .time-gauge-fill {
+      display: block;
+      height: 100%;
+      width: 100%;
+      border-radius: inherit;
+      transform-origin: left center;
+      background: linear-gradient(90deg, #fb7185 0%, #f0c36a 35%, #34d399 100%);
       transition: transform 0.15s linear;
     }
-    .chip.time.warn .value { color: #fb7185; }
-    .chip.time.warn .time-gauge { border-color: rgba(251, 113, 133, 0.7); }
-    .chip.time.warn .time-gauge > b {
+    .time-gauge-label {
+      flex-shrink: 0;
+      min-width: 52px;
+      text-align: right;
+      font: 800 18px Outfit, sans-serif;
+      color: var(--gold);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+      letter-spacing: 0.02em;
+    }
+    .time-gauge.warn .time-gauge-label { color: #fb7185; }
+    .time-gauge.warn .time-gauge-track { border-color: rgba(251, 113, 133, 0.75); }
+    .time-gauge.warn .time-gauge-fill {
       background: linear-gradient(90deg, #fb7185, #ef4444);
       animation: timePulse 0.6s ease-in-out infinite;
     }
@@ -304,8 +323,11 @@
       }
       .chip.gold .ico-bill { width: 32px; height: 24px; }
       .chip.gold .value { font-size: 18px; -webkit-text-stroke-width: 3px; }
-      .chip.time { min-width: 96px; padding: 3px 8px; }
-      .time-gauge { height: 5px; }
+      .hud { gap: 6px; }
+      .hud-center { gap: 4px; }
+      .time-gauge { width: 220px; max-width: min(220px, 42vw); padding: 3px 8px 3px 6px; }
+      .time-gauge-track { height: 10px; }
+      .time-gauge-label { font-size: 15px; min-width: 44px; }
       .shop { width: min(220px, 60vw); max-height: 36vh; padding: 5px; }
 
       /* Mobile landscape overlay card optimizations */
@@ -353,7 +375,6 @@
       .hud-title { display: none; }
       .chip { padding: 5px 9px; gap: 5px; }
       .chip.gold .value { font-size: 24px; }
-      .chip.time { min-width: 110px; }
       .card { padding: 18px; }
       .card h1 { font-size: 24px; }
     }
@@ -375,16 +396,16 @@
       <div class="hud-left">
         <span class="hud-title">PRISM TYCOON</span>
       </div>
-      <div class="chip gold" id="chip-gold"><img class="ico-bill" src="assets/bill.png" alt=""><span class="value" id="hud-gold">0</span></div>
-      <div class="hud-right">
-        <div class="chip time" id="chip-time">
-          <div class="time-top">
-            <span class="label">시간</span>
-            <span class="value" id="hud-time">5:00</span>
+      <div class="hud-center">
+        <div class="time-gauge" id="chip-time" aria-label="남은 시간">
+          <div class="time-gauge-track">
+            <div class="time-gauge-fill" id="hud-time-fill"></div>
           </div>
-          <div class="time-gauge"><b id="hud-time-fill"></b></div>
+          <span class="time-gauge-label" id="hud-time">5:00</span>
         </div>
+        <div class="chip gold" id="chip-gold"><img class="ico-bill" src="assets/bill.png" alt=""><span class="value" id="hud-gold">0</span></div>
       </div>
+      <div class="hud-right"></div>
     </div>
 
     <div class="shop hidden" id="shop"><div id="shop-list"></div></div>
@@ -589,7 +610,8 @@
     }
 
     function segmentHitsSolid(x0, y0, x1, y1, box) {
-      const steps = 18;
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.max(12, Math.ceil(len / 10));
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const px = x0 + (x1 - x0) * t;
@@ -599,42 +621,156 @@
       return false;
     }
 
-    function findPath(fromX, fromY, toX, toY) {
-      const dest = walkablePoint(toX, toY);
-      toX = dest.x;
-      toY = dest.y;
-      const waypoints = [];
-      const blocking = [];
-      for (const box of solidBoxes()) {
-        if (segmentHitsSolid(fromX, fromY, toX, toY, box)) {
-          const dist = Math.hypot(box.x + box.w / 2 - fromX, box.y + box.h / 2 - fromY);
-          blocking.push({ box, dist });
+    function lineClear(x0, y0, x1, y1) {
+      return !solidBoxes().some((b) => segmentHitsSolid(x0, y0, x1, y1, b));
+    }
+
+    const PATH_PAD = PLAYER_R + 18;
+
+    function routePoint(x, y) {
+      const p = clampPoint(x, y);
+      if (blockedAt(p.x, p.y)) return null;
+      return p;
+    }
+
+    function pathNodes() {
+      const nodes = [];
+      const seen = [];
+      const push = (pt) => {
+        if (!pt) return;
+        for (const s of seen) {
+          if (Math.hypot(s.x - pt.x, s.y - pt.y) < 12) return;
         }
+        seen.push(pt);
+        nodes.push(pt);
+      };
+      for (const box of solidBoxes()) {
+        const x0 = box.x - PATH_PAD;
+        const x1 = box.x + box.w + PATH_PAD;
+        const y0 = box.y - PATH_PAD;
+        const y1 = box.y + box.h + PATH_PAD;
+        const xm = (x0 + x1) / 2;
+        const ym = (y0 + y1) / 2;
+        push(routePoint(x0, y0));
+        push(routePoint(x1, y0));
+        push(routePoint(x0, y1));
+        push(routePoint(x1, y1));
+        push(routePoint(x0, ym));
+        push(routePoint(x1, ym));
+        push(routePoint(xm, y0));
+        push(routePoint(xm, y1));
       }
-      blocking.sort((a, b) => a.dist - b.dist);
+      return nodes;
+    }
 
-      if (blocking.length > 0) {
-        for (const b of blocking) {
-          const box = b.box;
-          const topY = box.y - PLAYER_R - 16;
-          const botY = box.y + box.h + PLAYER_R + 16;
-          const midY = box.y + box.h / 2;
-          const useTop = (fromY < midY && toY < midY + 20) || (fromY <= midY && toY <= midY);
-          const bypassY = useTop ? topY : botY;
+    function tightenPath(origin, pts) {
+      if (!pts.length) return pts;
+      const seq = [origin].concat(pts);
+      const out = [seq[0]];
+      let i = 0;
+      while (i < seq.length - 1) {
+        let best = i + 1;
+        for (let j = seq.length - 1; j > i + 1; j--) {
+          if (lineClear(seq[i].x, seq[i].y, seq[j].x, seq[j].y)) {
+            best = j;
+            break;
+          }
+        }
+        out.push(seq[best]);
+        i = best;
+      }
+      out.shift();
+      return out.length ? out : pts;
+    }
 
-          if (fromX < box.x && toX > box.x + box.w) {
-            waypoints.push(clampPoint(box.x - PLAYER_R - 14, bypassY));
-            waypoints.push(clampPoint(box.x + box.w + PLAYER_R + 14, bypassY));
-          } else if (fromX > box.x + box.w && toX < box.x) {
-            waypoints.push(clampPoint(box.x + box.w + PLAYER_R + 14, bypassY));
-            waypoints.push(clampPoint(box.x - PLAYER_R - 14, bypassY));
-          } else {
-            waypoints.push(clampPoint(box.x + box.w / 2, bypassY));
+    function findPath(fromX, fromY, toX, toY) {
+      const origin = walkablePoint(fromX, fromY);
+      const dest = walkablePoint(toX, toY);
+      if (lineClear(origin.x, origin.y, dest.x, dest.y)) {
+        return [{ x: dest.x, y: dest.y }];
+      }
+
+      const nodes = [origin].concat(pathNodes(), [dest]);
+      const n = nodes.length;
+      const goal = n - 1;
+      const dist = new Array(n).fill(Infinity);
+      const prev = new Array(n).fill(-1);
+      const used = new Array(n).fill(false);
+      dist[0] = 0;
+
+      for (let iter = 0; iter < n; iter++) {
+        let u = -1;
+        let best = Infinity;
+        for (let i = 0; i < n; i++) {
+          if (!used[i] && dist[i] < best) { best = dist[i]; u = i; }
+        }
+        if (u < 0 || u === goal) break;
+        used[u] = true;
+        for (let v = 0; v < n; v++) {
+          if (used[v] || v === u) continue;
+          if (!lineClear(nodes[u].x, nodes[u].y, nodes[v].x, nodes[v].y)) continue;
+          const d = dist[u] + Math.hypot(nodes[v].x - nodes[u].x, nodes[v].y - nodes[u].y);
+          if (d < dist[v]) {
+            dist[v] = d;
+            prev[v] = u;
           }
         }
       }
-      waypoints.push({ x: toX, y: toY });
-      return waypoints;
+
+      if (dist[goal] === Infinity) {
+        return [{ x: dest.x, y: dest.y }];
+      }
+
+      const raw = [];
+      for (let v = goal; v >= 0; v = prev[v]) raw.push(nodes[v]);
+      raw.reverse();
+      if (raw.length && Math.hypot(raw[0].x - origin.x, raw[0].y - origin.y) < 8) raw.shift();
+      if (!raw.length) raw.push({ x: dest.x, y: dest.y });
+      return tightenPath(origin, raw);
+    }
+
+    function hitSolidNear(x, y, towardX, towardY) {
+      const boxes = solidBoxes();
+      return boxes.find((b) => circleHitsRect(x + towardX, y + towardY, PLAYER_R, b))
+        || boxes.find((b) => circleHitsRect(x, y, PLAYER_R, b))
+        || null;
+    }
+
+    function slideAround(p, wp, dt) {
+      const step = SPEED * dt * 0.9;
+      const sx = Math.sign(wp.x - p.x);
+      const sy = Math.sign(wp.y - p.y);
+      const box = hitSolidNear(p.x, p.y, sx * 6, sy * 6);
+      if (!box) return;
+
+      const leftX = box.x - PATH_PAD;
+      const rightX = box.x + box.w + PATH_PAD;
+      const topY = box.y - PATH_PAD;
+      const botY = box.y + box.h + PATH_PAD;
+      const blockedAheadY = blockedAt(p.x, p.y + (sy || 1) * 4);
+      const blockedAheadX = blockedAt(p.x + (sx || 1) * 4, p.y);
+
+      if (blockedAheadY) {
+        const viaLeft = Math.abs(p.x - leftX) + Math.abs(leftX - wp.x);
+        const viaRight = Math.abs(p.x - rightX) + Math.abs(rightX - wp.x);
+        const dir = viaLeft < viaRight ? -1 : 1;
+        const nx = Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, p.x + dir * step));
+        if (!blockedAt(nx, p.y)) p.x = nx;
+        else {
+          const ox = Math.max(BOUNDS.x0, Math.min(BOUNDS.x1, p.x - dir * step));
+          if (!blockedAt(ox, p.y)) p.x = ox;
+        }
+      } else if (blockedAheadX) {
+        const viaTop = Math.abs(p.y - topY) + Math.abs(topY - wp.y);
+        const viaBot = Math.abs(p.y - botY) + Math.abs(botY - wp.y);
+        const dir = viaTop < viaBot ? -1 : 1;
+        const ny = Math.max(BOUNDS.y0, Math.min(BOUNDS.y1, p.y + dir * step));
+        if (!blockedAt(p.x, ny)) p.y = ny;
+        else {
+          const oy = Math.max(BOUNDS.y0, Math.min(BOUNDS.y1, p.y - dir * step));
+          if (!blockedAt(p.x, oy)) p.y = oy;
+        }
+      }
     }
 
     function movePlayer(dx, dy, dt) {
@@ -651,20 +787,8 @@
       if (canX) p.x = nx;
       if (canY) p.y = ny;
 
-      // Smart Wall-Sliding: if blocked in one direction while navigating, slide along the perpendicular edge
-      if (state && state.waypoints && state.waypoints.length > 0) {
-        const wp = state.waypoints[0];
-        if (!canX && canY && Math.abs(dy) < 0.3) {
-          const tryUp = p.y - SPEED * dt * 0.8;
-          const tryDown = p.y + SPEED * dt * 0.8;
-          if (wp.y < p.y && !blockedAt(p.x, tryUp)) p.y = tryUp;
-          else if (wp.y >= p.y && !blockedAt(p.x, tryDown)) p.y = tryDown;
-        } else if (!canY && canX && Math.abs(dx) < 0.3) {
-          const tryLeft = p.x - SPEED * dt * 0.8;
-          const tryRight = p.x + SPEED * dt * 0.8;
-          if (wp.x < p.x && !blockedAt(tryLeft, p.y)) p.x = tryLeft;
-          else if (wp.x >= p.x && !blockedAt(tryRight, p.y)) p.x = tryRight;
-        }
+      if (state && state.waypoints && state.waypoints.length > 0 && (!canX || !canY)) {
+        slideAround(p, state.waypoints[0], dt);
       }
     }
 
@@ -790,14 +914,17 @@
 
     function svgFor(kind, size) {
       const outer = shapeFor(kind, size / 3.1, 1);
-      const inner = outer.map((p) => [p[0] * 0.72, p[1] * 0.72]);
+      const innerScale = gemInnerScale(kind);
+      const inner = outer.map((p) => [p[0] * innerScale, p[1] * innerScale]);
       const to = (pts) => pts.map((p) => `${(p[0] + size / 2).toFixed(1)},${(p[1] + size / 2).toFixed(1)}`).join(' ');
       const g = GEMS[kind];
       const h = hash(1);
       const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
+      const join = gemJoin(kind);
+      const lw = Math.min(1.15, gemStrokeWidth(size / 3.1));
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
-        <polygon points="${to(outer)}" fill="#3f322e" stroke="${g.line}" stroke-width="1.4"/>
-        <polygon points="${to(inner)}" fill="${glow}" stroke="rgba(255,255,255,0.35)" stroke-width="0.6"/></svg>`;
+        <polygon points="${to(outer)}" fill="#3f322e" stroke="${g.line}" stroke-width="${lw.toFixed(2)}" stroke-linejoin="${join}" stroke-miterlimit="2.2"/>
+        <polygon points="${to(inner)}" fill="${glow}"/></svg>`;
     }
 
     function stripBlack(img) {
@@ -910,6 +1037,8 @@
       bill: null,
       billWanted: null,
       stall: null,
+      mine: null,
+      bagIcon: null,
       factories: {},
       idle: null,
       walk: []
@@ -949,12 +1078,16 @@
     // Hopper void from sprite scan: fully dark at ~66–78% height, below the gold lip (~62%).
     const STALL_SLOT_UV = { x: 0.30, y: 0.655, w: 0.40, h: 0.125 };
 
+    // Cave mouth in mine-cave.png — right-facing hole. Gems spawn at the lip and fly east.
+    const MINE_MOUTH_UV = { x: 0.22, y: 0.50, w: 0.56, h: 0.40 };
+
     // Factory sprites share one booth layout. Window sits in the gold/iron frame;
-    // bench UV is the protruding counter lip, aligned to m.input (input coords stay put).
+    // sprite anchors to the body, pads sit on the protruding sill below the window frame.
     const MACHINE_WINDOW_UV = { x: 0.24, y: 0.34, w: 0.52, h: 0.30 };
     const MACHINE_BENCH_UV = 0.70;
     const MACHINE_FOOT_UV = 0.99;
     const MACHINE_LANTERN_UV = { x: 0.10, y: 0.42 };
+    const MACHINE_PAD_GAP = 32;
 
     async function loadFactoryArt() {
       art.factories = {};
@@ -984,7 +1117,7 @@
       const iw = img.naturalWidth || img.width;
       const ih = img.naturalHeight || img.height;
       const destH = destW * (ih / iw);
-      const benchWorldY = m.input.y + 10;
+      const benchWorldY = b.y + b.h + 10;
       return {
         x: b.x + b.w / 2 - destW / 2,
         y: benchWorldY - destH * MACHINE_BENCH_UV,
@@ -1147,11 +1280,13 @@
         img.src = ASSET_DIR + 'hall-bg.png';
       });
 
-      const [hall, bill, billWanted, stall] = await Promise.all([
+      const [hall, bill, billWanted, stall, mine, bagIcon] = await Promise.all([
         hallPromise,
         loadPng(ASSET_DIR + 'bill.png'),
         loadPng(ASSET_DIR + 'bill-wanted.png'),
         loadPng(ASSET_DIR + 'stall-register.png'),
+        loadPng(ASSET_DIR + 'mine-cave.png?v=wall1'),
+        loadPng(ASSET_DIR + 'bag-icon.png?v=picto1'),
         loadArt8Dir(),
         loadFactoryArt()
       ]);
@@ -1159,6 +1294,8 @@
       art.bill = bill;
       art.billWanted = billWanted;
       art.stall = stall;
+      art.mine = mine;
+      art.bagIcon = bagIcon;
       layoutMarketBelt();
     }
 
@@ -1241,6 +1378,40 @@
     }
 
     const ORE_REST = 18;
+
+    function mineBox() {
+      const v = MINE_VEIN;
+      const img = art.mine;
+      const destW = 148;
+      const destH = img
+        ? destW * ((img.naturalHeight || img.height) / (img.naturalWidth || img.width))
+        : 100;
+      const spawnX = v.x - 11;
+      const spawnY = v.y + 18;
+      const mouthCx = destW * (MINE_MOUTH_UV.x + MINE_MOUTH_UV.w * 0.5);
+      const mouthLip = destH * (MINE_MOUTH_UV.y + MINE_MOUTH_UV.h * 0.78);
+      return {
+        x: spawnX - mouthCx,
+        y: spawnY - mouthLip,
+        w: destW,
+        h: destH,
+        img
+      };
+    }
+
+    function caveMouth() {
+      const box = mineBox();
+      if (box.img) {
+        return {
+          x: box.x + box.w * MINE_MOUTH_UV.x,
+          y: box.y + box.h * MINE_MOUTH_UV.y,
+          w: box.w * MINE_MOUTH_UV.w,
+          h: box.h * MINE_MOUTH_UV.h
+        };
+      }
+      const v = MINE_VEIN;
+      return { x: v.x - 16, y: v.y + 12, w: 20, h: 24 };
+    }
 
     function seedOrePile() {
       const a = orePileAnchor();
@@ -1407,26 +1578,27 @@
       const col3 = 650;
       const col4 = 890;
 
-      BAG_PAD = { x: col1 - 65, y: 150, w: 130, h: 80 };
+      BAG_PAD = { x: 172, y: 100, w: 126, h: 82 };
       MINE_VEIN = { x: col1 - 65, y: 285, w: 130, h: 120 };
+
+      function layoutFrontPads(m, cx) {
+        const y = m.body.y + m.body.h + MACHINE_PAD_GAP;
+        m.input = { x: cx - 82, y, w: 52, h: 56 };
+        m.upgrade = { x: cx - 24, y, w: 48, h: 56 };
+        m.output = { x: cx + 30, y, w: 52, h: 56 };
+      }
 
       const m0 = MACHINES[0]; 
       m0.body = { x: col2 - 70, y: 220, w: 140, h: 72 };
-      m0.input = { x: col2 - 82, y: 292, w: 52, h: 56 };
-      m0.upgrade = { x: col2 - 24, y: 292, w: 48, h: 56 };
-      m0.output = { x: col2 + 30, y: 292, w: 52, h: 56 };
+      layoutFrontPads(m0, col2);
       
       const m1 = MACHINES[1]; 
       m1.body = { x: col3 - 70, y: 105, w: 140, h: 72 };
-      m1.input = { x: col3 - 82, y: 177, w: 52, h: 56 };
-      m1.upgrade = { x: col3 - 24, y: 177, w: 48, h: 56 };
-      m1.output = { x: col3 + 30, y: 177, w: 52, h: 56 };
+      layoutFrontPads(m1, col3);
       
       const m2 = MACHINES[2]; 
       m2.body = { x: col3 - 70, y: 335, w: 140, h: 72 };
-      m2.input = { x: col3 - 82, y: 407, w: 52, h: 56 };
-      m2.upgrade = { x: col3 - 24, y: 407, w: 48, h: 56 };
-      m2.output = { x: col3 + 30, y: 407, w: 52, h: 56 };
+      layoutFrontPads(m2, col3);
 
       MARKET_PAD = { x: col4 - 65, y: 270, w: 130, h: 120 };
       layoutMarketBelt();
@@ -1668,14 +1840,21 @@
           const tdy = curTarget.y - state.player.y;
           const dist = Math.hypot(tdx, tdy);
           if (dist < 14) {
-            if (state.waypoints && state.waypoints.length > 0) {
-              state.waypoints.shift(); // 현재 경유지 완료
-              if (state.waypoints.length === 0) {
+            const nxt = state.waypoints && state.waypoints.length > 1 ? state.waypoints[1] : null;
+            const canSkip = dist < 5 || !nxt || lineClear(state.player.x, state.player.y, nxt.x, nxt.y);
+            if (canSkip) {
+              if (state.waypoints && state.waypoints.length > 0) {
+                state.waypoints.shift();
+                if (state.waypoints.length === 0) {
+                  state.targetPos = null;
+                  state.waypoints = null;
+                }
+              } else {
                 state.targetPos = null;
-                state.waypoints = null;
               }
             } else {
-              state.targetPos = null;
+              dx = tdx / dist;
+              dy = tdy / dist;
             }
           } else {
             dx = tdx / dist;
@@ -2098,34 +2277,48 @@
       return 0.4 + 0.6 * Math.sin(performance.now() / 120);
     }
 
+    function gemJoin(kind) {
+      return kind === 'raw' ? 'round' : 'miter';
+    }
+
+    function gemStrokeWidth(size) {
+      return Math.max(1.2, Math.min(1.85, size * 0.11));
+    }
+
+    function gemInnerScale(kind) {
+      return kind === 'raw' ? 0.80 : 0.90;
+    }
+
     function drawWarnGem(kind, seed, size) {
       const pulse = warnPulse();
       const fill = `rgba(251,113,133,${0.55 + pulse * 0.45})`;
       const line = `rgba(254,202,202,${0.75 + pulse * 0.25})`;
-      paintGem(kind, size, seed, { fill, line, lw: 2.6 });
+      paintGem(kind, size, seed, { fill, line });
     }
 
     function paintGem(kind, size, seed, opt) {
       const g = GEMS[kind];
       const line = (opt && opt.line) || g.line;
       const pts = shapeFor(kind, size, seed);
-      const lw = (opt && opt.lw) || 2.8;
+      const lw = (opt && opt.lw != null) ? opt.lw : gemStrokeWidth(size);
+      const join = gemJoin(kind);
+      const innerScale = gemInnerScale(kind);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
 
       if (opt && opt.fill) {
-        poly(pts, opt.fill, line, lw);
+        poly(pts, opt.fill, line, lw, join);
       } else {
         const h = hash(seed || 1);
         const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
-        const halo = h < 0.34 ? 'rgba(196,181,253,0.35)' : h < 0.67 ? 'rgba(94,234,212,0.35)' : 'rgba(251,191,36,0.35)';
+        const halo = h < 0.34 ? 'rgba(196,181,253,0.28)' : h < 0.67 ? 'rgba(94,234,212,0.28)' : 'rgba(251,191,36,0.28)';
         ctx.fillStyle = halo;
         ctx.beginPath();
-        ctx.ellipse(0, 2, size * 0.85, size * 0.55, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 2, size * 0.72, size * 0.46, 0, 0, Math.PI * 2);
         ctx.fill();
-        poly(pts, '#3f322e', line, lw);
-        const inner = pts.map((p) => [p[0] * 0.72, p[1] * 0.72]);
-        poly(inner, glow, 'rgba(255,255,255,0.35)', 0.9);
+        poly(pts, '#3f322e', line, lw, join);
+        const inner = pts.map((p) => [p[0] * innerScale, p[1] * innerScale]);
+        poly(inner, glow, null, 0, join);
         ctx.fillStyle = 'rgba(255,255,255,0.62)';
         ctx.beginPath();
         ctx.moveTo(inner[0][0] * 0.55, inner[0][1] * 0.55);
@@ -2135,10 +2328,17 @@
         ctx.fill();
       }
 
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      ctx.clip();
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.beginPath();
       ctx.ellipse(-size * 0.22, -size * 0.28, size * 0.18, size * 0.12, -0.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
     }
 
     function spawnBills(total, wanted) {
@@ -2323,13 +2523,21 @@
       ctx.closePath();
     }
 
-    function poly(pts, fill, stroke, lw) {
+    function poly(pts, fill, stroke, lw, join) {
       ctx.beginPath();
       ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.closePath();
       if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+      if (stroke) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lw || 2;
+        ctx.lineJoin = join || 'miter';
+        ctx.miterLimit = 2.2;
+        ctx.lineCap = 'butt';
+        ctx.stroke();
+      }
     }
 
     function gemAt(kind, x, y, s, seed) {
@@ -2552,7 +2760,7 @@
       ctx.lineCap = 'round';
       ctx.beginPath();
       // Mine to Machine 0
-      ctx.moveTo(MINE_VEIN.x + MINE_VEIN.w * 0.6, MINE_VEIN.y + MINE_VEIN.h * 0.5);
+      ctx.moveTo(MINE_VEIN.x + MINE_VEIN.w * 0.62, MINE_VEIN.y + MINE_VEIN.h * 0.55);
       ctx.lineTo(m0.input.x + m0.input.w * 0.3, m0.input.y + m0.input.h * 0.5);
       
       // Machine 0 to Machine 1 & 2 fork
@@ -2608,23 +2816,34 @@
     function drawMineVein() {
       const v = MINE_VEIN;
       const hot = inRect(state.player, v);
-      const tNow = performance.now() / 1000;
+      const box = mineBox();
 
-      ctx.fillStyle = 'rgba(8,4,14,0.85)';
-      ctx.beginPath();
-      ctx.ellipse(v.x + 10, v.y + 38, 28, 42, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#1a1024';
-      ctx.beginPath();
-      ctx.moveTo(v.x - 22, v.y + 88);
-      ctx.quadraticCurveTo(v.x - 28, v.y - 8, v.x + 18, v.y - 6);
-      ctx.quadraticCurveTo(v.x + 36, v.y + 20, v.x + 22, v.y + 92);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = `rgba(167,139,250,${0.18 + 0.1 * Math.sin(tNow * 2)})`;
-      ctx.beginPath();
-      ctx.ellipse(v.x + 8, v.y + 36, 16, 26, -0.15, 0, Math.PI * 2);
-      ctx.fill();
+      if (box.img) {
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(box.x + box.w / 2 + 4, box.y + box.h - 6, box.w * 0.38, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.drawImage(box.img, box.x, box.y, box.w, box.h);
+      } else {
+        const tNow = performance.now() / 1000;
+        ctx.fillStyle = 'rgba(8,4,14,0.85)';
+        ctx.beginPath();
+        ctx.ellipse(v.x + 10, v.y + 38, 28, 42, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1a1024';
+        ctx.beginPath();
+        ctx.moveTo(v.x - 22, v.y + 88);
+        ctx.quadraticCurveTo(v.x - 28, v.y - 8, v.x + 18, v.y - 6);
+        ctx.quadraticCurveTo(v.x + 36, v.y + 20, v.x + 22, v.y + 92);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `rgba(167,139,250,${0.18 + 0.1 * Math.sin(tNow * 2)})`;
+        ctx.beginPath();
+        ctx.ellipse(v.x + 8, v.y + 36, 16, 26, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        drawCrystalCluster(v.x + 18, v.y + 8, 0.55);
+        drawCrystalCluster(v.x + v.w - 8, v.y + 22, 0.42);
+      }
 
       const a = orePileAnchor();
       ctx.fillStyle = 'rgba(28,18,30,0.9)';
@@ -2632,7 +2851,7 @@
       ctx.ellipse(a.cx, a.cy + 4, a.rx + 8, a.ry + 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      drawDottedPad(v, hot, 'rgba(167,139,250,0.22)', '#c4b5fd', '⛏️ 광맥');
+      drawDottedPad(v, hot, 'rgba(167,139,250,0.16)', '#c4b5fd', null);
 
       const spill = (state.oreSpill || []).slice().sort((p, q) => p.y - q.y);
       spill.forEach((o) => {
@@ -2642,14 +2861,17 @@
         paintGem('raw', GEM_S + 2, o.seed, { lw: 2.2 });
         ctx.restore();
       });
+    }
 
-      drawCrystalCluster(v.x + 18, v.y + 8, 0.55);
-      drawCrystalCluster(v.x + v.w - 8, v.y + 22, 0.42);
-      ctx.fillStyle = hot ? '#c4b5fd' : 'rgba(226,232,240,0.75)';
-      ctx.font = '800 13px Pretendard, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⛏️ 광맥', v.x + v.w / 2, v.y + 16);
-      ctx.textAlign = 'left';
+    function drawBagSilhouette(cx, cy, s) {
+      roundRect(cx - 13 * s, cy - 3 * s, 26 * s, 22 * s, 7 * s);
+      ctx.fill();
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = 3.4 * s;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy - 3 * s, 7 * s, Math.PI, 0, false);
+      ctx.stroke();
     }
 
     function drawBagPad() {
@@ -2657,17 +2879,41 @@
       if (state.bagLevel >= bagMax()) return;
       const hot = inRect(state.player, r);
       const cost = BAG_COSTS[state.bagLevel];
-      const next = CAPACITY_BASE + (state.bagLevel + 1) * BAG_STEP;
       const can = state.gold >= cost;
-      drawDottedPad(r, hot, can ? 'rgba(94,234,212,0.3)' : 'rgba(80,80,90,0.35)', can ? '#5eead4' : '#94a3b8', '🎒');
-      ctx.fillStyle = can ? '#5eead4' : 'rgba(226,232,240,0.65)';
-      ctx.font = '800 12px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(next + '칸', r.x + r.w / 2, r.y + 22);
-      ctx.textAlign = 'left';
-      drawCostBadge(r.x + r.w / 2, r.y + r.h - 18, cost, can, false);
+      drawDottedPad(r, hot, can ? 'rgba(94,234,212,0.18)' : 'rgba(40,28,20,0.4)', can ? '#5eead4' : 'rgba(226,232,240,0.5)', null);
+
+      const cx = r.x + r.w * 0.40;
+      const cy = r.y + r.h * 0.40;
+      ctx.save();
+      ctx.globalAlpha = hot ? 0.88 : 0.62;
+      const icon = art.bagIcon;
+      if (icon) {
+        const iw = icon.naturalWidth || icon.width;
+        const ih = icon.naturalHeight || icon.height;
+        const h = 46;
+        const w = h * (iw / ih);
+        ctx.drawImage(icon, cx - w / 2, cy - h / 2, w, h);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        drawBagSilhouette(cx, cy, 1.12);
+      }
+      const px = r.x + r.w * 0.74;
+      const py = r.y + r.h * 0.38;
+      ctx.globalAlpha = hot ? 0.92 : 0.68;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(px - 9, py);
+      ctx.lineTo(px + 9, py);
+      ctx.moveTo(px, py - 9);
+      ctx.lineTo(px, py + 9);
+      ctx.stroke();
+      ctx.restore();
+
+      drawCostBadge(r.x + r.w / 2, r.y + r.h - 12, cost, can, false);
       if (hot && can && state.bagT > 0) {
-        drawProgressRing(r.x + r.w / 2, r.y + r.h / 2 + 6, 16, state.bagT / 0.7, '#5eead4');
+        drawProgressRing(r.x + r.w / 2, r.y + r.h / 2 + 4, 16, state.bagT / 1.5, '#5eead4');
       }
     }
 
@@ -3611,10 +3857,10 @@
         ctx.save();
         if (blocked) {
           const pulse = warnPulse();
-          poly(worldPts, `rgba(251,113,133,${0.55 + pulse * 0.4})`, '#fecdd3', 2.6);
+          poly(worldPts, `rgba(251,113,133,${0.55 + pulse * 0.4})`, '#fecdd3', gemStrokeWidth(GEM_S), gemJoin(p.kind));
         } else {
           const style = GEMS[p.kind];
-          poly(worldPts, style.fill, style.line, 2.4);
+          poly(worldPts, style.fill, style.line, gemStrokeWidth(GEM_S), gemJoin(p.kind));
         }
         ctx.restore();
       });
@@ -3665,7 +3911,7 @@
       ctx.save();
       ctx.translate(pos.x, pos.y);
       if (warn) drawWarnGem(g.kind, g.seed, GEM_STACK_S * scale);
-      else paintGem(g.kind, GEM_STACK_S * scale, g.seed, { lw: 2.4 });
+      else paintGem(g.kind, GEM_STACK_S * scale, g.seed, null);
       ctx.restore();
     }
 
@@ -3770,11 +4016,10 @@
         if (warn) {
           paintGem(gem.kind, GEM_STACK_S, gem.seed, {
             fill: `rgba(251,113,133,${0.55 + fullPulse * 0.45})`,
-            line: `rgba(254,202,202,${0.7 + fullPulse * 0.3})`,
-            lw: 2.6
+            line: `rgba(254,202,202,${0.7 + fullPulse * 0.3})`
           });
         } else {
-          paintGem(gem.kind, GEM_STACK_S, gem.seed, { line: style.line, lw: 2.4 });
+          paintGem(gem.kind, GEM_STACK_S, gem.seed, { line: style.line });
         }
         ctx.restore();
       }
@@ -3913,7 +4158,7 @@
       const pts = shapeFor(a.kind, 36, a.seed);
       ctx.save();
       ctx.translate(58, 62);
-      paintGem(a.kind, 36, a.seed, { blur: 14, lw: 2 });
+      paintGem(a.kind, 36, a.seed, { blur: 14 });
       drawDiagonals(pts, info.props, Math.min(1, a.t / 0.32));
       ctx.restore();
 
@@ -4511,13 +4756,16 @@
         ctx.save();
         ctx.globalAlpha = 0.45 + t * 0.4;
         ctx.translate(fallX, fallY);
-        poly(scrap, fill, border, 2.4);
+        poly(scrap, fill, border, gemStrokeWidth(LESSON_GEM), gemJoin(lesson.cuts >= 2 ? 'trap' : 'raw'));
         ctx.restore();
       }
-      poly(remain, fill, border, 3);
-      const inner = remain.map((p) => [p[0] * 0.72, p[1] * 0.72]);
+      const lessonJoin = gemJoin(lesson.cuts >= 2 ? 'trap' : 'raw');
+      const lessonLw = gemStrokeWidth(LESSON_GEM);
+      const lessonInner = gemInnerScale(lesson.cuts >= 2 ? 'trap' : 'raw');
+      poly(remain, fill, border, lessonLw, lessonJoin);
+      const inner = remain.map((p) => [p[0] * lessonInner, p[1] * lessonInner]);
       const ih = hash(lesson.seed || 1);
-      poly(inner, ih < 0.34 ? '#c4b5fd' : ih < 0.67 ? '#5eead4' : '#fbbf24', 'rgba(255,255,255,0.35)', 1);
+      poly(inner, ih < 0.34 ? '#c4b5fd' : ih < 0.67 ? '#5eead4' : '#fbbf24', null, 0, lessonJoin);
       if (cutting || lesson.cuts >= 1) {
         ctx.strokeStyle = `rgba(253,224,71,${0.55 + t * 0.45})`;
         ctx.lineWidth = 3.5;
