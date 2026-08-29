@@ -295,6 +295,16 @@ document.addEventListener("DOMContentLoaded", () => {
     syncHudPlacement();
   }
   syncMobileLayout();
+
+  const mobileFs = typeof MobileFullscreen === "function"
+    ? MobileFullscreen({
+      root: document.getElementById("game-container"),
+      button: document.getElementById("btn-fullscreen"),
+      onResize: syncMobileLayout,
+      isPlaying: () => running && !portraitBlocked
+    })
+    : null;
+
   if (typeof hudOverlayMq.addEventListener === "function") {
     hudOverlayMq.addEventListener("change", syncHudPlacement);
   } else if (typeof hudOverlayMq.addListener === "function") {
@@ -2969,6 +2979,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function openGameOver() {
     running = false;
+    if (mobileFs) mobileFs.syncButton();
     phase = "gameover";
     scene = "world";
     refreshUI();
@@ -3081,6 +3092,10 @@ document.addEventListener("DOMContentLoaded", () => {
     running = true;
     lastTs = performance.now();
     beginTank();
+    if (mobileFs) {
+      mobileFs.request();
+      mobileFs.syncButton();
+    }
   }
 
   // ---------- Measure (tank scene) ----------
@@ -5319,6 +5334,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cat.arriveCb = null;
     stopCatWalk();
     updateHud();
+    if (mobileFs) mobileFs.syncButton();
     introOverlay.classList.remove("hidden");
     introOverlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
