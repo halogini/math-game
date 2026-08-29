@@ -237,7 +237,7 @@
 
     .overlay {
       position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
-      padding: 16px; background: rgba(4, 7, 14, 0.88); backdrop-filter: blur(4px); overflow-y: auto;
+      padding: 16px; background: rgba(8, 4, 18, 0.58); backdrop-filter: blur(5px); overflow-y: auto;
     }
     .card {
       width: min(520px, 100%); background: #1a1026; border: 1px solid var(--line);
@@ -494,6 +494,7 @@
     const CONVEY_DROP = 0.32;
 
     let BOUNDS = { x0: 70, x1: 930, y0: 140, y1: 560 };
+    let WALK = { segs: [], hubs: [], pathW: 90, rocks: [], crystals: [] };
 
     function carryCap(s) {
       return CAPACITY_BASE + s.bagLevel * BAG_STEP;
@@ -583,6 +584,65 @@
 
     function solidBoxes() {
       return MACHINES.map(machineSolid).concat([stallSolid()]);
+    }
+
+    function distToSeg(px, py, a, b) {
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const len2 = vx * vx + vy * vy || 1;
+      const t = Math.max(0, Math.min(1, ((px - a.x) * vx + (py - a.y) * vy) / len2));
+      return Math.hypot(px - (a.x + vx * t), py - (a.y + vy * t));
+    }
+
+    function onWalkFloor(x, y) {
+      if (!WALK.segs.length) return true;
+      for (let i = 0; i < WALK.hubs.length; i++) {
+        const h = WALK.hubs[i];
+        if (Math.hypot(x - h.x, y - h.y) <= h.r) return true;
+      }
+      const half = WALK.pathW * 0.5;
+      for (let i = 0; i < WALK.segs.length; i++) {
+        const s = WALK.segs[i];
+        if (distToSeg(x, y, s[0], s[1]) <= half) return true;
+      }
+      return false;
+    }
+
+    function rebuildWalk() {
+      const m0 = MACHINES[0], m1 = MACHINES[1], m2 = MACHINES[2];
+      const front = (m) => ({
+        x: m.body.x + m.body.w / 2,
+        y: m.input.y + m.input.h * 0.72
+      });
+      const bag = { x: BAG_PAD.x + BAG_PAD.w / 2, y: BAG_PAD.y + BAG_PAD.h * 0.72 };
+      const mine = { x: MINE_VEIN.x + MINE_VEIN.w * 0.55, y: MINE_VEIN.y + MINE_VEIN.h * 0.62 };
+      const f0 = front(m0), f1 = front(m1), f2 = front(m2);
+      const mkt = { x: MARKET_PAD.x + MARKET_PAD.w * 0.4, y: MARKET_PAD.y + MARKET_PAD.h * 0.64 };
+      const fork = { x: (f0.x + f1.x) * 0.5, y: f0.y };
+      const merge = { x: (f1.x + mkt.x) * 0.5, y: mkt.y };
+      WALK.segs = [
+        [bag, mine],
+        [mine, f0],
+        [f0, fork],
+        [fork, { x: fork.x, y: f1.y }],
+        [{ x: fork.x, y: f1.y }, f1],
+        [fork, { x: fork.x, y: f2.y }],
+        [{ x: fork.x, y: f2.y }, f2],
+        [f1, { x: merge.x, y: f1.y }],
+        [{ x: merge.x, y: f1.y }, merge],
+        [f2, { x: merge.x, y: f2.y }],
+        [{ x: merge.x, y: f2.y }, merge],
+        [merge, mkt]
+      ];
+      WALK.hubs = [
+        { ...bag, r: 36 },
+        { ...mine, r: 40 },
+        { ...f0, r: 42 },
+        { ...f1, r: 42 },
+        { ...f2, r: 42 },
+        { ...mkt, r: 40 },
+        { ...fork, r: 22 },
+        { ...merge, r: 22 }
+      ];
     }
 
     function blockedAt(x, y) {
@@ -1043,6 +1103,8 @@
       stall: null,
       mine: null,
       bagIcon: null,
+      caveRock: null,
+      caveCrystal: null,
       factories: {},
       idle: null,
       walk: []
@@ -1277,15 +1339,8 @@
     }
 
     async function loadArt() {
-      const hallPromise = new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = ASSET_DIR + 'hall-bg.png';
-      });
-
       const [hall, bill, billWanted, stall, mine, bagIcon] = await Promise.all([
-        hallPromise,
+        loadPng(ASSET_DIR + 'hall-bg.png?v=kit12'),
         loadPng(ASSET_DIR + 'bill.png'),
         loadPng(ASSET_DIR + 'bill-wanted.png'),
         loadPng(ASSET_DIR + 'stall-register.png'),
@@ -1382,6 +1437,7 @@
     }
 
     const ORE_REST = 18;
+    const ORE_TOSS = 0.52;
 
     function mineBox() {
       const v = MINE_VEIN;
@@ -1417,16 +1473,41 @@
       return { x: v.x - 16, y: v.y + 12, w: 20, h: 24 };
     }
 
-    function seedOrePile() {
+    function pileRestXY(salt) {
       const a = orePileAnchor();
+      const ang = hash(salt * 9.1) * Math.PI * 2;
+      const rad = Math.sqrt(hash(salt * 4.7));
+      return {
+        x: a.cx + Math.cos(ang) * a.rx * rad * 0.95,
+        y: a.cy + Math.sin(ang) * a.ry * rad - (1 - rad) * 34
+      };
+    }
+
+    function scatterPilePos(salt, others) {
+      let best = pileRestXY(salt);
+      let bestGap = -1;
+      for (let attempt = 0; attempt < 14; attempt++) {
+        const p = pileRestXY(salt + attempt * 1.37);
+        if (!others || !others.length) return p;
+        let gap = 1e9;
+        for (const o of others) {
+          const tx = (o.fly && o.fly.x1 != null) ? o.fly.x1 : o.x;
+          const ty = (o.fly && o.fly.y1 != null) ? o.fly.y1 : o.y;
+          const d = Math.hypot(tx - p.x, ty - p.y);
+          if (d < gap) gap = d;
+        }
+        if (gap > 11) return p;
+        if (gap > bestGap) { bestGap = gap; best = p; }
+      }
+      return best;
+    }
+
+    function seedOrePile() {
       const list = [];
       for (let i = 0; i < ORE_REST; i++) {
-        const ang = hash(i * 9.1) * Math.PI * 2;
-        const rad = Math.sqrt(hash(i * 4.7));
+        const p = pileRestXY(i);
         list.push({
-          x: a.cx + Math.cos(ang) * a.rx * rad * 0.95,
-          y: a.cy + Math.sin(ang) * a.ry * rad - (1 - rad) * 34,
-          vx: 0, vy: 0,
+          x: p.x, y: p.y, vx: 0, vy: 0,
           seed: 40 + i * 13,
           settled: true
         });
@@ -1435,18 +1516,23 @@
     }
 
     function spawnOreFromCave(s, n) {
-      const v = MINE_VEIN;
+      const mouth = caveMouth();
       const flying = s.oreSpill.filter((o) => !o.settled).length;
       n = Math.min(n, Math.max(0, 6 - flying));
       for (let i = 0; i < n; i++) {
-        const k = hash(s.oreSpill.length * 1.7 + i * 11.3 + (s.seed || 1));
+        const salt = (s.seed || 1) * 17.3 + s.oreSpill.length * 9.1 + i * 4.7;
+        const k = hash(salt);
+        const rest = scatterPilePos(salt + 3.3, s.oreSpill);
+        const x0 = mouth.x + mouth.w * (0.32 + k * 0.40);
+        const y0 = mouth.y + mouth.h * (0.22 + hash(k * 17) * 0.40);
         s.oreSpill.push({
-          x: v.x - 16 + k * 10,
-          y: v.y + 12 + hash(k * 17) * 16,
-          vx: 90 + hash(k * 3) * 80,
-          vy: 10 + hash(k * 8) * 40,
+          x: x0,
+          y: y0,
+          vx: rest.x - x0,
+          vy: 0,
           seed: 70 + Math.floor(k * 400),
-          settled: false
+          settled: false,
+          fly: { x0, y0, x1: rest.x, y1: rest.y, t: 0 }
         });
       }
     }
@@ -1464,24 +1550,23 @@
 
     function tickOreSpill(s, dt) {
       if (!s.oreSpill) s.oreSpill = seedOrePile();
-      const v = MINE_VEIN;
-      const a = orePileAnchor();
       s.oreSpill.forEach((o) => {
         if (o.settled) return;
-        o.vy += 320 * dt;
-        o.x += o.vx * dt;
-        o.y += o.vy * dt;
-        o.vx *= 0.985;
-        const dx = (o.x - a.cx) / a.rx;
-        const mound = a.cy - Math.max(0, 1 - dx * dx) * 36;
-        if (Math.abs(dx) < 1.12 && o.y >= mound && o.vy > 0) {
-          o.y = mound;
+        if (!o.fly) {
+          const rest = scatterPilePos(o.seed || 1, s.oreSpill.filter((g) => g !== o));
+          o.fly = { x0: o.x, y0: o.y, x1: rest.x, y1: rest.y, t: 0 };
+        }
+        o.fly.t = Math.min(1, o.fly.t + dt / ORE_TOSS);
+        const e = easeOutCubic(o.fly.t);
+        const arc = Math.sin(e * Math.PI) * 32;
+        o.x = o.fly.x0 + (o.fly.x1 - o.fly.x0) * e;
+        o.y = o.fly.y0 + (o.fly.y1 - o.fly.y0) * e - arc;
+        o.vx = (o.fly.x1 - o.fly.x0) * (1 - e);
+        if (o.fly.t >= 1) {
+          o.x = o.fly.x1;
+          o.y = o.fly.y1;
+          o.fly = null;
           o.settled = true;
-          o.vx = 0;
-          o.vy = 0;
-        } else if (o.y > v.y + v.h + 10) {
-          o.settled = true;
-          o.y = v.y + v.h - 6 - hash(o.seed) * 8;
           o.vx = 0;
           o.vy = 0;
         }
@@ -1499,7 +1584,7 @@
         phase: 'ready',
         time: GAME_TIME,
         gold: 0,
-        player: { x: 220, y: 470, facing: -1, dir: 'left', walkT: 0, moving: false },
+        player: { x: 230, y: 360, facing: -1, dir: 'left', walkT: 0, moving: false },
         carry: [],
         bagLevel: 0,
         owned: { parallel: 0, adjacent: 0, right: 0 },
@@ -1608,6 +1693,7 @@
       layoutMarketBelt();
 
       BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 20, y1: YARD.y + YARD.h - 20 };
+      rebuildWalk();
       checkOrientation();
     }
 
@@ -2722,99 +2808,88 @@
       ctx.lineCap = 'butt';
     }
 
-    function drawYard() {
-      roundRect(20, 44, MAP_W - 40, MAP_H - 64, 22);
-      ctx.save();
-      ctx.clip();
-      const cave = ctx.createLinearGradient(0, 44, 0, MAP_H);
-      cave.addColorStop(0, '#3a2850');
-      cave.addColorStop(0.45, '#2a1838');
-      cave.addColorStop(1, '#1a1028');
-      ctx.fillStyle = cave;
-      ctx.fillRect(20, 44, MAP_W - 40, MAP_H - 64);
-      if (art.hall) {
-        ctx.globalAlpha = 0.58;
-        ctx.drawImage(art.hall, 20, 44, MAP_W - 40, MAP_H - 64);
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-
-      const floor = ctx.createLinearGradient(0, YARD.y, 0, YARD.y + YARD.h);
-      floor.addColorStop(0, 'rgba(88,62,94,0.78)');
-      floor.addColorStop(0.5, 'rgba(68,48,72,0.82)');
-      floor.addColorStop(1, 'rgba(52,38,56,0.86)');
-      ctx.fillStyle = floor;
-      roundRect(YARD.x, YARD.y, YARD.w, YARD.h, 16);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(90,70,110,0.22)';
-      ctx.lineWidth = 1.4;
-      for (let i = 0; i < 9; i++) {
-        const x0 = YARD.x + 40 + i * 92;
-        ctx.beginPath();
-        ctx.moveTo(x0, YARD.y + 18);
-        ctx.lineTo(x0 + 28, YARD.y + YARD.h * 0.45);
-        ctx.lineTo(x0 - 12, YARD.y + YARD.h - 18);
-        ctx.stroke();
-      }
-
-      const m0 = MACHINES[0], m1 = MACHINES[1], m2 = MACHINES[2];
-      ctx.strokeStyle = 'rgba(90,68,50,0.6)';
-      ctx.lineWidth = 36;
-      ctx.lineCap = 'round';
+    function traceWalkPath() {
       ctx.beginPath();
-      // Mine to Machine 0
-      ctx.moveTo(MINE_VEIN.x + MINE_VEIN.w * 0.62, MINE_VEIN.y + MINE_VEIN.h * 0.55);
-      ctx.lineTo(m0.input.x + m0.input.w * 0.3, m0.input.y + m0.input.h * 0.5);
-      
-      // Machine 0 to Machine 1 & 2 fork
-      const forkX = (m0.output.x + m1.input.x) * 0.5;
-      ctx.moveTo(m0.output.x + m0.output.w * 0.6, m0.output.y + m0.output.h * 0.5);
-      ctx.lineTo(forkX, m0.output.y + m0.output.h * 0.5);
-      ctx.lineTo(forkX, m1.input.y + m1.input.h * 0.5);
-      ctx.lineTo(m1.input.x + m1.input.w * 0.3, m1.input.y + m1.input.h * 0.5);
+      WALK.segs.forEach(([a, b], i) => {
+        if (i === 0) ctx.moveTo(a.x, a.y);
+        else ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      });
+    }
 
-      ctx.moveTo(forkX, m0.output.y + m0.output.h * 0.5);
-      ctx.lineTo(forkX, m2.input.y + m2.input.h * 0.5);
-      ctx.lineTo(m2.input.x + m2.input.w * 0.3, m2.input.y + m2.input.h * 0.5);
-
-      // Machine 1 & 2 to Market merge
-      const mergeX = (m1.output.x + MARKET_PAD.x) * 0.5;
-      ctx.moveTo(m1.output.x + m1.output.w * 0.6, m1.output.y + m1.output.h * 0.5);
-      ctx.lineTo(mergeX, m1.output.y + m1.output.h * 0.5);
-      ctx.lineTo(mergeX, MARKET_PAD.y + MARKET_PAD.h * 0.5);
-      ctx.lineTo(MARKET_PAD.x + MARKET_PAD.w * 0.3, MARKET_PAD.y + MARKET_PAD.h * 0.5);
-
-      ctx.moveTo(m2.output.x + m2.output.w * 0.6, m2.output.y + m2.output.h * 0.5);
-      ctx.lineTo(mergeX, m2.output.y + m2.output.h * 0.5);
-      ctx.lineTo(mergeX, MARKET_PAD.y + MARKET_PAD.h * 0.5);
+    function drawWalkFloor() {
+      if (!WALK.segs.length) return;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#2a2624';
+      ctx.lineWidth = WALK.pathW + 18;
+      traceWalkPath();
       ctx.stroke();
+      ctx.strokeStyle = '#4a4540';
+      ctx.lineWidth = WALK.pathW;
+      traceWalkPath();
+      ctx.stroke();
+      ctx.fillStyle = '#4a4540';
+      WALK.hubs.forEach((h) => {
+        ctx.beginPath();
+        ctx.ellipse(h.x, h.y, Math.max(h.r, WALK.pathW * 0.48), Math.max(h.r * 0.7, WALK.pathW * 0.34), 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.lineCap = 'butt';
+      ctx.lineJoin = 'miter';
+    }
 
-      ctx.strokeStyle = 'rgba(140,110,75,0.4)';
-      ctx.lineWidth = 22;
+    function drawCaveStamp(img, x, y, s, flip, aspectPad) {
+      if (!img) return;
+      const dw = (aspectPad || 150) * s;
+      const dh = dw * (img.height / img.width);
+      ctx.save();
+      ctx.translate(x, y);
+      if (flip) ctx.scale(-1, 1);
+      ctx.drawImage(img, -dw / 2, -dh, dw, dh);
+      ctx.restore();
+    }
+
+    function drawHallCover(dx, dy, dw, dh) {
+      const img = art.hall;
+      if (!img) return;
+      // Image is authored at the hall aspect — stretch 1:1, do not cover-crop/zoom.
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+
+    function drawWornTrails() {
+      if (!WALK.segs.length) return;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(28, 22, 18, 0.14)';
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      WALK.segs.forEach(([a, b]) => {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      });
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(62, 52, 42, 0.1)';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      WALK.segs.forEach(([a, b]) => {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      });
       ctx.stroke();
       ctx.lineCap = 'butt';
+      ctx.lineJoin = 'miter';
+    }
 
-      // Cave walls instead of a house-yard fence
-      [
-        [18, 70, 90, 70, '#2a1a32'], [80, 48, 120, 64, '#241628'],
-        [220, 40, 110, 58, '#2e1c38'], [MAP_W * 0.45, 36, 140, 54, '#261830'],
-        [MAP_W * 0.72, 42, 130, 60, '#2c1a36'], [MAP_W - 140, 58, 120, 80, '#241428'],
-        [8, 200, 70, 110, '#201426'], [8, 400, 64, 130, '#261830'],
-        [MAP_W - 80, 200, 80, 120, '#221428'], [MAP_W - 90, 420, 86, 150, '#1e1224'],
-        [40, MAP_H - 120, 140, 80, '#281830'], [MAP_W - 180, MAP_H - 120, 150, 86, '#241628']
-      ].forEach(([x, y, w, h, c]) => drawCaveRock(x, y, w, h, c));
-
-      [[80, 128, 1.05], [210, 96, 0.78], [MAP_W * 0.48, 88, 0.7], [MAP_W - 120, 108, 1],
-        [48, 310, 0.85], [MAP_W - 44, 300, 0.9], [70, MAP_H - 100, 1.15], [MAP_W - 60, MAP_H - 110, 1],
-        [280, MAP_H - 85, 0.65], [MAP_W * 0.7, MAP_H - 88, 0.72]
-      ].forEach(([x, y, s]) => drawCrystalCluster(x, y, s));
-
-      [[108, 176, 9, 3], [168, 198, 7, 8], [92, 328, 8, 12],
-        [214, 548, 10, 21], [400, 562, 8, 17], [748, 158, 9, 29],
-        [888, 206, 8, 31], [918, 508, 10, 41], [676, 548, 7, 44],
-        [508, 128, 8, 51], [140, 540, 9, 61], [830, 170, 7, 73]
-      ].forEach(([x, y, s, seed]) => drawOreChunk(x, y, s, seed, false));
+    function drawYard() {
+      const hx = 20, hy = 44, hw = MAP_W - 40, hh = MAP_H - 64;
+      roundRect(hx, hy, hw, hh, 22);
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#1a1424';
+      ctx.fillRect(hx, hy, hw, hh);
+      if (art.hall) drawHallCover(hx, hy, hw, hh);
+      ctx.restore();
     }
 
     function drawMineVein() {
@@ -4234,20 +4309,11 @@
     }
 
     function drawAtmosphere() {
-      const t = performance.now() / 1000;
-      const haze = ctx.createLinearGradient(0, 40, 0, 220);
-      haze.addColorStop(0, 'rgba(88,50,140,0.22)');
+      const haze = ctx.createLinearGradient(0, 40, 0, 160);
+      haze.addColorStop(0, 'rgba(88,50,140,0.12)');
       haze.addColorStop(1, 'rgba(88,50,140,0)');
       ctx.fillStyle = haze;
-      ctx.fillRect(20, 44, MAP_W - 40, 160);
-      for (let i = 0; i < 12; i++) {
-        const px = 80 + (i * 79 + Math.sin(t * 0.4 + i) * 18) % 840;
-        const py = 90 + (i * 37) % 430;
-        ctx.fillStyle = `rgba(196,181,253,${0.12 + 0.12 * Math.sin(t * 2 + i)})`;
-        ctx.beginPath();
-        ctx.arc(px, py, 1.6 + (i % 3), 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.fillRect(20, 44, MAP_W - 40, 120);
     }
 
     function drawRipples() {
@@ -4285,8 +4351,8 @@
       ctx.scale(view.scale, view.scale);
       ctx.translate(-camera.x + jx, -camera.y + jy);
 
-      drawAtmosphere();
       drawYard();
+      drawAtmosphere();
       drawRipples();
 
       uiHits = [];
