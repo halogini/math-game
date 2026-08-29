@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>PRISM TYCOON | 할로매쓰</title>
-  <meta name="description" content="어느 레인을 밟고 지나가느냐가 보석을 결정한다. 5분 안에 금화를 최대한 모으는 수학 타이쿤.">
+  <meta name="description" content="어느 레인을 밟고 지나가느냐가 보석을 결정한다. 5분 안에 판매금액을 최대한 모으는 수학 타이쿤.">
   <meta property="og:title" content="PRISM TYCOON | 할로매쓰">
   <meta property="og:description" content="지나간 길이 도형을 만든다">
   <meta property="og:type" content="website">
@@ -478,11 +478,11 @@
         <p class="tagline">줍고 · 넣고 · 꺼내고 · 팔아서 공장을 키우세요</p>
         <div class="flow">
           <div><span>⛏️</span><b>광맥</b><span>밟으면 원석이 등에 쌓입니다</span></div>
-          <div><span>🏭</span><b>기계</b><span>↑(입구)에 넣고 ↓(출구)에서 꺼냅니다</span></div>
+          <div><span>🏭</span><b>공장</b><span>↑(입구)에 넣고 ↓(출구)에서 꺼냅니다</span></div>
           <div><img class="ico-bill" src="assets/bill.png" alt=""><b>판매대</b><span>쌓인 보석을 팝니다</span></div>
-          <div><span>⬆️</span><b>업그레이드</b><span>기계 앞에서 사고 강화합니다</span></div>
+          <div><span>⬆️</span><b>업그레이드</b><span>공장 앞에서 사고 강화합니다</span></div>
         </div>
-        <div class="note">어떤 기계가 어떤 모양을 만드는지는 직접 알아내세요. WASD·드래그로 이동.</div>
+        <div class="note" id="move-note">WASD(방향키), 드래그, 클릭으로 이동.</div>
         <div class="load-wrap" id="load-wrap" aria-live="polite">
           <div class="load-track">
             <div class="load-fill" id="load-fill"></div>
@@ -503,7 +503,6 @@
           <div class="sub" id="best-line">최고 기록 0</div>
         </div>
         <div class="tally" id="tally"></div>
-        <div class="note" id="closing-note"></div>
         <button class="btn-main" id="btn-restart">다시 도전하기</button>
       </div>
     </div>
@@ -812,17 +811,17 @@
     // body = solid (no walk-through). input/output = walkable shelves.
     // Modified layout: Input and Output are side-by-side in front of the body for better visibility.
     const MACHINES = [
-      { id: 'parallel', name: '나란히 틀', costs: [100, 120, 200, 320, 480], req: null,
+      { id: 'parallel', name: '평행 공장', costs: [100, 120, 200, 320, 480], req: null,
         body: { x: 300, y: 270, w: 140, h: 72 },
         input: { x: 280, y: 342, w: 80, h: 56 },
         output: { x: 380, y: 342, w: 80, h: 56 },
         ops: { raw: 'trap', trap: 'para' }, sign: ['raw', 'para'] },
-      { id: 'adjacent', name: '이웃 변 룬', costs: [420, 180, 300, 460, 700], req: 'parallel',
+      { id: 'adjacent', name: '이웃 변 공장', costs: [420, 180, 300, 460, 700], req: 'parallel',
         body: { x: 570, y: 170, w: 140, h: 72 },
         input: { x: 550, y: 242, w: 80, h: 56 },
         output: { x: 650, y: 242, w: 80, h: 56 },
         ops: { para: 'rhombus', rect: 'square' }, sign: ['para', 'rhombus'] },
-      { id: 'right', name: '직각 룬', costs: [420, 180, 300, 460, 700], req: 'parallel',
+      { id: 'right', name: '직각 공장', costs: [420, 180, 300, 460, 700], req: 'parallel',
         body: { x: 570, y: 400, w: 140, h: 72 },
         input: { x: 550, y: 472, w: 80, h: 56 },
         output: { x: 650, y: 472, w: 80, h: 56 },
@@ -1206,11 +1205,11 @@
       para:    { name: '평행사변형', price: 38,  fill: GEM_FILL, line: '#1d4ed8', props: [1, 0, 0],
         diag: '대각선이 서로를 이등분' },
       rhombus: { name: '마름모',     price: 82,  fill: GEM_FILL, line: '#7c3aed', props: [1, 1, 0],
-        diag: '대각선이 서로 수직이등분' },
+        diag: '두 대각선은 서로를 수직이등분' },
       rect:    { name: '직사각형',   price: 82,  fill: GEM_FILL, line: '#b45309', props: [1, 0, 1],
-        diag: '대각선이 이등분하고 길이가 같음' },
+        diag: '두 대각선은 길이가 같고\n서로를 이등분' },
       square:  { name: '정사각형',   price: 240, fill: GEM_FILL, line: '#db2777', props: [1, 1, 1],
-        diag: '대각선이 이등분·직교·길이 같음' }
+        diag: '두 대각선이 길이가 같고\n서로를 수직이등분' }
     };
 
     // 포함관계: 주문 도형의 성질을 모두 갖춘 더 특수한 사각형도 인정
@@ -1280,6 +1279,154 @@
 
     function lerpPts(from, to, t) {
       return from.map((p, i) => [p[0] + (to[i][0] - p[0]) * t, p[1] + (to[i][1] - p[1]) * t]);
+    }
+
+    function clipPolyHalfPlane(pts, nx, ny, c) {
+      if (!pts || pts.length < 3) return [];
+      const out = [];
+      const n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % n];
+        const da = nx * a[0] + ny * a[1] - c;
+        const db = nx * b[0] + ny * b[1] - c;
+        const ina = da >= -1e-6;
+        const inb = db >= -1e-6;
+        if (ina && inb) {
+          out.push(b);
+        } else if (ina && !inb) {
+          const t = da / (da - db || 1e-8);
+          out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+        } else if (!ina && inb) {
+          const t = da / (da - db || 1e-8);
+          out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+          out.push(b);
+        }
+      }
+      return out;
+    }
+
+    function clipKeepSeg(pts, L, R, keep) {
+      const dx = R[0] - L[0], dy = R[1] - L[1];
+      let nx = -dy, ny = dx;
+      const nl = Math.hypot(nx, ny) || 1;
+      nx /= nl;
+      ny /= nl;
+      let c = nx * L[0] + ny * L[1];
+      if (nx * keep[0] + ny * keep[1] < c) {
+        nx = -nx;
+        ny = -ny;
+        c = nx * L[0] + ny * L[1];
+      }
+      return clipPolyHalfPlane(pts, nx, ny, c);
+    }
+
+    function cutOutward(L, R, keep) {
+      const dx = R[0] - L[0], dy = R[1] - L[1];
+      let nx = -dy, ny = dx;
+      const nl = Math.hypot(nx, ny) || 1;
+      nx /= nl;
+      ny /= nl;
+      const mx = (L[0] + R[0]) / 2, my = (L[1] + R[1]) / 2;
+      if (nx * (keep[0] - mx) + ny * (keep[1] - my) > 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      return { nx, ny, px: mx + nx * 12, py: my + ny * 12 };
+    }
+
+    function hitsAtY(pts, y) {
+      const hits = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        if ((a[1] - y) * (b[1] - y) > 0 || Math.abs(b[1] - a[1]) < 1e-8) continue;
+        const t = (y - a[1]) / (b[1] - a[1]);
+        hits.push([a[0] + (b[0] - a[0]) * t, y]);
+      }
+      hits.sort((p, q) => p[0] - q[0]);
+      if (hits.length >= 2) return [hits[0], hits[hits.length - 1]];
+      let minX = Infinity, maxX = -Infinity;
+      pts.forEach((p) => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); });
+      return [[minX, y], [maxX, y]];
+    }
+
+    function extendCut(L, R, pad) {
+      const dx = R[0] - L[0], dy = R[1] - L[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      return {
+        x0: L[0] - ux * pad, y0: L[1] - uy * pad,
+        x1: R[0] + ux * pad, y1: R[1] + uy * pad
+      };
+    }
+
+    function makeSlice(src, L, R, keep) {
+      const remain = clipKeepSeg(src, L, R, keep);
+      const out = cutOutward(L, R, keep);
+      const scrap = clipKeepSeg(src, L, R, [out.px, out.py]);
+      return {
+        L, R,
+        guide: extendCut(L, R, 10),
+        remain: remain.length >= 3 ? remain : src,
+        scrap: scrap.length >= 3 ? scrap : null,
+        fallX: out.nx * 22,
+        fallY: out.ny * 22
+      };
+    }
+
+    // Inscribe a parallelogram in a trapezoid (horizontal bases) by two parallel leg cuts.
+    function parallelogramInsideTrap(trap) {
+      const TL = trap[0], TR = trap[1], BR = trap[2], BL = trap[3];
+      const yT = (TL[1] + TR[1]) / 2;
+      const yB = (BL[1] + BR[1]) / 2;
+      const h = yB - yT || 1;
+      const topW = TR[0] - TL[0];
+      const W = Math.abs(topW) * 0.86;
+      const inset = (Math.abs(topW) - W) / 2;
+      const pTLx = Math.min(TL[0], TR[0]) + inset;
+      const pTRx = Math.max(TL[0], TR[0]) - inset;
+      const pad = Math.abs(topW) * 0.06;
+      const minBot = Math.min(BL[0], BR[0]) + pad;
+      const maxBot = Math.max(BL[0], BR[0]) - pad;
+      let k = 0.48;
+      const kMax = (maxBot - pTRx) / h;
+      const kMin = (minBot - pTLx) / h;
+      k = Math.max(kMin + 0.02, Math.min(kMax - 0.02, k));
+      if (!(kMax > kMin)) k = 0;
+      return [
+        [pTLx, yT],
+        [pTRx, yT],
+        [pTRx + k * h, yB],
+        [pTLx + k * h, yB]
+      ];
+    }
+
+    // Two parallel slices: raw→trap is a horizontal pair; trap→para is a slanted pair
+    // through the trapezoid so the leftover is always a parallelogram.
+    function parallelCutPlan(fromKind, toKind, seed, size) {
+      const src = shapeFor(fromKind, size, seed);
+      const keep = [0, 0];
+      if (toKind === 'para') {
+        const para = parallelogramInsideTrap(src);
+        const keepP = [
+          (para[0][0] + para[1][0] + para[2][0] + para[3][0]) / 4,
+          (para[0][1] + para[1][1] + para[2][1] + para[3][1]) / 4
+        ];
+        const cut1 = makeSlice(src, para[1], para[2], keepP);
+        const cut2 = makeSlice(cut1.remain, para[0], para[3], keepP);
+        cut2.remain = para;
+        return { src, dst: para, cut1, cut2 };
+      }
+      let minY = Infinity, maxY = -Infinity;
+      src.forEach((p) => { minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); });
+      const yBot = minY + (maxY - minY) * 0.78;
+      const yTop = minY + (maxY - minY) * 0.28;
+      const bot = hitsAtY(src, yBot);
+      const top = hitsAtY(src, yTop);
+      const cut1 = makeSlice(src, bot[0], bot[1], keep);
+      const cut2 = makeSlice(cut1.remain, top[0], top[1], keep);
+      cut2.remain = [top[0], top[1], bot[1], bot[0]];
+      return { src, dst: cut2.remain, cut1, cut2 };
     }
 
     function svgFor(kind, size) {
@@ -1498,6 +1645,11 @@
     const MACHINE_BENCH_UV = 0.70;
     const MACHINE_FOOT_UV = 0.99;
     const MACHINE_LANTERN_UV = { x: 0.10, y: 0.42 };
+    const MACHINE_SMOKE_UV = {
+      parallel: { x: 0.52, y: 0.09 },
+      adjacent: { x: 0.50, y: 0.07 },
+      right: { x: 0.40, y: 0.10 }
+    };
     const MACHINE_PAD_GAP = 32;
 
     async function loadFactoryArt() {
@@ -1547,18 +1699,70 @@
       };
     }
 
-    function drawMachineSpriteOverlays(m, lv, box, look, busy, owned, tNow) {
-      const win = machineWindowRect(box);
-      const roofLit = look.signboard || (busy && lv >= 3);
-
-      if (busy && lv >= 3) {
-        const pulse = 0.22 + 0.14 * Math.sin(tNow / 320);
-        ctx.fillStyle = `rgba(${look.glow},${pulse})`;
-        roundRect(win.x - 4, win.y - 4, win.w + 8, win.h + 8, 6);
+    function drawFactorySmoke(cx, cy, tNow, scale) {
+      const s = scale || 1;
+      for (let i = 0; i < 6; i++) {
+        const pt = ((tNow + i * 240) / (1100 + i * 170)) % 1;
+        const rise = pt * 42 * s;
+        const drift = Math.sin(tNow / 480 + i * 1.6) * 8 * s * (0.35 + pt);
+        const r = (5.5 + pt * 12) * s;
+        const fade = (1 - pt) * (pt < 0.1 ? pt / 0.1 : 1);
+        ctx.fillStyle = `rgba(214,222,234,${0.5 * fade})`;
+        ctx.beginPath();
+        ctx.arc(cx + drift, cy - rise, r, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
 
-      if (look.glass && !busy && owned) {
+    function drawFactoryEmbers(cx, cy, tNow, scale) {
+      const s = scale || 1;
+      for (let i = 0; i < 5; i++) {
+        const pt = ((tNow / (200 + i * 45)) + i * 0.18) % 1;
+        ctx.globalAlpha = (1 - pt) * 0.95;
+        ctx.fillStyle = i % 2 ? '#fdba74' : '#fb923c';
+        ctx.beginPath();
+        ctx.arc(cx + (i - 2) * 3.4 * s, cy - pt * 28 * s, (1.5 + (1 - pt) * 1.2) * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawMachineRunFx(m, look, busy, tNow, smokeX, smokeY, scale) {
+      if (!busy) return;
+      const s = scale || 1;
+      if (m.id === 'right') drawFactoryEmbers(smokeX, smokeY + 3 * s, tNow, s);
+      drawFactorySmoke(smokeX, smokeY, tNow, s);
+      ctx.fillStyle = `rgba(${look.glow},${0.14 + 0.08 * Math.sin(tNow / 300)})`;
+      ctx.beginPath();
+      ctx.ellipse(smokeX, smokeY + 10 * s, 22 * s, 8 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawMachineWindowLight(win, look, busy, owned, tNow) {
+      if (busy) {
+        const pulse = 0.30 + 0.16 * Math.sin(tNow / 280);
+        ctx.fillStyle = `rgba(${look.glow},${pulse})`;
+        roundRect(win.x - 7, win.y - 7, win.w + 14, win.h + 14, 8);
+        ctx.fill();
+        ctx.save();
+        roundRect(win.x + 1, win.y + 1, win.w - 2, win.h - 2, 4);
+        ctx.clip();
+        const gx = win.x + win.w * 0.5;
+        const gy = win.y + win.h * 0.55;
+        const rad = Math.max(win.w, win.h) * 0.62;
+        const g = ctx.createRadialGradient(gx, gy, 4, gx, gy, rad);
+        g.addColorStop(0, `rgba(${look.glow},${0.42 + 0.14 * Math.sin(tNow / 200)})`);
+        g.addColorStop(1, `rgba(${look.glow},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(win.x, win.y, win.w, win.h);
+        ctx.restore();
+        ctx.strokeStyle = `rgba(${look.glow},0.8)`;
+        ctx.lineWidth = 2.2;
+        roundRect(win.x, win.y, win.w, win.h, 5);
+        ctx.stroke();
+        return;
+      }
+      if (look.glass && owned) {
         ctx.fillStyle = 'rgba(255,255,255,0.10)';
         ctx.beginPath();
         ctx.moveTo(win.x + 8, win.y + 4);
@@ -1567,40 +1771,38 @@
         ctx.closePath();
         ctx.fill();
       }
+    }
+
+    function drawMachineLanternHalo(lx, ly, busy, tNow) {
+      if (!busy) return;
+      const glow = 0.55 + 0.4 * Math.sin(tNow / 260);
+      ctx.fillStyle = `rgba(253,186,116,${0.16 + glow * 0.22})`;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(254,243,166,${0.16 + glow * 0.2})`;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawMachineSpriteOverlays(m, lv, box, look, busy, owned, tNow) {
+      const win = machineWindowRect(box);
+      drawMachineWindowLight(win, look, busy, owned, tNow);
 
       if (look.lanterns) {
         const lx = box.x + box.w * MACHINE_LANTERN_UV.x;
         const ly = box.y + box.h * MACHINE_LANTERN_UV.y;
-        const glow = busy ? (0.55 + 0.35 * Math.sin(tNow / 280)) : 0.22;
-        if (busy || roofLit) {
-          ctx.fillStyle = `rgba(253,186,116,${0.12 + glow * 0.25})`;
-          ctx.beginPath();
-          ctx.arc(lx, ly, 14, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        drawMachineLanternHalo(lx, ly, busy, tNow);
       }
 
-      if (busy && lv >= 3 && m.id === 'right') {
-        const rx = box.x + box.w * 0.55;
-        const ry = box.y + box.h * 0.12;
-        ctx.fillStyle = '#fb923c';
-        for (let i = 0; i < 3; i++) {
-          const pt = (tNow / (180 + i * 40) + i * 0.2) % 1;
-          ctx.globalAlpha = 1 - pt;
-          ctx.fillRect(rx + i * 5, ry - pt * 18, 2.4, 2.4);
-          ctx.globalAlpha = 1;
-        }
-      }
-
-      if (roofLit && lv >= 3) {
-        const t = tNow / 220;
-        const rcx = box.x + box.w * 0.52;
-        const roofY = box.y + box.h * 0.08;
-        ctx.fillStyle = `rgba(200,210,230,${0.2 + 0.18 * Math.sin(t)})`;
-        ctx.beginPath();
-        ctx.arc(rcx, roofY - Math.sin(t) * 4, 8, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const uv = MACHINE_SMOKE_UV[m.id] || MACHINE_SMOKE_UV.parallel;
+      drawMachineRunFx(
+        m, look, busy, tNow,
+        box.x + box.w * uv.x,
+        box.y + box.h * uv.y,
+        box.w / 168
+      );
     }
 
     function stallBox() {
@@ -1621,7 +1823,7 @@
 
     function orderBoardBox() {
       const s = stallBox();
-      const bw = 150, bh = 108;
+      const bw = 156, bh = 126;
       return {
         x: Math.round(s.x + s.w / 2 - bw / 2),
         y: Math.max(YARD.y - 4, Math.round(s.y - bh + 18)),
@@ -1752,7 +1954,8 @@
 
     function processTime(id) {
       const lv = mLv(id);
-      return PROCESS_BASE / (1 + 0.28 * Math.max(0, lv - 1));
+      const base = id === 'parallel' ? PROCESS_BASE * 1.35 : PROCESS_BASE;
+      return base / (1 + 0.28 * Math.max(0, lv - 1));
     }
 
     function processSlots(id) {
@@ -1784,6 +1987,40 @@
 
     function machineAtKiosk(p) {
       return MACHINES.find((m) => inRect(p, kioskRect(m)));
+    }
+
+    function machineAtFront(p) {
+      return MACHINES.find((m) => {
+        if (mLv(m.id) < 1) return inRect(p, kioskRect(m));
+        return inRect(p, m.input) || inRect(p, m.output);
+      });
+    }
+
+    function canFeedMachine(s, m) {
+      if (m.id === 'parallel' && !s.lessons.parallel) {
+        return s.carry.some((g) => g.kind === 'raw');
+      }
+      return s.carry.some((g) => m.ops[g.kind]);
+    }
+
+    function factoryStandTip(s) {
+      const m = machineAtFront(s.player);
+      if (!m) return '';
+      const lv = mLv(m.id);
+      if (lv < 1) {
+        if (m.req && mLv(m.req) < 1) return '이 공장은 아직 열 수 없어요';
+        if (s.gold >= m.costs[0]) return '그대로 서 있으면 공장이 해금돼요';
+        if (incomingGold(s) > 0) return '판매금액을 수령하면 공장을 열 수 있어요';
+        return '원석을 팔면 공장을 열 수 있어요';
+      }
+      if (inRect(s.player, m.input)) {
+        return canFeedMachine(s, m)
+          ? '그대로 서 있으면 공장에 넣어요'
+          : '공장에 넣을 원석을 가져오세요';
+      }
+      const ws = s.workshops[m.id];
+      if (ws && ws.output.length) return '그대로 서 있으면 공장에서 꺼내요';
+      return '공장 출구에서 꺼낼 수 있어요';
     }
 
     function orePileAnchor() {
@@ -1940,7 +2177,7 @@
         phase: 'ready',
         time: GAME_TIME,
         gold: 0,
-        player: { x: 230, y: 360, facing: -1, dir: 'left', walkT: 0, moving: false },
+        player: { x: 360, y: 455, facing: -1, dir: 'left', walkT: 0, moving: false },
         carry: [],
         bagLevel: 0,
         owned: { parallel: 0, adjacent: 0, right: 0 },
@@ -1962,12 +2199,15 @@
         shake: 0,
         order: null,
         orderFlash: 0,
-        eventWait: 24 + Math.random() * 18,
+        eventWait: 12,
         seed: 1,
         lessons: { parallel: false },
         cutLesson: null,
         targetPos: null,
-        ripples: []
+        ripples: [],
+        tip: null,
+        firstMake: {},
+        guide: { step: 'mine', paraDone: false, orderT: 0, pendingOrderTime: false, diagShown: false }
       };
       ensureWorkshops(s);
       return s;
@@ -1985,11 +2225,62 @@
       return list;
     }
 
-    function maybeRollEvent(s) {
+    function hasQuadProps(kind) {
+      return !!(kind && kind !== 'raw' && GEMS[kind]);
+    }
+
+    function queueDiagHint(s) {
+      if (!s.guide || s.guide.diagShown) return;
+      s.guide.diagShown = true;
+      if (s.guide.step === 'orderTime') s.guide.pendingOrderTime = true;
+      s.guide.step = 'diagHint';
+      s.guide.orderT = 0;
+    }
+
+    function factoryUnlockCost() {
+      return MACHINES[0].costs[0];
+    }
+
+    function carryRawCount(s) {
+      let n = 0;
+      for (let i = 0; i < s.carry.length; i++) {
+        if (s.carry[i].kind === 'raw') n++;
+      }
+      return n;
+    }
+
+    function incomingGold(s) {
+      let n = 0;
+      const bills = s.bills || [];
+      for (let i = 0; i < bills.length; i++) n += bills[i].value;
+      const conv = s.convey || [];
+      for (let i = 0; i < conv.length; i++) n += (conv[i].value || 0) + (conv[i].bonus || 0);
+      return n;
+    }
+
+    function spawnParaOrder(s, generous) {
+      const need = generous ? 1 : 1 + Math.floor(Math.random() * 3);
+      const mult = generous ? 3 : 2 + Math.floor(Math.random() * 3);
+      const maxT = generous ? 32 : 18 + Math.random() * 14;
+      s.order = { kind: 'para', need, got: 0, mult, t: maxT, maxT, hold: !!generous };
+      s.orderFlash = 1;
+      sound.order();
+    }
+
+    function maybeRollEvent(s, must) {
+      if (!s.lessons.parallel) {
+        s.eventWait = 10;
+        return;
+      }
       s.eventWait = EVENT_GAP_MIN + Math.random() * (EVENT_GAP_MAX - EVENT_GAP_MIN);
-      if (Math.random() < 0.38) return;
+      const forcePara = s.guide && !s.guide.paraDone;
+      if (!forcePara && !must && Math.random() < 0.38) return;
       const pool = producible(s.owned).filter((k) => k !== 'raw');
       if (!pool.length) return;
+      if (forcePara) {
+        spawnParaOrder(s, true);
+        return;
+      }
       const kind = pool[Math.floor(Math.random() * pool.length)];
       const need = 1 + Math.floor(Math.random() * 3);
       const mult = 2 + Math.floor(Math.random() * 3);
@@ -2052,6 +2343,23 @@
       BOUNDS = { x0: YARD.x + 25, x1: YARD.x + YARD.w - 25, y0: YARD.y + 20, y1: YARD.y + YARD.h - 20 };
       rebuildWalk();
       checkOrientation();
+      syncMoveHint();
+    }
+
+    function isTouchDevice() {
+      try {
+        if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+        if (window.matchMedia('(pointer: coarse)').matches) return true;
+      } catch (_) {}
+      return (navigator.maxTouchPoints || 0) > 1;
+    }
+
+    function syncMoveHint() {
+      const note = document.getElementById('move-note');
+      if (!note) return;
+      note.textContent = isTouchDevice()
+        ? '드래그, 클릭으로 이동.'
+        : 'WASD(방향키), 드래그, 클릭으로 이동.';
     }
 
     function checkOrientation() {
@@ -2202,7 +2510,17 @@
                     targetY = m.upgrade.y + m.upgrade.h / 2;
                     isSmart = true;
                     break;
-                  } else if (inInput || inOutput || inBody) {
+                  } else if (inInput) {
+                    targetX = m.input.x + m.input.w / 2;
+                    targetY = m.input.y + m.input.h / 2;
+                    isSmart = true;
+                    break;
+                  } else if (inOutput) {
+                    targetX = m.output.x + m.output.w / 2;
+                    targetY = m.output.y + m.output.h / 2;
+                    isSmart = true;
+                    break;
+                  } else if (inBody) {
                     let needInput = false;
                     for (let g of state.carry) {
                       if (m.ops[g.kind]) { needInput = true; break; }
@@ -2368,9 +2686,11 @@
       if (s.time <= 10 && s.time > 0 && Math.floor(prevTime) !== Math.floor(s.time)) sound.tick();
 
       if (s.order) {
-        s.order.t -= dt;
-        if (s.order.t <= 0) s.order = null;
-      } else {
+        if (!s.order.hold) {
+          s.order.t -= dt;
+          if (s.order.t <= 0) s.order = null;
+        }
+      } else if (s.lessons.parallel) {
         s.eventWait -= dt;
         if (s.eventWait <= 0) maybeRollEvent(s);
       }
@@ -2492,6 +2812,11 @@
           const ease = e < 0.5 ? 2 * e * e : 1 - Math.pow(-2 * e + 2, 2) / 2;
           p.pts = lerpPts(p.from, p.to, ease);
           p.t = ease;
+          if (s.previewHold && p.progress >= 0.9) {
+            p.progress = 0.2;
+            p.from = p.pts.slice();
+            return true;
+          }
           if (p.progress >= 1) {
             if (ws.output.length >= outCap) return true;
             const out = { kind: p.target, seed: p.seed, pts: p.to.slice(), from: null, to: null, t: 1 };
@@ -2524,6 +2849,7 @@
             s.carry.push(g);
             addSparks(to.x, to.y, '#fde68a', 5);
             sound.collect(g.kind);
+            celebrateFirstMake(s, g.kind);
           }
         }
       });
@@ -2596,10 +2922,22 @@
             ord.got++;
             if (ord.got >= ord.need) {
               bonus = Math.floor(GEMS[ord.kind].price * ord.mult * 0.5);
-              addFloater(s.player.x, s.player.y - 72, '완료!', '#f472b6', true);
+              const firstOrder = s.guide && !s.guide.paraDone;
+              addFloater(s.player.x, s.player.y - 72, firstOrder ? '특별요청을 해결했어요!' : '완료!', '#f472b6', true);
               sound.orderDone();
+              if (s.guide) s.guide.paraDone = true;
               s.order = null;
-              s.eventWait = EVENT_GAP_MIN + Math.random() * 12;
+              if (firstOrder) {
+                if (hasQuadProps(gem.kind) && !s.guide.diagShown) {
+                  s.guide.pendingOrderTime = true;
+                } else {
+                  s.guide.step = 'orderTime';
+                  s.guide.orderT = 0;
+                }
+                maybeRollEvent(s, true);
+              } else {
+                s.eventWait = EVENT_GAP_MIN + Math.random() * 12;
+              }
             }
           }
           // Tease: gem rides the belt before any cash appears.
@@ -2618,6 +2956,7 @@
           });
           addSparks(s.player.x, s.player.y - 20, wanted ? '#f9a8d4' : '#fde68a', wanted ? 8 : 4);
           sound.sellHop();
+          if (hasQuadProps(gem.kind)) queueDiagHint(s);
         }
       } else s.sellT = 0;
 
@@ -2640,7 +2979,6 @@
       if (s.appraisal) {
         s.appraisal.t += dt;
         s.appraisal.life += dt;
-        if (s.appraisal.life > 2.8) s.appraisal = null;
       }
       s.floaters = s.floaters.filter((f) => (f.t += dt) < 1);
       s.sparks = s.sparks.filter((sp) => {
@@ -2662,6 +3000,7 @@
       s.shake = Math.max(0, s.shake - dt);
       s.orderFlash = Math.max(0, s.orderFlash - dt * 1.6);
 
+      updateGuide(dt);
       updateHud();
       updateShopAtMachine();
     }
@@ -2679,6 +3018,139 @@
       addFloater(state.player.x, state.player.y - 50, '가방+' + carryCap(state), '#5eead4', true);
       addSparks(state.player.x, state.player.y - 30, '#5eead4', 10);
       sound.bag();
+    }
+
+    function setGuideTip(text, max) {
+      const s = state;
+      if (!text) {
+        s.tip = null;
+        return;
+      }
+      if (s.tip && s.tip.text === text) return;
+      s.tip = { text, t: 0, max: max == null ? 999 : max };
+    }
+
+    function celebrateFirstMake(s, kind) {
+      const text = kind === 'square'
+        ? '대단해요! 정사각형을 만들었어요!'
+        : kind === 'para' ? '평행사변형을 만들었어요!'
+        : kind === 'rhombus' ? '마름모를 만들었어요!'
+        : kind === 'rect' ? '직사각형을 만들었어요!'
+        : '';
+      if (!text || (s.firstMake && s.firstMake[kind])) return;
+      s.firstMake = s.firstMake || {};
+      s.firstMake[kind] = true;
+      s.tip = { text, t: 0, max: kind === 'square' ? 6 : 4.5, hold: true };
+    }
+
+    function guideTargetRect() {
+      const s = state;
+      if (!s.guide) return null;
+      const step = s.guide.step;
+      if (step === 'mine' || step === 'remine') return MINE_VEIN;
+      if (step === 'sell') return MARKET_PAD;
+      if (step === 'cash') {
+        return { x: CASH_ANCHOR.x - 38, y: CASH_ANCHOR.y - 42, w: 76, h: 58 };
+      }
+      if (step === 'buy') return kioskRect(MACHINES[0]);
+      if (step === 'feed') return MACHINES[0].input;
+      if (step === 'order' || step === 'orderTime') return orderBoardBox();
+      return null;
+    }
+
+    function updateGuide(dt) {
+      const s = state;
+      if (s.tip) s.tip.t += dt;
+      if (!s.guide || s.guide.step === 'done' || s.phase !== 'play') {
+        if (s.tip && s.tip.t >= s.tip.max) s.tip = null;
+        return;
+      }
+
+      const cost = factoryUnlockCost();
+      const raw = carryRawCount(s);
+      const total = s.gold + incomingGold(s);
+      const oreNeed = Math.ceil(cost / GEMS.raw.price);
+      const bagFull = s.carry.length >= carryCap(s) && raw > 0;
+      let step = s.guide.step;
+
+      if (s.owned.parallel >= 1 && s.lessons.parallel) {
+        if (step === 'orderTime' || step === 'done' || step === 'diagHint') {
+          // keep
+        } else if (!s.guide.paraDone && step !== 'order') {
+          step = 'order';
+          s.guide.orderT = 0;
+          if (!s.order) spawnParaOrder(s, true);
+        }
+      } else if (s.owned.parallel >= 1 && !s.lessons.parallel) {
+        step = raw >= 1 ? 'feed' : 'remine';
+      } else if (s.gold >= cost && raw >= 1) {
+        step = 'buy';
+      } else if (s.gold >= cost) {
+        step = 'remine';
+      } else if (total >= cost && s.gold < cost) {
+        step = 'cash';
+      } else if (raw >= oreNeed || bagFull || (raw > 0 && inRect(s.player, MARKET_PAD))) {
+        step = 'sell';
+      } else {
+        step = 'mine';
+      }
+
+      s.guide.step = step;
+
+      if (step === 'order') {
+        s.guide.orderT = (s.guide.orderT || 0) + dt;
+        if (s.guide.orderT > 5.5 && !(s.tip && s.tip.hold)) setGuideTip(null);
+      } else if (step === 'orderTime') {
+        s.guide.orderT = (s.guide.orderT || 0) + dt;
+        if (s.guide.orderT > 7) {
+          s.guide.step = 'done';
+          if (!(s.tip && s.tip.hold)) setGuideTip(null);
+          return;
+        }
+      } else if (step === 'diagHint') {
+        s.guide.orderT = (s.guide.orderT || 0) + dt;
+        if (s.guide.orderT > 5.5) {
+          if (s.guide.pendingOrderTime) {
+            step = 'orderTime';
+            s.guide.step = 'orderTime';
+            s.guide.orderT = 0;
+            s.guide.pendingOrderTime = false;
+          } else {
+            s.guide.step = 'done';
+            if (!(s.tip && s.tip.hold)) setGuideTip(null);
+            return;
+          }
+        }
+      }
+
+      if (s.tip && s.tip.t >= s.tip.max && s.tip.max < 900) s.tip = null;
+
+      const onMine = inRect(s.player, MINE_VEIN);
+      const onMarket = inRect(s.player, MARKET_PAD);
+      const onFactory = !!machineAtFront(s.player);
+      let text = '';
+      if (onFactory && (step === 'mine' || step === 'sell' || step === 'cash' || step === 'remine' || step === 'buy' || step === 'feed')) {
+        text = factoryStandTip(s);
+      } else if (step === 'mine') {
+        text = onMine ? '그대로 서 있으면 원석이 쌓여요' : '광맥으로 가서 원석을 주우세요';
+      } else if (step === 'sell') {
+        text = onMarket ? '그대로 서 있으면 원석을 팔아요' : '판매대에서 원석을 파세요';
+      } else if (step === 'cash') {
+        text = onMarket ? '한 걸음 나와 판매금액을 수령하세요' : '판매금액을 수령하세요';
+      } else if (step === 'remine') {
+        text = onMine ? '공장에 넣을 원석을 주우세요' : '다시 원석을 주우세요';
+      } else if (step === 'buy') {
+        text = '평행 공장 앞으로 가서 해금하세요';
+      } else if (step === 'feed') {
+        text = '원석을 공장 입구에 넣으세요';
+      } else if (step === 'order') {
+        if ((s.guide.orderT || 0) <= 5.5) text = '특별요청이 올라왔어요';
+      } else if (step === 'orderTime') {
+        text = '특별요청을 해결했어요!\n특별요청은 시간이 지나면 사라지니 주의하세요.';
+      } else if (step === 'diagHint') {
+        text = '사각형의 성질이 많을수록 판매금액이 올라가요';
+      }
+      if (text && !(s.tip && s.tip.hold)) setGuideTip(text, step === 'orderTime' ? 7 : ((step === 'order' || step === 'diagHint') ? 5.5 : 999));
     }
 
     // Stuck / blocked feedback: blink red ~1s, rest ~0.9s, repeat.
@@ -3109,6 +3581,49 @@
         ctx.lineWidth = 1.6;
         cornerMark(m, pts[0], pts[1], 7);
       }
+    }
+
+    function drawTrapParallel(pts, progress) {
+      const u = Math.max(0, Math.min(1, progress));
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 200);
+      const pairs = [[0, 1], [3, 2]];
+      pairs.forEach(([i, j], idx) => {
+        const x0 = pts[i][0], y0 = pts[i][1];
+        const x1 = pts[j][0], y1 = pts[j][1];
+        const x = x0 + (x1 - x0) * u;
+        const y = y0 + (y1 - y0) * u;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(110,231,183,${0.35 + pulse * 0.4})`;
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(236,253,245,${0.75 + pulse * 0.25})`;
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.restore();
+        if (u < 0.95) return;
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+        const dx = x1 - x0, dy = y1 - y0;
+        const L = Math.hypot(dx, dy) || 1;
+        const ux = dx / L, uy = dy / L;
+        const px = -uy, py = ux;
+        const out = idx === 0 ? -1 : 1;
+        ctx.save();
+        ctx.fillStyle = '#ecfdf5';
+        ctx.font = '800 12px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('∥', mx + px * 10 * out, my + py * 10 * out);
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'left';
+        ctx.restore();
+      });
     }
 
     // ---------- world (fantasy mine + factory floor) ----------
@@ -3945,7 +4460,7 @@
       const H = 28;
       const x = b.x, y = b.y, w = b.w, h = b.h;
       const tNow = performance.now();
-      const roofLit = look.signboard || (busy && lv >= 3);
+      const roofLit = look.signboard || busy;
       const cornerR = look.signboard ? 6 : 5;
 
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -3962,14 +4477,14 @@
         drawMachineSpriteOverlays(m, lv, sprBox, look, busy, owned, tNow);
 
         const win = machineWindowRect(sprBox);
-        if (owned) {
+        if (owned && !(busy && m.id === 'parallel')) {
           const painted = lv >= 2;
           drawMachineSign(
             m.id, win.x + win.w / 2, win.y + win.h * 0.52, painted,
             lv >= 3 ? 1.18 : 1.14,
             painted ? 'paint' : 'carve'
           );
-        } else {
+        } else if (!owned) {
           ctx.save();
           ctx.globalAlpha = 0.45;
           drawMachineSign(m.id, win.x + win.w / 2, win.y + win.h * 0.52, false, 0.9);
@@ -4096,22 +4611,7 @@
       }
       ctx.restore();
 
-      if (busy && lv >= 3) {
-        const t = tNow / 220;
-        ctx.fillStyle = `rgba(200,210,230,${0.26 + 0.2 * Math.sin(t)})`;
-        ctx.beginPath();
-        ctx.arc(rcx + 8, roofTopY - 14 - Math.sin(t) * 5, 7, 0, Math.PI * 2);
-        ctx.fill();
-        if (m.id === 'right') {
-          ctx.fillStyle = '#fb923c';
-          for (let i = 0; i < 3; i++) {
-            const pt = (tNow / (180 + i * 40) + i * 0.2) % 1;
-            ctx.globalAlpha = 1 - pt;
-            ctx.fillRect(rcx + 10 + i * 5, roofTopY - 8 - pt * 20, 2.4, 2.4);
-          }
-          ctx.globalAlpha = 1;
-        }
-      }
+      drawMachineRunFx(m, look, busy, tNow, rcx + 8, roofTopY - 12, 1);
 
       if (look.lanterns) {
         const glow = busy ? (0.55 + 0.35 * Math.sin(tNow / 280)) : 0.28;
@@ -4122,12 +4622,7 @@
           ctx.beginPath();
           ctx.arc(lx + 1.5, ly - 14, 5, 0, Math.PI * 2);
           ctx.fill();
-          if (busy) {
-            ctx.fillStyle = `rgba(253,186,116,${0.18 + glow * 0.2})`;
-            ctx.beginPath();
-            ctx.arc(lx + 1.5, ly - 14, 10, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          drawMachineLanternHalo(lx + 1.5, ly - 14, busy, tNow);
         });
       }
 
@@ -4135,24 +4630,10 @@
       const ww = m.id === 'parallel' ? w * 0.72 : w * 0.56;
       const wy = y + h * 0.26;
       const wh = h * 0.42;
-      if (busy && lv >= 3) {
-        const pulse = 0.22 + 0.14 * Math.sin(tNow / 320);
-        ctx.fillStyle = `rgba(${look.glow},${pulse})`;
-        roundRect(wx - 5, wy - 5, ww + 10, wh + 10, 6);
-        ctx.fill();
-      }
       ctx.fillStyle = look.glass ? 'rgba(10,8,6,0.88)' : 'rgba(12,8,6,0.72)';
       roundRect(wx, wy, ww, wh, 4);
       ctx.fill();
-      if (look.glass && !busy) {
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath();
-        ctx.moveTo(wx + 8, wy + 4);
-        ctx.lineTo(wx + ww * 0.42, wy + 4);
-        ctx.lineTo(wx + 10, wy + wh - 6);
-        ctx.closePath();
-        ctx.fill();
-      }
+      drawMachineWindowLight({ x: wx, y: wy, w: ww, h: wh }, look, busy, owned, tNow);
       ctx.strokeStyle = look.signboard
         ? (busy ? look.hi : look.accent)
         : (look.metal ? (busy ? look.hi : '#d4b07a') : '#8a7058');
@@ -4162,7 +4643,7 @@
 
       ctx.fillStyle = owned ? '#1a0e08' : '#120e0a';
       ctx.fillRect(x + 4, y + h - 2, w - 8 + D * 0.15, 12);
-      ctx.fillStyle = busy && lv >= 3 ? look.hi : look.counter;
+      ctx.fillStyle = busy ? look.hi : look.counter;
       roundRect(x + 2, y + h - 14, w - 4, 14, 3);
       ctx.fill();
       ctx.fillStyle = owned ? 'rgba(255,240,200,0.35)' : 'rgba(255,255,255,0.08)';
@@ -4172,14 +4653,14 @@
       roundRect(x + 2, y + h - 14, w - 4, 14, 3);
       ctx.stroke();
 
-      if (owned) {
+      if (owned && !(busy && m.id === 'parallel')) {
         const painted = lv >= 2;
         drawMachineSign(
           m.id, wx + ww / 2, wy + wh * 0.52, painted,
           lv >= 3 ? 1.18 : 1.14,
           painted ? 'paint' : 'carve'
         );
-      } else {
+      } else if (!owned) {
         ctx.save();
         ctx.globalAlpha = 0.45;
         drawMachineSign(m.id, wx + ww / 2, wy + wh * 0.52, false, 0.9);
@@ -4286,7 +4767,8 @@
       const lv = mLv(m.id);
       const owned = lv >= 1;
       const onIn = owned && inRect(state.player, m.input);
-      const lure = !owned && !mLv('parallel') && state.carry.some((g) => g.kind === 'raw');
+      const lure = !owned && !mLv('parallel') && state.carry.some((g) => g.kind === 'raw')
+        && state.guide && (state.guide.step === 'buy' || state.guide.step === 'feed');
       const ws = state.workshops[m.id];
       const inWarn = warnOn('in:' + m.id);
 
@@ -4326,14 +4808,162 @@
       if (ws) ws.output.forEach((g, i) => drawGemOnShelf(g, m.output, i, outWarn));
     }
 
+    function paintCutGem(pts, kind, seed, size, alpha) {
+      if (!pts || pts.length < 3) return;
+      ctx.save();
+      ctx.globalAlpha = alpha == null ? 1 : alpha;
+      const g = GEMS[kind];
+      const lw = gemStrokeWidth(size);
+      const join = gemJoin(kind);
+      const innerScale = gemInnerScale(kind);
+      const h = hash(seed || 1);
+      const glow = h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24';
+      poly(pts, '#3f322e', g.line, lw, join);
+      const inner = pts.map((p) => [p[0] * innerScale, p[1] * innerScale]);
+      poly(inner, glow, null, 0, join);
+      ctx.restore();
+    }
+
+    function strokeCutFace(L, R, t, done) {
+      const u = done ? 1 : Math.max(0, Math.min(1, t));
+      if (u < 0.02) return;
+      ctx.strokeStyle = done ? 'rgba(253,224,71,0.88)' : `rgba(253,224,71,${0.55 + u * 0.4})`;
+      ctx.lineWidth = done ? 2.4 : 2.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(L[0], L[1]);
+      ctx.lineTo(L[0] + (R[0] - L[0]) * u, L[1] + (R[1] - L[1]) * u);
+      ctx.stroke();
+    }
+
+    function drawParallelCutJob(p, size, blocked) {
+      const plan = parallelCutPlan(p.kind, p.target, p.seed, size);
+      const e = Math.min(1, p.progress);
+      const P1 = 0.46, GAP = 0.07, P2 = 0.92;
+      let remain = plan.src;
+      let scrap = null, fallX = 0, fallY = 0, scrapT = 0;
+      let active = null, bladeT = 0, cutsDone = 0;
+      if (e < P1) {
+        bladeT = e / P1;
+        active = plan.cut1;
+        if (bladeT > 0.04) {
+          remain = plan.cut1.remain;
+          scrap = plan.cut1.scrap;
+          fallX = plan.cut1.fallX;
+          fallY = plan.cut1.fallY;
+          scrapT = bladeT;
+        }
+      } else if (e < P1 + GAP) {
+        remain = plan.cut1.remain;
+        cutsDone = 1;
+      } else if (e < P2) {
+        cutsDone = 1;
+        bladeT = (e - P1 - GAP) / (P2 - P1 - GAP);
+        active = plan.cut2;
+        remain = bladeT > 0.04 ? plan.cut2.remain : plan.cut1.remain;
+        if (bladeT > 0.04) {
+          scrap = plan.cut2.scrap;
+          fallX = plan.cut2.fallX;
+          fallY = plan.cut2.fallY;
+          scrapT = bladeT;
+        }
+      } else {
+        cutsDone = 2;
+        remain = plan.cut2.remain;
+        const settle = (e - P2) / (1 - P2);
+        if (remain.length === plan.dst.length) remain = lerpPts(remain, plan.dst, settle);
+      }
+
+      const kindNow = cutsDone >= 2 ? p.target : p.kind;
+      const grinding = !!(active && bladeT > 0.02 && bladeT < 0.98);
+      const vib = grinding ? (Math.random() - 0.5) * 1.2 : 0;
+      const vibY = grinding ? (Math.random() - 0.5) * 0.9 : 0;
+
+      ctx.save();
+      ctx.translate(vib, vibY);
+      if (scrap && scrapT > 0) {
+        ctx.save();
+        ctx.translate(fallX * scrapT, fallY * scrapT);
+        paintCutGem(scrap, p.kind, p.seed, size, Math.max(0, 0.7 - scrapT * 0.55));
+        ctx.restore();
+      }
+      if (blocked) {
+        const wp = warnPulse();
+        ctx.save();
+        ctx.globalAlpha = 0.55 + wp * 0.4;
+        poly(remain, `rgba(251,113,133,0.85)`, '#fecdd3', gemStrokeWidth(size), gemJoin(kindNow));
+        ctx.restore();
+      } else {
+        paintCutGem(remain, kindNow, p.seed, size, 1);
+      }
+
+      if (cutsDone >= 1) strokeCutFace(plan.cut1.L, plan.cut1.R, 1, true);
+      if (cutsDone >= 2) strokeCutFace(plan.cut2.L, plan.cut2.R, 1, true);
+      if (active) {
+        strokeCutFace(active.L, active.R, bladeT, false);
+        const g = active.guide;
+        const bx = g.x0 + (g.x1 - g.x0) * bladeT;
+        const by = g.y0 + (g.y1 - g.y0) * bladeT;
+        const ang = Math.atan2(g.y1 - g.y0, g.x1 - g.x0);
+        if (grinding && size >= 13) {
+          const nx = Math.sin(ang), ny = -Math.cos(ang);
+          const tNow = performance.now();
+          for (let i = 0; i < 5; i++) {
+            const u = ((tNow / 80) + i * 0.18) % 1;
+            ctx.fillStyle = i % 2 ? '#fde68a' : '#fda4af';
+            ctx.globalAlpha = 1 - u;
+            ctx.beginPath();
+            ctx.arc(bx + nx * u * 11 + Math.sin(tNow / 40 + i) * 2, by + ny * u * 11, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+      ctx.restore();
+    }
+
     function drawMachineProcess(m) {
       const lv = mLv(m.id);
       if (lv < 1) return;
       const ws = state.workshops[m.id];
-      if (!ws) return;
-      const cx = m.body.x + m.body.w / 2;
-      const cy = m.body.y + m.body.h * 0.55;
+      if (!ws || !ws.processing.length) return;
       const outWarn = warnOn('out:' + m.id);
+      const box = machineSpriteBox(m, lv);
+      const win = box ? machineWindowRect(box) : {
+        x: m.body.x, y: m.body.y, w: m.body.w, h: m.body.h
+      };
+      const cx = win.x + win.w / 2;
+      const cy = win.y + win.h * 0.52;
+
+      if (m.id === 'parallel') {
+        const jobs = ws.processing;
+        const n = jobs.length;
+        const cols = n <= 3 ? n : Math.ceil(n / 2);
+        const rows = Math.ceil(n / cols);
+        const size = Math.max(9, Math.min(
+          (win.h - 8) / (rows * 2.2),
+          (win.w - 8) / (cols * 2.6)
+        ));
+        const gapX = Math.min(size * 2.55, (win.w - 10) / cols);
+        const gapY = Math.min(size * 2.05, (win.h - 10) / rows);
+        ctx.save();
+        roundRect(win.x + 3, win.y + 3, win.w - 6, win.h - 6, 4);
+        ctx.clip();
+        jobs.forEach((p, i) => {
+          const row = Math.floor(i / cols);
+          const col = i % cols;
+          const rowN = row === rows - 1 ? n - row * cols : cols;
+          const ox = (col - (rowN - 1) / 2) * gapX;
+          const oy = (row - (rows - 1) / 2) * gapY;
+          ctx.save();
+          ctx.translate(cx + ox, cy + oy);
+          drawParallelCutJob(p, size, outWarn && p.progress >= 0.98);
+          ctx.restore();
+        });
+        ctx.restore();
+        return;
+      }
+
       ws.processing.forEach((p, i) => {
         const ox = (i - (ws.processing.length - 1) / 2) * 18;
         const worldPts = p.pts.map(([x, y]) => [x + cx + ox, y + cy]);
@@ -4403,6 +5033,74 @@
       // Gems are drawn per-machine inside drawLanes depth pass.
     }
 
+    function wrapBoardText(text, maxW) {
+      const parts = String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      const lines = [];
+      for (let p = 0; p < parts.length; p++) {
+        const src = parts[p];
+        if (ctx.measureText(src).width <= maxW) {
+          lines.push(src);
+          continue;
+        }
+        let acc = '';
+        for (let i = 0; i < src.length; i++) {
+          const next = acc + src[i];
+          if (acc && ctx.measureText(next).width > maxW) {
+            lines.push(acc);
+            acc = src[i];
+          } else acc = next;
+        }
+        if (acc) lines.push(acc);
+      }
+      return lines.slice(0, 2);
+    }
+
+    function drawBoardFrame(bx, by, bw, bh, fill, stroke, lw) {
+      ctx.fillStyle = fill;
+      roundRect(bx, by, bw, bh, 10);
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lw == null ? 2 : lw;
+      roundRect(bx, by, bw, bh, 10);
+      ctx.stroke();
+    }
+
+    function drawSoldOnBoard(bx, by, bw, bh, a) {
+      const info = GEMS[a.kind];
+      const wanted = !!a.wanted;
+      drawBoardFrame(
+        bx, by, bw, bh,
+        wanted ? 'rgba(88,28,60,0.82)' : 'rgba(36,22,12,0.82)',
+        wanted ? 'rgba(249,168,212,0.75)' : (info.line || 'rgba(180,120,60,0.65)'),
+        2
+      );
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '800 13px Pretendard, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(info.name, bx + bw / 2, by + 18);
+
+      const cx = bx + bw / 2;
+      const cy = by + 52;
+      ctx.save();
+      ctx.translate(cx, cy);
+      const size = 26;
+      const pts = shapeFor(a.kind, size, a.seed);
+      paintGem(a.kind, size, a.seed, { blur: 10 });
+      const markT = Math.min(1, a.t / 0.32);
+      if (a.kind === 'trap') drawTrapParallel(pts, markT);
+      else if (a.kind !== 'raw') drawDiagonals(pts, info.props, markT);
+      ctx.restore();
+
+      ctx.font = '800 11px Pretendard, sans-serif';
+      ctx.fillStyle = '#fde68a';
+      const lines = wrapBoardText(info.diag, bw - 18);
+      const base = by + bh - 8 - (lines.length - 1) * 14;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], bx + bw / 2, base + i * 14);
+      }
+      ctx.textAlign = 'left';
+    }
+
     function drawOrderBoard() {
       const { x: bx, y: by, w: bw, h: bh } = orderBoardBox();
 
@@ -4414,14 +5112,15 @@
       ctx.stroke();
 
       const ord = state.order;
+      const a = state.appraisal;
+      const showSold = a && (!ord || a.life < 2.8);
+      if (showSold) {
+        drawSoldOnBoard(bx, by, bw, bh, a);
+        return;
+      }
+
       if (!ord) {
-        ctx.fillStyle = 'rgba(36,22,12,0.72)';
-        roundRect(bx, by, bw, bh, 10);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(180,120,60,0.45)';
-        ctx.lineWidth = 2;
-        roundRect(bx, by, bw, bh, 10);
-        ctx.stroke();
+        drawBoardFrame(bx, by, bw, bh, 'rgba(36,22,12,0.72)', 'rgba(180,120,60,0.45)', 2);
         ctx.fillStyle = 'rgba(148,163,184,0.75)';
         ctx.font = '700 15px Pretendard, sans-serif';
         ctx.textAlign = 'center';
@@ -4430,20 +5129,18 @@
         return;
       }
 
-      const urgent = ord.t < 6;
+      const hold = !!ord.hold;
+      const urgent = !hold && ord.t < 6;
       const flash = state.orderFlash || 0;
 
-      ctx.fillStyle = flash > 0
-        ? `rgba(88,28,60,${0.75 + 0.2 * flash})`
-        : 'rgba(36,22,12,0.82)';
-      roundRect(bx, by, bw, bh, 10);
-      ctx.fill();
-      ctx.strokeStyle = urgent
-        ? 'rgba(251,113,133,0.95)'
-        : (flash > 0 ? `rgba(249,168,212,${0.5 + 0.5 * flash})` : 'rgba(180,120,60,0.65)');
-      ctx.lineWidth = urgent || flash > 0.3 ? 3 : 2;
-      roundRect(bx, by, bw, bh, 10);
-      ctx.stroke();
+      drawBoardFrame(
+        bx, by, bw, bh,
+        flash > 0 ? `rgba(88,28,60,${0.75 + 0.2 * flash})` : 'rgba(36,22,12,0.82)',
+        urgent
+          ? 'rgba(251,113,133,0.95)'
+          : (flash > 0 ? `rgba(249,168,212,${0.5 + 0.5 * flash})` : 'rgba(180,120,60,0.65)'),
+        urgent || flash > 0.3 ? 3 : 2
+      );
 
       ctx.fillStyle = urgent ? '#fb7185' : '#f9a8d4';
       ctx.font = '800 15px Pretendard, sans-serif';
@@ -4458,13 +5155,15 @@
       ctx.font = '800 18px Outfit, sans-serif';
       ctx.fillText(ord.got + '/' + ord.need, bx + 88, by + 84);
 
-      const p = Math.max(0, ord.t / ord.maxT);
-      ctx.fillStyle = 'rgba(148,163,184,0.3)';
-      roundRect(bx + 16, by + bh - 22, bw - 32, 6, 3);
-      ctx.fill();
-      ctx.fillStyle = urgent ? '#fb7185' : '#f472b6';
-      roundRect(bx + 16, by + bh - 22, (bw - 32) * p, 6, 3);
-      ctx.fill();
+      if (!hold) {
+        const p = Math.max(0, ord.t / ord.maxT);
+        ctx.fillStyle = 'rgba(148,163,184,0.3)';
+        roundRect(bx + 16, by + bh - 22, bw - 32, 6, 3);
+        ctx.fill();
+        ctx.fillStyle = urgent ? '#fb7185' : '#f472b6';
+        roundRect(bx + 16, by + bh - 22, (bw - 32) * p, 6, 3);
+        ctx.fill();
+      }
     }
 
     function drawPlayer() {
@@ -4590,106 +5289,79 @@
     function drawTip() {
       const tip = state.tip;
       if (!tip) return;
-      const fade = tip.t < 0.25 ? tip.t / 0.25 : tip.t > tip.max - 0.4 ? (tip.max - tip.t) / 0.4 : 1;
+      const fade = tip.t < 0.25 ? tip.t / 0.25 : (tip.max < 900 && tip.t > tip.max - 0.4 ? (tip.max - tip.t) / 0.4 : 1);
+      if (fade <= 0) return;
       const p = state.player;
       ctx.save();
       ctx.globalAlpha = Math.max(0, fade);
       ctx.font = '700 15px Pretendard, sans-serif';
-      const w = Math.min(320, ctx.measureText(tip.text).width + 28);
+      const maxW = 300;
+      let lines = tip.text.split('\n');
+      if (lines.length === 1 && ctx.measureText(tip.text).width > maxW) {
+        const words = tip.text.split(' ');
+        if (words.length > 1) {
+          lines = [];
+          let cur = '';
+          for (let i = 0; i < words.length; i++) {
+            const next = cur ? cur + ' ' + words[i] : words[i];
+            if (cur && ctx.measureText(next).width > maxW) {
+              lines.push(cur);
+              cur = words[i];
+            } else cur = next;
+          }
+          if (cur) lines.push(cur);
+        }
+      }
+      let textW = 0;
+      for (let i = 0; i < lines.length; i++) {
+        textW = Math.max(textW, ctx.measureText(lines[i]).width);
+      }
+      const w = Math.min(328, textW + 28);
+      const h = 16 + lines.length * 20;
       const x = Math.max(40, Math.min(MAP_W - w - 40, p.x - w / 2));
-      const y = p.y < 240 ? p.y + 40 : p.y - 75;
+      const y = p.y < 240 ? p.y + 40 : p.y - 28 - h;
       ctx.fillStyle = 'rgba(20,12,28,0.92)';
-      roundRect(x, y, w, 32, 12);
+      roundRect(x, y, w, h, 12);
       ctx.fill();
       ctx.strokeStyle = 'rgba(240,195,106,0.7)';
       ctx.lineWidth = 2;
-      roundRect(x, y, w, 32, 12);
+      roundRect(x, y, w, h, 12);
       ctx.stroke();
       ctx.fillStyle = '#f5e9d6';
       ctx.textAlign = 'center';
-      ctx.fillText(tip.text, x + w / 2, y + 21);
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], x + w / 2, y + 22 + i * 20);
+      }
       ctx.textAlign = 'left';
       ctx.restore();
     }
 
-    function drawAppraisal() {
-      const a = state.appraisal;
-      if (!a) return;
-      const isCompact = view.h < 500;
-      const k = isCompact ? 0.68 : Math.max(0.72, Math.min(1, view.w / 900));
-      const W = 248, H = 176;
+    function drawGuideWorld() {
+      const s = state;
+      if (!s || s.phase !== 'play' || !s.guide) return;
+      if (s.guide.paraDone || s.guide.step === 'done' || s.guide.step === 'orderTime' || s.guide.step === 'diagHint') return;
+      const r = guideTargetRect();
+      if (!r) return;
+      const pulse = 0.45 + 0.55 * Math.sin(performance.now() / 220);
       ctx.save();
-      // Position at bottom-left so the selling stall, conveyor belt, money, and player on the right are never obscured
-      ctx.translate(14, view.h - H * k - 14);
-      ctx.scale(k, k);
-      ctx.globalAlpha = Math.min(1, (2.8 - a.life) * 2);
-
-      ctx.fillStyle = 'rgba(22,12,30,0.94)';
-      roundRect(0, 0, W, H, 14);
-      ctx.fill();
-      ctx.strokeStyle = a.wanted ? 'rgba(244,114,182,0.7)' : 'rgba(240,195,106,0.45)';
-      ctx.lineWidth = 2;
-      roundRect(0, 0, W, H, 14);
+      ctx.strokeStyle = `rgba(240,195,106,${0.4 + pulse * 0.55})`;
+      ctx.lineWidth = 3.4;
+      ctx.setLineDash([8, 5]);
+      roundRect(r.x - 8, r.y - 8, r.w + 16, r.h + 16, 14);
       ctx.stroke();
-      ctx.fillStyle = a.wanted ? '#f9a8d4' : '#c4b5fd';
-      [[8, 8], [W - 8, 8], [8, H - 8], [W - 8, H - 8]].forEach(([x, y]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      const info = GEMS[a.kind];
-      const pts = shapeFor(a.kind, 36, a.seed);
-      ctx.save();
-      ctx.translate(58, 62);
-      paintGem(a.kind, 36, a.seed, { blur: 14 });
-      drawDiagonals(pts, info.props, Math.min(1, a.t / 0.32));
-      ctx.restore();
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '800 15px Pretendard, sans-serif';
-      ctx.fillText(info.name, 112, 28);
-
-      ctx.fillStyle = '#fde68a';
-      ctx.font = '800 28px Outfit, sans-serif';
-      ctx.fillText(String(a.value), 112, 62);
-      drawBillSprite(168, 52, 24, a.wanted, 0);
-      if (a.wanted) {
-        ctx.fillStyle = '#f9a8d4';
-        ctx.font = '800 15px Outfit, sans-serif';
-        ctx.fillText('주문 ×' + (a.mult || 1), 112, 82);
-      }
-
-      // Diagonal verdict — the educational sell feedback
-      const prog = Math.min(1, Math.max(0, (a.t - 0.28) / 0.35));
-      if (prog > 0) {
-        ctx.globalAlpha = Math.min(1, (2.8 - a.life) * 2) * prog;
-        ctx.fillStyle = 'rgba(36,22,48,0.9)';
-        roundRect(12, H - 58, W - 24, 44, 10);
-        ctx.fill();
-        ctx.strokeStyle = info.line;
-        ctx.lineWidth = 1.5;
-        roundRect(12, H - 58, W - 24, 44, 10);
-        ctx.stroke();
-
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = '700 11px Pretendard, sans-serif';
-        ctx.fillText('성질', 22, H - 38);
-        ctx.fillStyle = '#fde68a';
-        ctx.font = '800 13px Pretendard, sans-serif';
-        const verdict = info.diag;
-        // Wrap long Korean lines
-        if (verdict.length > 16) {
-          const mid = Math.ceil(verdict.length / 2);
-          let split = verdict.lastIndexOf(' ', mid);
-          if (split < 6) split = verdict.indexOf('·', 6);
-          if (split < 6) split = mid;
-          ctx.fillText(verdict.slice(0, split).trim(), 22, H - 20);
-          ctx.fillText(verdict.slice(split).replace(/^[·\s]+/, '').trim(), 22, H - 6);
-        } else {
-          ctx.fillText(verdict, 22, H - 18);
-        }
-      }
+      ctx.setLineDash([]);
+      const ax = r.x + r.w / 2;
+      const ay = r.y - 16 + Math.sin(performance.now() / 180) * 6;
+      ctx.fillStyle = '#f0c36a';
+      ctx.strokeStyle = 'rgba(20,10,4,0.7)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + 14);
+      ctx.lineTo(ax - 11, ay - 4);
+      ctx.lineTo(ax + 11, ay - 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -4766,11 +5438,12 @@
       drawLanes();
       drawSparks();
       drawFloaters();
+      drawGuideWorld();
+      drawTip();
       if (state.phase === 'cutLesson') drawCutLesson();
 
       ctx.restore();
 
-      drawAppraisal();
       if (state.phase === 'play') drawStick();
     }
 
@@ -5126,6 +5799,11 @@
       if (el && el.hud) el.hud.classList.remove('hidden');
       state.cutLesson = null;
       state.phase = 'play';
+      if (state.guide && state.guide.step !== 'done') {
+        state.guide.step = 'order';
+        state.guide.orderT = 0;
+      }
+      if (!state.order) spawnParaOrder(state, true);
     }
 
     function drawCutLesson() {
@@ -5277,7 +5955,7 @@
       ctx.fillStyle = '#fde68a';
       ctx.font = '800 16px Pretendard, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('이 기계는 한 쌍의 대변을', cx, cy + 84);
+      ctx.fillText('이 공장은 한 쌍의 대변을', cx, cy + 84);
       ctx.fillText('평행하게 만들어 줍니다', cx, cy + 104);
       ctx.textAlign = 'left';
 
@@ -5351,14 +6029,38 @@
       sound.click();
       state = newState();
       state.phase = 'play';
+      camera.inited = false;
       const previewLv = Number((location.search.match(/[?&]preview=(\d+)/) || [])[1] || 0);
       if (previewLv >= 1) {
         const lv = Math.min(5, previewLv);
         state.owned = { parallel: lv, adjacent: lv, right: lv };
         state.gold = 9999;
         state.lessons.parallel = true;
+        state.guide.step = 'done';
+        state.guide.paraDone = true;
+        state.guide.diagShown = true;
         state.player.x = 470;
         state.player.y = 330;
+        if (/[?&]run=1(?:&|$)/.test(location.search)) {
+          state.previewHold = true;
+          ensureWorkshops(state);
+          MACHINES.forEach((m) => {
+            const ws = state.workshops[m.id];
+            let kind = Object.keys(m.ops)[0];
+            let next = m.ops[kind];
+            if (m.id === 'parallel' && /[?&]para=1(?:&|$)/.test(location.search)) {
+              kind = 'trap';
+              next = 'para';
+            }
+            ws.processing.push({
+              kind, seed: 7, target: next,
+              pts: shapeFor(kind, GEM_S, 7),
+              from: shapeFor(kind, GEM_S, 7),
+              to: shapeFor(next, GEM_S, 7),
+              t: 0.4, progress: 0.4
+            });
+          });
+        }
       }
       shopSig = '';
       startOverlay.classList.add('hidden');
@@ -5391,8 +6093,6 @@
         row.innerHTML = `${svgFor(kind, 20)}<span>${GEMS[kind].name} × ${n}</span>`;
         tally.appendChild(row);
       });
-
-      document.getElementById('closing-note').textContent = '어떤 문에 무엇을 넣었는지 떠올려 보세요.';
 
       resultOverlay.classList.remove('hidden');
       updateHud();
