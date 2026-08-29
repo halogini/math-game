@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/games/:game",
+      "destination": "/games/:game/index.html",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

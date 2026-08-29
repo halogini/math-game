@@ -1028,6 +1028,10 @@
       return path + 'assets/';
     })();
 
+    document.querySelectorAll('img.ico-bill').forEach((img) => {
+      img.src = ASSET_DIR + 'bill.png';
+    });
+
     const DIRS_8 = ['right','down-right','down','down-left','left','up-left','up','up-right'];
     const FACTORY_IDS = ['parallel', 'adjacent', 'right'];
     const art = {
@@ -4934,7 +4938,7 @@
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
       document.querySelector('#start-overlay .note')
-        .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}</b> <img class="ico-bill" src="assets/bill.png" alt="">`);
+        .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}</b> <img class="ico-bill" src="${ASSET_DIR}bill.png" alt="">`);
     }
     requestAnimationFrame(loop);
     loadArt().catch((err) => console.warn('PRISM TYCOON art load:', err));
