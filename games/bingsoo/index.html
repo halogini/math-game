@@ -169,7 +169,7 @@
           <form id="player-form">
             <div class="form-group">
               <label for="input-player-name" id="label-player-name">도전자 이름:</label>
-              <input type="text" id="input-player-name" class="form-input" value="도전자" placeholder="예: 홍길동" maxlength="12" />
+              <input type="text" id="input-player-name" class="form-input" value="도전자" placeholder="예: 홍길동" maxlength="12" required />
             </div>
             <div class="form-group" id="student-id-group">
               <label for="input-student-id">학번:</label>
@@ -178,6 +178,7 @@
             <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
               ⚡ 챔피언에 도전하기 (게임 시작)
             </button>
+            <p id="profile-err" class="profile-err"></p>
           </form>
         </div>
       </div>

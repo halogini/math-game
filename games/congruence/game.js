@@ -400,7 +400,7 @@ function initCongruenceGame() {
       }
       nameEl.placeholder = '닉네임 입력';
       nameEl.value = playerName;
-      nameEl.removeAttribute('required');
+      nameEl.setAttribute('required', '');
     } else {
       nameEl.value = playerName || '도전자';
     }
@@ -420,11 +420,16 @@ function initCongruenceGame() {
     const nameInput = document.getElementById('input-player-name');
     const idInput = document.getElementById('input-student-id');
 
+    const errEl = document.getElementById('profile-err');
+    const setErr = (t) => { if (errEl) errEl.textContent = t || ''; };
+
     let cleanName = sanitizeInput(nameInput ? nameInput.value : '', 12);
     if (!cleanName) {
-      cleanName = activeMode === 'dorms' ? randomDormsNickname() : '도전자';
-      if (nameInput) nameInput.value = cleanName;
+      setErr('닉네임을 입력해야 시작할 수 있습니다.');
+      if (nameInput) nameInput.focus();
+      return;
     }
+    setErr('');
 
     if (activeMode === 'school' && idInput) {
       let cleanId = sanitizeInput(idInput.value, 10);

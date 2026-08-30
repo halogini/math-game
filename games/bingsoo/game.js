@@ -202,7 +202,7 @@ function initBingsooGame() {
     if (resultLockedIdSpan) resultLockedIdSpan.style.display = 'none';
     if (labelPlayerName) labelPlayerName.textContent = '도전자 닉네임:';
     if (inputPlayerName) {
-      inputPlayerName.placeholder = '비워두면 랜덤 닉네임';
+      inputPlayerName.placeholder = '닉네임';
       if (!inputPlayerName.value && playerName) inputPlayerName.value = playerName;
     }
     if (inputStudentId) inputStudentId.removeAttribute('required');
@@ -250,12 +250,16 @@ function initBingsooGame() {
   // Form Submit Handler
   playerForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    const errEl = document.getElementById('profile-err');
+    const setErr = (t) => { if (errEl) errEl.textContent = t || ''; };
     const rawName = inputPlayerName ? inputPlayerName.value : '';
-    let cleanName = sanitizeInput(rawName, 12);
+    const cleanName = sanitizeInput(rawName, 12);
     if (!cleanName) {
-      cleanName = activeMode === 'dorms' ? randomDormsNickname() : '도전자';
-      if (inputPlayerName) inputPlayerName.value = cleanName;
+      setErr('닉네임을 입력해야 시작할 수 있습니다.');
+      if (inputPlayerName) inputPlayerName.focus();
+      return;
     }
+    setErr('');
 
     let cleanId = '';
     if (activeMode === 'school') {

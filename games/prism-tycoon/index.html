@@ -371,6 +371,46 @@
     .lb-table th, .lb-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(240, 195, 106, 0.14); }
     .lb-table th { color: var(--muted); font-size: 11px; }
     .lb-table td { color: var(--text); }
+    .opening-banner {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; margin: 4px 0 14px; text-align: center;
+    }
+    .opening-subtitle {
+      font: 800 12px Pretendard, sans-serif; color: #d97706;
+      background: #fef3c7; padding: 3px 10px; border-radius: 10px;
+    }
+    .opening-champ-heading {
+      margin: 0; font: 800 18px Pretendard, sans-serif; color: #7dd3fc;
+    }
+    .champ-card {
+      position: relative; width: 100%; overflow: hidden;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 14px;
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 2px solid #f59e0b;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.22);
+    }
+    .champ-trophy { font-size: 28px; z-index: 1; }
+    .champ-info { flex: 1; min-width: 0; text-align: left; z-index: 1; }
+    .champ-name {
+      display: block; font: 800 16px Pretendard, sans-serif; color: #78350f;
+    }
+    .champ-id {
+      display: block; margin-top: 2px;
+      font: 600 12px Pretendard, sans-serif; color: #92400e;
+    }
+    .champ-score {
+      font: 800 22px Outfit, Pretendard, sans-serif; color: #d97706;
+      white-space: nowrap; z-index: 1;
+    }
+    .champ-score small { font-size: 13px; margin-left: 2px; }
+    .btn-toggle-opening-leaderboard {
+      width: 100%; padding: 9px 12px; border-radius: 10px; cursor: pointer;
+      border: 1px solid #f59e0b; background: rgba(254, 243, 199, 0.12);
+      color: #f0c36a; font: 700 13px Pretendard, sans-serif;
+    }
+    .opening-banner .lb-box { width: 100%; margin-top: 0; }
+    .opening-banner .lb-box h3 { display: none; }
     .profile-form {
       display: grid; gap: 8px; margin-top: 12px;
       padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.2);
@@ -591,6 +631,37 @@
 
     <div class="overlay hidden" id="start-overlay">
       <div class="card">
+        <div class="opening-banner" id="opening-champ-banner">
+          <span class="opening-subtitle">1위 챔피언 도전!</span>
+          <p class="opening-champ-heading">👑 명예의 전당 랭킹 1위</p>
+          <div class="champ-card" id="champ-card-box">
+            <div class="champ-trophy">🥇</div>
+            <div class="champ-info">
+              <span class="champ-name" id="opening-champ-name">불러오는 중…</span>
+              <span class="champ-id" id="opening-champ-id"></span>
+            </div>
+            <div class="champ-score" id="opening-champ-score">—</div>
+          </div>
+          <button type="button" id="btn-toggle-opening-leaderboard" class="btn-toggle-opening-leaderboard">
+            🏆 명예의 전당 순위표 전체 보기
+          </button>
+          <div class="lb-box hidden" id="opening-lb-box">
+            <h3 id="opening-lb-title">🏆 명예의 전당 (Top 20)</h3>
+            <div class="lb-wrap">
+              <table class="lb-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-opening-id">학번</th>
+                    <th>총 수익</th>
+                  </tr>
+                </thead>
+                <tbody id="opening-leaderboard-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         <h1>보석 타이쿤</h1>
         <p class="tagline">보석동굴에서 정사각형 보석을 만들어라!<br>보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
         <div class="flow">
@@ -610,22 +681,6 @@
           </label>
           <p class="profile-err" id="profile-err"></p>
         </form>
-        <div class="lb-box" id="opening-lb-box">
-          <h3 id="opening-lb-title">🏆 명예의 전당 (Top 20)</h3>
-          <div class="lb-wrap">
-            <table class="lb-table">
-              <thead>
-                <tr>
-                  <th>순위</th>
-                  <th>이름</th>
-                  <th id="th-opening-id">학번</th>
-                  <th>총 수익</th>
-                </tr>
-              </thead>
-              <tbody id="opening-leaderboard-tbody"></tbody>
-            </table>
-          </div>
-        </div>
         <div class="load-wrap" id="load-wrap" aria-live="polite">
           <div class="load-track">
             <div class="load-fill" id="load-fill"></div>
@@ -768,14 +823,9 @@
       const idIn = document.getElementById('input-student-id');
       let cleanName = sanitizeInput(nameIn ? nameIn.value : playerName, 12);
       if (!cleanName) {
-        if (activeMode === 'dorms') {
-          cleanName = randomDormsNickname();
-          if (nameIn) nameIn.value = cleanName;
-        } else {
-          setErr('닉네임을 입력해야 시작할 수 있습니다.');
-          if (nameIn) nameIn.focus();
-          return false;
-        }
+        setErr('닉네임을 입력해야 시작할 수 있습니다.');
+        if (nameIn) nameIn.focus();
+        return false;
       }
       playerName = cleanName;
       try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
@@ -892,6 +942,33 @@
       }
     }
 
+    function renderOpeningChamp(list) {
+      const nameEl = document.getElementById('opening-champ-name');
+      const idEl = document.getElementById('opening-champ-id');
+      const scoreEl = document.getElementById('opening-champ-score');
+      const champ = list && list[0];
+      if (!champ) {
+        if (nameEl) nameEl.textContent = '아직 없음';
+        if (idEl) {
+          idEl.textContent = activeMode === 'school' ? '학번: —' : '';
+          idEl.style.display = activeMode === 'school' ? '' : 'none';
+        }
+        if (scoreEl) scoreEl.innerHTML = '0<small>💰</small>';
+        return;
+      }
+      if (nameEl) nameEl.textContent = champ.name || '도전자';
+      if (idEl) {
+        if (activeMode === 'school') {
+          idEl.style.display = '';
+          idEl.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
+        } else {
+          idEl.textContent = '';
+          idEl.style.display = 'none';
+        }
+      }
+      if (scoreEl) scoreEl.innerHTML = `${champ.score.toLocaleString()}<small>💰</small>`;
+    }
+
     async function loadLeaderboard() {
       const opening = document.getElementById('opening-leaderboard-tbody');
       const result = document.getElementById('result-leaderboard-tbody');
@@ -900,6 +977,7 @@
       if (result) result.innerHTML = emptyHint;
       const data = await fetchScoresMap();
       const list = collectTycoonScores(data || {});
+      renderOpeningChamp(list);
       renderLbRows(opening, list);
       renderLbRows(result, list);
     }
@@ -916,21 +994,22 @@
       const idIn = document.getElementById('input-student-id');
       const lead = document.getElementById('profile-lead');
       if (nameIn) {
-        if (activeMode === 'dorms') {
-          nameIn.placeholder = '비워두면 랜덤 닉네임';
-          nameIn.removeAttribute('required');
-        } else {
-          nameIn.placeholder = '1~12자';
-          nameIn.setAttribute('required', '');
-        }
+        nameIn.placeholder = '1~12자';
+        nameIn.setAttribute('required', '');
         if (playerName) nameIn.value = playerName;
       }
       if (idIn && studentId) idIn.value = studentId;
       if (lead) {
-        lead.textContent = showId
-          ? '이름과 학번을 입력해야 시작할 수 있습니다.'
-          : '닉네임을 비워두면 랜덤 닉네임이 지정됩니다.';
+        if (showId) {
+          lead.style.display = '';
+          lead.textContent = '이름과 학번을 입력해야 시작할 수 있습니다.';
+        } else {
+          lead.textContent = '';
+          lead.style.display = 'none';
+        }
       }
+      const champId = document.getElementById('opening-champ-id');
+      if (champId && !showId) champId.style.display = 'none';
       const title = activeMode === 'dorms' ? '🏆 dorms 명예의 전당 (Top 20)' : '🏆 명예의 전당 (Top 20)';
       const ot = document.getElementById('opening-lb-title');
       const rt = document.getElementById('result-lb-title');
@@ -946,10 +1025,6 @@
       playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || playerName || '', 12);
       if (activeMode === 'school') {
         studentId = sanitizeInput(localStorage.getItem(idStorageKey) || studentId || '', 10);
-      }
-      if (activeMode === 'dorms' && !playerName) {
-        playerName = randomDormsNickname();
-        try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
       }
       const setMsg = (text, kind) => {
         if (!msg) return;
@@ -7345,6 +7420,18 @@
 
     btnStart.addEventListener('click', start);
     document.getElementById('btn-restart').addEventListener('click', start);
+    const btnToggleOpeningLb = document.getElementById('btn-toggle-opening-leaderboard');
+    const openingLbBox = document.getElementById('opening-lb-box');
+    if (btnToggleOpeningLb && openingLbBox) {
+      btnToggleOpeningLb.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openingLbBox.classList.toggle('hidden');
+        btnToggleOpeningLb.textContent = openingLbBox.classList.contains('hidden')
+          ? '🏆 명예의 전당 순위표 전체 보기'
+          : '▲ 순위표 접기';
+      });
+    }
     const profileForm = document.getElementById('profile-form');
     if (profileForm) {
       profileForm.addEventListener('submit', (e) => {

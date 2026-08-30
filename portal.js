@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       modalTitle.textContent = '🌐 도전자 닉네임 설정';
       labelPlayerName.textContent = '도전자 닉네임:';
-      inputPlayerName.placeholder = '비워두면 랜덤 닉네임';
+      inputPlayerName.placeholder = '닉네임';
       if (inputPlayerName && !inputPlayerName.value && playerName) {
         inputPlayerName.value = playerName;
       }
@@ -237,13 +237,9 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     let cleanName = sanitizeInput(inputPlayerName.value, 12);
 
-    if (!cleanName && activeMode === 'dorms') {
-      cleanName = randomDormsNickname();
-      if (inputPlayerName) inputPlayerName.value = cleanName;
-    }
-
     if (!cleanName) {
-      alert('닉네임/이름을 올바르게 입력해 주세요.');
+      alert('닉네임을 입력해야 시작할 수 있습니다.');
+      if (inputPlayerName) inputPlayerName.focus();
       return;
     }
 

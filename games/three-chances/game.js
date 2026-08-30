@@ -5617,8 +5617,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   profileForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    playerName = sanitizeInput(document.getElementById("input-player-name").value)
-      || (activeMode === "dorms" ? randomDormsNickname() : "도전자");
+    const nameField = document.getElementById("input-player-name");
+    const errEl = document.getElementById("profile-err");
+    const cleanName = sanitizeInput(nameField ? nameField.value : "");
+    if (!cleanName) {
+      if (errEl) errEl.textContent = "닉네임을 입력해야 시작할 수 있습니다.";
+      if (nameField) nameField.focus();
+      return;
+    }
+    if (errEl) errEl.textContent = "";
+    playerName = cleanName;
     if (activeMode === "dorms") {
       studentId = "";
     } else {
@@ -5685,7 +5693,8 @@ document.addEventListener("DOMContentLoaded", () => {
       labelName.textContent = "";
       labelName.append("닉네임");
       if (nameInput) {
-        nameInput.placeholder = "비워두면 랜덤 닉네임";
+        nameInput.placeholder = "닉네임 입력";
+        nameInput.setAttribute("required", "");
         labelName.appendChild(document.createTextNode(" "));
         labelName.appendChild(nameInput);
       }
