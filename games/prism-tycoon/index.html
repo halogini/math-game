@@ -709,6 +709,12 @@
       if (typeof str !== 'string') return '';
       return str.replace(/[<>'"/]/g, '').trim().slice(0, maxLen);
     }
+    function randomDormsNickname() {
+      const prefixes = ['도름', '별빛', '반짝', '똑똑', '신난', '고냥', '빙수', '프라즘'];
+      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const num = String(Math.floor(10 + Math.random() * 90));
+      return sanitizeInput(prefix + num, 12);
+    }
     function escapeHtml(str) {
       if (str == null) return '';
       return String(str).replace(/[&<>"']/g, (m) => ({
@@ -729,6 +735,10 @@
     const idStorageKey = `halomath_id_${activeMode}`;
     let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
     let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
+    if (activeMode === 'dorms' && !playerName) {
+      playerName = randomDormsNickname();
+      try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
+    }
 
     function isDevPreview() {
       return /[?&]preview=\d+/.test(location.search);
@@ -756,11 +766,16 @@
       if (isDevPreview()) return true;
       const nameIn = document.getElementById('input-player-name');
       const idIn = document.getElementById('input-student-id');
-      const cleanName = sanitizeInput(nameIn ? nameIn.value : playerName, 12);
+      let cleanName = sanitizeInput(nameIn ? nameIn.value : playerName, 12);
       if (!cleanName) {
-        setErr('닉네임을 입력해야 시작할 수 있습니다.');
-        if (nameIn) nameIn.focus();
-        return false;
+        if (activeMode === 'dorms') {
+          cleanName = randomDormsNickname();
+          if (nameIn) nameIn.value = cleanName;
+        } else {
+          setErr('닉네임을 입력해야 시작할 수 있습니다.');
+          if (nameIn) nameIn.focus();
+          return false;
+        }
       }
       playerName = cleanName;
       try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
@@ -900,12 +915,21 @@
       const nameIn = document.getElementById('input-player-name');
       const idIn = document.getElementById('input-student-id');
       const lead = document.getElementById('profile-lead');
-      if (nameIn && playerName) nameIn.value = playerName;
+      if (nameIn) {
+        if (activeMode === 'dorms') {
+          nameIn.placeholder = '비워두면 랜덤 닉네임';
+          nameIn.removeAttribute('required');
+        } else {
+          nameIn.placeholder = '1~12자';
+          nameIn.setAttribute('required', '');
+        }
+        if (playerName) nameIn.value = playerName;
+      }
       if (idIn && studentId) idIn.value = studentId;
       if (lead) {
         lead.textContent = showId
           ? '이름과 학번을 입력해야 시작할 수 있습니다.'
-          : '랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.';
+          : '닉네임을 비워두면 랜덤 닉네임이 지정됩니다.';
       }
       const title = activeMode === 'dorms' ? '🏆 dorms 명예의 전당 (Top 20)' : '🏆 명예의 전당 (Top 20)';
       const ot = document.getElementById('opening-lb-title');
@@ -922,6 +946,10 @@
       playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || playerName || '', 12);
       if (activeMode === 'school') {
         studentId = sanitizeInput(localStorage.getItem(idStorageKey) || studentId || '', 10);
+      }
+      if (activeMode === 'dorms' && !playerName) {
+        playerName = randomDormsNickname();
+        try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
       }
       const setMsg = (text, kind) => {
         if (!msg) return;
