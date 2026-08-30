@@ -3178,6 +3178,10 @@
 
     function queueDiagHint(s) {
       if (!s.guide || s.guide.diagShown) return;
+      if (!s.guide.paraDone) {
+        s.guide.pendingDiag = true;
+        return;
+      }
       s.guide.diagShown = true;
       if (s.guide.step === 'orderTime') s.guide.pendingOrderTime = true;
       s.guide.step = 'diagHint';
@@ -3874,8 +3878,9 @@
               if (s.guide) s.guide.paraDone = true;
               s.order = null;
               if (firstOrder) {
-                if (hasQuadProps(gem.kind) && !s.guide.diagShown) {
+                if (s.guide.pendingDiag || (hasQuadProps(gem.kind) && !s.guide.diagShown)) {
                   s.guide.pendingOrderTime = true;
+                  queueDiagHint(s);
                 } else {
                   s.guide.step = 'orderTime';
                   s.guide.orderT = 0;
@@ -4028,19 +4033,16 @@
       let step = s.guide.step;
 
       if (s.owned.parallel >= 1 && s.lessons.parallel) {
-        if (step === 'orderTime' || step === 'done' || step === 'diagHint') {
-          // keep
-        } else if (!s.guide.paraDone && step !== 'order') {
+        if (s.guide.paraDone && (step === 'orderTime' || step === 'done' || step === 'diagHint')) {
+          // keep post-order hints
+        } else if (!s.guide.paraDone) {
+          if (step !== 'order' && !s.order) spawnParaOrder(s, true);
           step = 'order';
-          s.guide.orderT = 0;
-          if (!s.order) spawnParaOrder(s, true);
         }
       } else if (s.owned.parallel >= 1 && !s.lessons.parallel) {
         step = raw >= 1 ? 'feed' : 'remine';
-      } else if (s.gold >= cost && raw >= 1) {
-        step = 'buy';
       } else if (s.gold >= cost) {
-        step = 'remine';
+        step = 'buy';
       } else if (total >= cost && s.gold < cost) {
         step = 'cash';
       } else if (raw >= oreNeed || bagFull || (raw > 0 && inRect(s.player, MARKET_PAD))) {
@@ -6093,8 +6095,8 @@
       const lv = mLv(m.id);
       const owned = lv >= 1;
       const onIn = owned && inRect(state.player, m.input);
-      const lure = !owned && !mLv('parallel') && state.carry.some((g) => g.kind === 'raw')
-        && state.guide && (state.guide.step === 'buy' || state.guide.step === 'feed');
+      const lure = !owned && !mLv('parallel') && state.guide
+        && (state.guide.step === 'buy' || (state.guide.step === 'feed' && state.carry.some((g) => g.kind === 'raw')));
       const ws = state.workshops[m.id];
       const inWarn = warnOn('in:' + m.id);
 
