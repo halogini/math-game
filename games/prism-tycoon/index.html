@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>보석 타이쿤 | 할로매쓰</title>
-  <meta name="description" content="보석 타이쿤 — 보석동굴에서 정사각형 보석을 만들어라! 보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
+  <meta name="description" content="보석 타이쿤 — 동굴이 무너지기 전에 최대한 많은 정사각형 보석을 만들어라!">
   <meta property="og:title" content="보석 타이쿤">
-  <meta property="og:description" content="보석 타이쿤. 보석동굴에서 정사각형 보석을 만들고 파세요. 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
+  <meta property="og:description" content="보석 타이쿤. 동굴이 무너지기 전에 최대한 많은 정사각형 보석을 만들어라!">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -103,7 +103,6 @@
       vertical-align: middle; flex-shrink: 0;
     }
     .ico-bill-lg { width: 42px; height: 42px; }
-    .flow .ico-bill { width: 20px; height: 20px; margin-top: 1px; }
     .buy .cost {
       display: inline-flex; align-items: center; gap: 4px;
     }
@@ -274,25 +273,41 @@
     .buy.owned .cost { color: var(--teal); }
 
     .overlay {
-      position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
-      padding: 16px; background: rgba(8, 4, 18, 0.58); backdrop-filter: blur(5px); overflow-y: auto;
+      position: absolute; inset: 0; z-index: 50; display: flex;
+      align-items: flex-start; justify-content: center;
+      padding: 16px; background: rgba(8, 4, 18, 0.58); backdrop-filter: blur(5px);
+      overflow-x: hidden; overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
+    #result-overlay .result-card { width: min(580px, 100%); }
     .card {
       width: min(520px, 100%); background: #1a1026; border: 1px solid var(--line);
       border-radius: 20px; padding: 22px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      margin-block: auto;
     }
-    .card h1 { margin: 0; font: 800 36px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.04em; line-height: 1.2; }
-    .card .tagline { margin: 8px 0 16px; font: 700 14px Pretendard, sans-serif; color: #f0c36a; line-height: 1.55; }
+    .card h1 { margin: 0; font: 800 36px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.04em; line-height: 1.2; text-align: center; }
     .card h2 { margin: 0 0 6px; font: 800 28px Pretendard, sans-serif; color: var(--gold); text-align: center; letter-spacing: 0.04em; }
-    .flow { display: grid; gap: 7px; margin-bottom: 14px; }
-    .flow div {
-      display: flex; gap: 8px; align-items: baseline;
-      font: 600 13px Pretendard, sans-serif; color: var(--muted); line-height: 1.5;
+    .game-guide-box.short-banner {
+      margin: 4px 0 12px; padding: 10px 12px;
+      text-align: center;
+      background: rgba(232, 195, 106, 0.1);
+      border: 1px solid var(--line);
+      border-radius: 12px;
     }
-    .flow b { color: #f8fafc; }
-    .note {
-      font: 600 12px Pretendard, sans-serif; color: var(--muted);
-      border-top: 1px solid rgba(148, 163, 184, 0.2); padding-top: 10px; line-height: 1.6;
+    .game-guide-box .guide-title {
+      font: 800 22px Pretendard, sans-serif;
+      color: var(--gold); letter-spacing: 0.04em; margin-bottom: 4px;
+    }
+    .game-guide-box .guide-desc {
+      margin: 0;
+      font: 700 13px Pretendard, sans-serif;
+      color: #f5e9d6; line-height: 1.45;
+    }
+    .game-guide-box .guide-best {
+      margin: 6px 0 0;
+      font: 700 12px Pretendard, sans-serif;
+      color: var(--gold);
     }
     .btn-main {
       display: block; width: 100%; margin-top: 14px; padding: 14px;
@@ -345,9 +360,113 @@
     }
     .final .big { font: 800 46px Outfit, sans-serif; color: var(--gold); line-height: 1.1; }
     .final .sub { font: 700 13px Pretendard, sans-serif; color: var(--muted); }
-    .record { margin-top: 8px; font: 800 14px Pretendard, sans-serif; color: var(--teal); }
-    .tally { display: grid; gap: 5px; margin-bottom: 12px; }
-    .tally div { display: flex; align-items: center; gap: 8px; font: 600 13px Pretendard, sans-serif; }
+    .result-header { text-align: center; margin: 0 0 8px; }
+    .trophy-anim {
+      display: block; font-size: 42px; line-height: 1;
+      margin-bottom: 6px;
+      animation: floatBounce 2s ease-in-out infinite;
+    }
+    @keyframes floatBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .result-flavor {
+      margin: 4px 0 0;
+      font: 700 13px Pretendard, sans-serif;
+      color: var(--muted); line-height: 1.4;
+    }
+    .record {
+      margin: 0 0 10px; padding: 8px 10px;
+      text-align: center;
+      font: 800 14px Pretendard, sans-serif; color: #2a1608;
+      background: linear-gradient(135deg, #f0c36a, #e8a54b);
+      border-radius: 10px;
+    }
+    .result-gems {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+      margin: 0 0 12px;
+    }
+    .result-gem {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 2px 5px;
+      background: rgba(232, 195, 106, 0.1);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .result-gem.miss { opacity: 0.4; filter: grayscale(0.4); }
+    .result-gem span {
+      font: 800 11px Outfit, Pretendard, sans-serif;
+      color: var(--gold);
+    }
+    .my-rank-card {
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center;
+      gap: 4px 10px;
+      margin: 0 0 12px; padding: 10px 12px;
+      background: linear-gradient(135deg, rgba(240, 195, 106, 0.2), rgba(76, 29, 149, 0.4));
+      border: 1px solid var(--gold);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .my-rank-kicker {
+      width: 100%;
+      font: 800 11px Pretendard, sans-serif;
+      color: var(--muted); letter-spacing: 0.06em;
+    }
+    .my-rank-place {
+      font: 800 28px Outfit, Pretendard, sans-serif;
+      color: var(--gold); line-height: 1.1;
+    }
+    .my-rank-detail {
+      width: 100%;
+      font: 700 12px Pretendard, sans-serif;
+      color: var(--text);
+    }
+    .lb-table tr.me td { background: rgba(240, 195, 106, 0.16); color: var(--gold); font-weight: 800; }
+    .album-wrap { margin: 0 0 12px; }
+    .album-title {
+      margin: 0 0 4px; font: 800 14px Pretendard, sans-serif;
+      color: var(--gold); text-align: center;
+    }
+    .album-lead {
+      margin: 0 0 10px; text-align: center;
+      font: 600 12px Pretendard, sans-serif; color: var(--muted); line-height: 1.45;
+    }
+    .album {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .album-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 6px 8px;
+      background: rgba(232, 195, 106, 0.08);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      text-align: center;
+      min-width: 0;
+    }
+    .album-card.got { background: rgba(232, 195, 106, 0.14); }
+    .album-card.miss { opacity: 0.48; filter: grayscale(0.35); }
+    .album-card svg { display: block; flex-shrink: 0; }
+    .album-card .name {
+      font: 800 12px Pretendard, sans-serif; color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    .album-card .diag {
+      font: 600 10px Pretendard, sans-serif; color: #fde68a;
+      line-height: 1.35; min-height: 2.6em;
+    }
+    .album-card .count {
+      font: 800 12px Outfit, Pretendard, sans-serif; color: var(--gold);
+    }
+    .album-card .sold-n {
+      font: 600 10px Pretendard, sans-serif; color: var(--muted);
+    }
+    .album-card .miss-label {
+      font: 700 11px Pretendard, sans-serif; color: var(--muted);
+    }
     .btn-rank {
       display: block; width: 100%; margin-top: 8px; padding: 11px;
       font: 800 15px Pretendard, sans-serif; cursor: pointer;
@@ -355,6 +474,21 @@
       border-radius: 12px; color: #f5e9d6;
     }
     .btn-rank:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result-nav {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 4px 0 10px;
+    }
+    .result-nav .btn-rank { margin-top: 0; min-height: 48px; }
+    .btn-back {
+      display: inline-flex; align-items: center;
+      margin: 0 0 10px; padding: 6px 0;
+      font: 800 13px Pretendard, sans-serif; cursor: pointer;
+      background: none; border: none; color: var(--teal);
+    }
+    .result-panel { min-width: 0; }
+    .lb-wrap { max-height: min(48vh, 320px); overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
     .rank-status {
       min-height: 1.4em; margin: 8px 0 0; text-align: center;
       font: 600 12px Pretendard, sans-serif; color: var(--muted);
@@ -366,7 +500,7 @@
       margin: 0 0 8px; font: 800 14px Pretendard, sans-serif;
       color: var(--gold); text-align: center;
     }
-    .lb-wrap { max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .lb-box { margin-top: 4px; }
     .lb-table { width: 100%; border-collapse: collapse; font: 600 12px Pretendard, sans-serif; }
     .lb-table th, .lb-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(240, 195, 106, 0.14); }
     .lb-table th { color: var(--muted); font-size: 11px; }
@@ -531,24 +665,45 @@
       .shop { width: min(220px, 60vw); max-height: 36vh; padding: 5px; }
 
       /* Mobile landscape overlay card optimizations */
-      .overlay { padding: 8px 16px; }
+      .overlay {
+        padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+          max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+      }
       .card {
         width: min(540px, 94vw);
         padding: 12px 18px;
         border-radius: 14px;
-        max-height: 94vh;
-        overflow-y: auto;
       }
+      #result-overlay {
+        align-items: flex-start;
+        padding-right: max(56px, env(safe-area-inset-right));
+      }
+      #result-overlay .result-card {
+        width: min(640px, 100%);
+        max-height: none;
+        height: auto;
+        margin-block: auto;
+        overflow: visible;
+        display: block;
+      }
+      .trophy-anim { font-size: 28px; margin-bottom: 2px; }
+      .result-flavor { font-size: 12px; }
+      .result-gems { margin-bottom: 8px; }
+      .result-gem { padding: 4px 1px 3px; }
+      .result-gem span { font-size: 10px; }
+      .result-gem svg { width: 22px; height: 22px; }
+      .record { margin-bottom: 6px; padding: 5px 8px; font-size: 12px; }
+      .my-rank-place { font-size: 22px; }
+      .my-rank-detail { font-size: 11px; }
+      .result-nav .btn-rank { min-height: 40px; padding: 8px 8px; font-size: 13px; }
+      .btn-back { margin-bottom: 6px; font-size: 12px; }
+      #result-album .album-wrap { margin: 0; }
+      #result-hall .lb-wrap { max-height: min(58vh, 280px); }
       .card h1 { font-size: 26px; }
       .card h2 { font-size: 22px; margin: 0 0 4px; }
-      .card .tagline { margin: 2px 0 8px; font-size: 12px; }
-      .flow {
-        grid-template-columns: 1fr 1fr;
-        gap: 4px 12px;
-        margin-bottom: 6px;
-      }
-      .flow div { font-size: 11px; gap: 5px; line-height: 1.35; }
-      .note { font-size: 11px; padding-top: 6px; line-height: 1.4; }
+      .game-guide-box.short-banner { margin: 2px 0 8px; padding: 6px 10px; }
+      .game-guide-box .guide-title { font-size: 18px; margin-bottom: 2px; }
+      .game-guide-box .guide-desc { font-size: 12px; }
       .btn-main {
         margin-top: 8px;
         padding: 9px 12px;
@@ -565,14 +720,15 @@
       }
       .final .big { font-size: 28px; }
       .final .sub { font-size: 11px; }
-      .tally {
-        grid-template-columns: 1fr 1fr;
-        gap: 3px 10px;
-        margin-bottom: 6px;
-        max-height: 72px;
-        overflow-y: auto;
-      }
-      .tally div { font-size: 11px; gap: 5px; }
+      .album-wrap { margin-bottom: 8px; }
+      .album-title { font-size: 13px; }
+      .album-lead { font-size: 11px; margin-bottom: 6px; }
+      .album { gap: 5px; }
+      .album-card { padding: 6px 4px 6px; border-radius: 10px; gap: 2px; }
+      .album-card .name { font-size: 11px; }
+      .album-card .diag { font-size: 9px; min-height: 0; }
+      .album-card .count { font-size: 11px; }
+      .album-card svg { width: 28px; height: 28px; }
     }
     @media (max-width: 620px) {
       .hud-title { display: none; }
@@ -622,7 +778,7 @@
       <div class="opening-ui">
         <div class="opening-brand">
           <p class="logo">보석 타이쿤</p>
-          <p class="hook">보석동굴에서 정사각형 보석을 만들어라!<br>보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
+          <p class="hook">동굴이 무너지기 전에 최대한 많은 정사각형 보석을 만들어라!</p>
         </div>
         <button type="button" class="opening-play" id="btn-opening-play">오프닝 보기</button>
         <button type="button" class="opening-skip" id="btn-opening-skip">건너뛰기</button>
@@ -662,15 +818,10 @@
             </div>
           </div>
         </div>
-        <h1>보석 타이쿤</h1>
-        <p class="tagline">보석동굴에서 정사각형 보석을 만들어라!<br>보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
-        <div class="flow">
-          <div><span>⛏️</span><b>광맥</b><span>밟으면 원석이 등에 쌓입니다</span></div>
-          <div><span>🏭</span><b>공장</b><span>↑(입구)에 넣고 ↓(출구)에서 꺼냅니다</span></div>
-          <div><img class="ico-bill" src="assets/bill.png" alt=""><b>판매대</b><span>쌓인 보석을 팝니다</span></div>
-          <div><span>⬆️</span><b>업그레이드</b><span>공장 앞에서 사고 강화합니다</span></div>
+        <div class="game-guide-box short-banner">
+          <div class="guide-title">보석 타이쿤</div>
+          <p class="guide-desc">동굴이 무너지기 전에 최대한 많은 정사각형 보석을 만들어라!</p>
         </div>
-        <div class="note" id="move-note">WASD(방향키), 드래그, 클릭으로 이동.</div>
         <form id="profile-form" class="profile-form" autocomplete="on">
           <p class="profile-lead" id="profile-lead">랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.</p>
           <label id="label-player-name">닉네임
@@ -692,35 +843,65 @@
     </div>
 
     <div class="overlay hidden" id="result-overlay">
-      <div class="card">
-        <h2>보석 타이쿤</h2>
-        <div class="final">
-          <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
-          <div class="sub">5분간 모은 금액</div>
-          <div class="sub" id="result-player"></div>
-          <div class="record hidden" id="record-badge">🏆 최고 기록 달성!</div>
-          <div class="sub" id="best-line">최고 기록 0</div>
+      <div class="card result-card">
+        <div id="result-home">
+          <div class="result-header">
+            <span class="trophy-anim" id="result-trophy" aria-hidden="true">💎</span>
+            <h2 id="result-title">주어진 시간 끝!</h2>
+            <p class="result-flavor" id="result-flavor">동굴이 무너지기 직전에 서둘러 빠져나왔습니다.</p>
+          </div>
+          <div class="final">
+            <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
+            <div class="sub">5분간 모은 금액</div>
+            <div class="sub" id="result-player"></div>
+            <div class="sub" id="best-line">최고 기록 0</div>
+          </div>
+          <div class="record hidden" id="record-badge">🎉 최고 기록 달성!</div>
+          <div class="result-gems" id="result-gems" aria-hidden="true"></div>
+          <div class="my-rank-card" id="my-rank-home">
+            <span class="my-rank-kicker">나의 순위</span>
+            <span class="my-rank-place">—</span>
+            <span class="my-rank-detail"></span>
+          </div>
+          <div class="result-nav">
+            <button type="button" class="btn-rank" id="btn-view-album">이번 동굴의 사각형 보기</button>
+            <button type="button" class="btn-rank" id="btn-view-hall">명예의 전당 보기</button>
+          </div>
+          <p class="rank-status" id="rank-status"></p>
+          <button class="btn-main" id="btn-restart">다시 도전하기</button>
         </div>
-        <div class="tally" id="tally"></div>
-        <button type="button" class="btn-rank" id="btn-send-rank">랭킹 등록하기</button>
-        <p class="rank-status" id="rank-status"></p>
-        <div class="lb-box">
-          <h3 id="result-lb-title">🏆 명예의 전당 (Top 20)</h3>
-          <div class="lb-wrap">
-            <table class="lb-table">
-              <thead>
-                <tr>
-                  <th>순위</th>
-                  <th>이름</th>
-                  <th id="th-result-id">학번</th>
-                  <th>총 수익</th>
-                </tr>
-              </thead>
-              <tbody id="result-leaderboard-tbody"></tbody>
-            </table>
+        <div class="result-panel hidden" id="result-album">
+          <button type="button" class="btn-back" id="btn-album-back">← 결과로 돌아가기</button>
+          <div class="album-wrap">
+            <h3 class="album-title">이번 동굴의 사각형</h3>
+            <p class="album-lead" id="album-lead"></p>
+            <div class="album" id="tally"></div>
           </div>
         </div>
-        <button class="btn-main" id="btn-restart">다시 도전하기</button>
+        <div class="result-panel hidden" id="result-hall">
+          <button type="button" class="btn-back" id="btn-hall-back">← 결과로 돌아가기</button>
+          <div class="my-rank-card" id="my-rank-hall">
+            <span class="my-rank-kicker">나의 순위</span>
+            <span class="my-rank-place">—</span>
+            <span class="my-rank-detail"></span>
+          </div>
+          <div class="lb-box">
+            <h3 id="result-lb-title">🏆 명예의 전당 (Top 20)</h3>
+            <div class="lb-wrap">
+              <table class="lb-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-result-id">학번</th>
+                    <th>총 수익</th>
+                  </tr>
+                </thead>
+                <tbody id="result-leaderboard-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -797,6 +978,9 @@
 
     function isDevPreview() {
       return /[?&]preview=\d+/.test(location.search);
+    }
+    function isResultPreview() {
+      return /[?&]result=1(?:&|$)/.test(location.search);
     }
     function hasValidProfile() {
       if (isDevPreview()) return true;
@@ -886,7 +1070,7 @@
         });
       };
       visit(dataObj, false);
-      return Array.from(bestMap.values()).sort((a, b) => b.score - a.score).slice(0, 20);
+      return Array.from(bestMap.values()).sort((a, b) => b.score - a.score);
     }
 
     function withCompetitionRanks(list) {
@@ -905,7 +1089,46 @@
       return list.map((item, i) => ({ item, rank: ranks[i], tied: counts[ranks[i]] > 1 }));
     }
 
-    function renderLbRows(tbody, list) {
+    function myPlayerKey() {
+      const name = sanitizeInput(playerName || '', 12);
+      if (!name) return '';
+      const sid = activeMode === 'school' ? sanitizeInput(studentId || '', 10) : 'DORMS';
+      return playerRecordKey(name, sid);
+    }
+
+    function findMyRank(fullList) {
+      const myKey = myPlayerKey();
+      if (!myKey || !fullList || !fullList.length) return null;
+      return withCompetitionRanks(fullList).find(
+        ({ item }) => playerRecordKey(item.name, item.studentId) === myKey
+      ) || null;
+    }
+
+    function renderMyRank(fullList) {
+      const list = fullList || [];
+      const mine = findMyRank(list);
+      const total = list.length;
+      const preview = !!(state && state.resultPreview);
+      document.querySelectorAll('.my-rank-card').forEach((card) => {
+        const place = card.querySelector('.my-rank-place');
+        const detail = card.querySelector('.my-rank-detail');
+        if (!place || !detail) return;
+        if (!mine) {
+          place.textContent = '—';
+          detail.textContent = preview
+            ? '미리보기 · 저장된 최고 기록이 없습니다.'
+            : (playerName ? '최고 기록을 불러오는 중…' : '닉네임을 입력하면 순위가 표시됩니다.');
+          return;
+        }
+        const tied = mine.tied ? '공동 ' : '';
+        place.textContent = `${tied}${mine.rank}위`;
+        const out = mine.rank > 20 ? ' · Top 20 밖' : '';
+        const hint = preview ? ' · 미리보기' : '';
+        detail.textContent = `최고 기록 ${mine.item.score.toLocaleString()} 💰 · 전체 ${total.toLocaleString()}명 중${out}${hint}`;
+      });
+    }
+
+    function renderLbRows(tbody, list, highlightKey) {
       if (!tbody) return;
       const colSpan = activeMode === 'school' ? 4 : 3;
       tbody.removeAttribute('aria-busy');
@@ -914,9 +1137,10 @@
         return;
       }
       tbody.innerHTML = withCompetitionRanks(list).map(({ item, rank, tied }) => {
+        const me = highlightKey && playerRecordKey(item.name, item.studentId) === highlightKey;
         const idTd = activeMode === 'school' ? `<td>${escapeHtml(item.studentId || '미입력')}</td>` : '';
         const label = tied ? `공동 ${rank}위` : `${rank}위`;
-        return `<tr><td>${label}</td><td>${escapeHtml(item.name)}</td>${idTd}<td>${item.score.toLocaleString()} 💰</td></tr>`;
+        return `<tr${me ? ' class="me"' : ''}><td>${label}</td><td>${escapeHtml(item.name)}</td>${idTd}<td>${item.score.toLocaleString()} 💰</td></tr>`;
       }).join('');
     }
 
@@ -976,10 +1200,13 @@
       if (opening) opening.innerHTML = emptyHint;
       if (result) result.innerHTML = emptyHint;
       const data = await fetchScoresMap();
-      const list = collectTycoonScores(data || {});
-      renderOpeningChamp(list);
-      renderLbRows(opening, list);
-      renderLbRows(result, list);
+      const saved = collectTycoonScores(data || {});
+      const top = saved.slice(0, 20);
+      const myKey = myPlayerKey();
+      renderOpeningChamp(top);
+      renderLbRows(opening, top, myKey);
+      renderLbRows(result, top, myKey);
+      renderMyRank(saved);
     }
 
     function syncRankUi() {
@@ -1021,6 +1248,13 @@
     async function submitRank() {
       const msg = document.getElementById('rank-status');
       const btn = document.getElementById('btn-send-rank');
+      if (isResultPreview() || (state && state.resultPreview)) {
+        if (msg) {
+          msg.textContent = '테스트 화면에서는 랭킹에 등록되지 않습니다.';
+          msg.className = 'rank-status ok';
+        }
+        return;
+      }
       const gold = Math.max(0, Math.floor(Number(state && state.gold) || 0));
       playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || playerName || '', 12);
       if (activeMode === 'school') {
@@ -2895,6 +3129,7 @@
         owned: { parallel: 0, adjacent: 0, right: 0 },
         workshops: {},
         sold: {},
+        made: {},
         mineT: 0, depositT: 0, collectT: 0, sellT: 0, bagT: 0, buyT: {},
         earnFlash: 0, lastEarn: 0, poorFlash: 0,
         fullFlash: 0, fullRest: 0, warnKey: '', warnKeys: [],
@@ -3077,6 +3312,10 @@
     function checkOrientation() {
       const gate = document.getElementById('rotate-gate');
       if (!gate) return;
+      if (isResultPreview()) {
+        gate.classList.add('hidden');
+        return;
+      }
       const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth < 800;
       gate.classList.toggle('hidden', !isPortrait);
     }
@@ -3446,6 +3685,7 @@
           }
           const seed = s.seed++;
           s.carry.push({ kind: 'raw', seed, pts: shapeFor('raw', GEM_S, seed), from: null, to: null, t: 1 });
+          noteMade(s, 'raw');
           pluckOreFromPile(s);
           spawnOreFromCave(s, Math.random() < 0.4 ? 2 : 1);
           addSparks(MINE_VEIN.x + MINE_VEIN.w / 2, MINE_VEIN.y + 20, '#a5b4fc', 3);
@@ -3535,6 +3775,7 @@
             const slot = shelfSlot(m.output, ws.output.length);
             startFly(out, bodyCx, bodyCy, slot.x, slot.y);
             ws.output.push(out);
+            noteMade(s, out.kind);
             s.glow[m.id] = 1;
             addSparks(slot.x, slot.y, GEMS[out.kind].line, 8);
             sound.craft(out.kind);
@@ -3735,6 +3976,12 @@
       }
       if (s.tip && s.tip.text === text) return;
       s.tip = { text, t: 0, max: max == null ? 999 : max };
+    }
+
+    function noteMade(s, kind) {
+      if (!s || !kind || !GEMS[kind]) return;
+      s.made = s.made || {};
+      s.made[kind] = (s.made[kind] || 0) + 1;
     }
 
     function celebrateFirstMake(s, kind) {
@@ -7241,6 +7488,7 @@
         try { openingVideo.removeAttribute('src'); openingVideo.load(); } catch (_) {}
       }
       openingEl.classList.add('hidden');
+      if (isResultPreview()) return;
       if (startOverlay) startOverlay.classList.remove('hidden');
     }
 
@@ -7268,7 +7516,19 @@
     }
     if (btnOpeningPlay) btnOpeningPlay.addEventListener('click', playOpening);
     if (btnOpeningSkip) btnOpeningSkip.addEventListener('click', finishOpening);
-    if (/[?&](skipopen|preview)=/.test(location.search)) finishOpening();
+    if (/[?&](skipopen|preview|result)=/.test(location.search)) finishOpening();
+
+    function openResultPreview() {
+      state = newState();
+      state.resultPreview = true;
+      state.gold = 1840;
+      state.made = { raw: 14, trap: 9, para: 6, rhombus: 3, rect: 0, square: 1 };
+      state.sold = { raw: 5, trap: 7, para: 4, rhombus: 2, square: 1 };
+      if (openingEl) openingEl.classList.add('hidden');
+      if (startOverlay) startOverlay.classList.add('hidden');
+      checkOrientation();
+      finish();
+    }
 
     function start() {
       if (!loadTrack.ready) return;
@@ -7319,6 +7579,39 @@
       syncFullscreenBtn();
     }
 
+    function showResultPanel(name) {
+      const home = document.getElementById('result-home');
+      const album = document.getElementById('result-album');
+      const hall = document.getElementById('result-hall');
+      if (home) home.classList.toggle('hidden', name !== 'home');
+      if (album) album.classList.toggle('hidden', name !== 'album');
+      if (hall) hall.classList.toggle('hidden', name !== 'hall');
+      if (resultOverlay) resultOverlay.scrollTop = 0;
+    }
+
+    function fillResultHome(isRecord) {
+      const made = (state && state.made) || {};
+      const trophy = document.getElementById('result-trophy');
+      const title = document.getElementById('result-title');
+      const flavor = document.getElementById('result-flavor');
+      if (trophy && title && flavor) {
+        trophy.textContent = isRecord ? '🏆' : '💎';
+        title.textContent = '주어진 시간 끝!';
+        flavor.textContent = '동굴이 무너지기 직전에 서둘러 빠져나왔습니다.';
+      }
+      const gems = document.getElementById('result-gems');
+      if (gems) {
+        gems.innerHTML = '';
+        Object.keys(GEMS).forEach((kind) => {
+          const n = made[kind] || 0;
+          const cell = document.createElement('div');
+          cell.className = 'result-gem' + (n ? '' : ' miss');
+          cell.innerHTML = `${svgFor(kind, 26)}<span>${n ? '×' + n : '—'}</span>`;
+          gems.appendChild(cell);
+        });
+      }
+    }
+
     function finish() {
       state.phase = 'over';
       stick = null;
@@ -7326,23 +7619,49 @@
       el.shop.classList.add('hidden');
       if (el && el.hud) el.hud.classList.add('hidden');
 
+      const preview = !!(state && state.resultPreview);
       const best = Number(localStorage.getItem(BEST_KEY) || 0);
-      const isRecord = state.gold > best;
+      const isRecord = !preview && state.gold > best;
       if (isRecord) localStorage.setItem(BEST_KEY, String(state.gold));
 
       document.getElementById('final-gold').textContent = state.gold;
       syncPlayerDisplays();
       document.getElementById('record-badge').classList.toggle('hidden', !isRecord);
-      document.getElementById('best-line').innerHTML = '최고 기록 ' + Math.max(best, state.gold);
+      document.getElementById('best-line').innerHTML = preview
+        ? '미리보기 · 랭킹 미등록'
+        : ('최고 기록 ' + Math.max(best, state.gold));
+      fillResultHome(isRecord);
+
+      const madeMap = (state && state.made) || {};
+      const albumLead = document.getElementById('album-lead');
+      if (albumLead) {
+        const hasMiss = Object.keys(GEMS).some((kind) => !madeMap[kind]);
+        const parts = [];
+        if (madeMap.square) parts.push('정사각형 보석을 만들었다!');
+        else if (madeMap.rect) parts.push('직사각형 보석을 만들었다!');
+        else if (madeMap.rhombus) parts.push('마름모 보석을 만들었다!');
+        else if (madeMap.para) parts.push('평행사변형 보석을 만들었다!');
+        else if (madeMap.trap) parts.push('사다리꼴 보석을 만들었다!');
+        if (hasMiss) parts.push('흐린 칸은 아직 만들지 못한 종류입니다.');
+        albumLead.textContent = parts.join(' ');
+        albumLead.classList.toggle('hidden', !parts.length);
+      }
 
       const tally = document.getElementById('tally');
       tally.innerHTML = '';
       Object.keys(GEMS).forEach((kind) => {
-        const n = state.sold[kind] || 0;
-        if (!n) return;
-        const row = document.createElement('div');
-        row.innerHTML = `${svgFor(kind, 20)}<span>${GEMS[kind].name} × ${n}</span>`;
-        tally.appendChild(row);
+        const g = GEMS[kind];
+        const made = (state.made && state.made[kind]) || 0;
+        const sold = state.sold[kind] || 0;
+        const card = document.createElement('div');
+        card.className = 'album-card ' + (made ? 'got' : 'miss');
+        if (made) card.style.borderColor = g.line;
+        const diag = String(g.diag || '').replace(/\n/g, '<br>');
+        const countHtml = made
+          ? `<span class="count">× ${made}</span>${sold ? `<span class="sold-n">판매 ${sold}</span>` : ''}`
+          : '<span class="miss-label">아직 없음</span>';
+        card.innerHTML = `${svgFor(kind, 44)}<span class="name">${g.name}</span><span class="diag">${diag}</span>${countHtml}`;
+        tally.appendChild(card);
       });
 
       const rankStatus = document.getElementById('rank-status');
@@ -7350,12 +7669,14 @@
         rankStatus.textContent = '';
         rankStatus.className = 'rank-status';
       }
+      showResultPanel('home');
       resultOverlay.classList.remove('hidden');
       updateHud();
       syncFullscreenBtn();
-      sound.finish(isRecord);
+      renderMyRank([]);
+      if (!preview) sound.finish(isRecord);
       loadLeaderboard();
-      if (hasValidProfile()) submitRank();
+      if (!preview && hasValidProfile()) submitRank();
     }
 
     const appEl = document.getElementById('app');
@@ -7421,7 +7742,21 @@
     }
 
     btnStart.addEventListener('click', start);
-    document.getElementById('btn-restart').addEventListener('click', start);
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      if (isResultPreview()) {
+        openResultPreview();
+        return;
+      }
+      start();
+    });
+    const btnViewAlbum = document.getElementById('btn-view-album');
+    const btnViewHall = document.getElementById('btn-view-hall');
+    const btnAlbumBack = document.getElementById('btn-album-back');
+    const btnHallBack = document.getElementById('btn-hall-back');
+    if (btnViewAlbum) btnViewAlbum.addEventListener('click', () => showResultPanel('album'));
+    if (btnViewHall) btnViewHall.addEventListener('click', () => showResultPanel('hall'));
+    if (btnAlbumBack) btnAlbumBack.addEventListener('click', () => showResultPanel('home'));
+    if (btnHallBack) btnHallBack.addEventListener('click', () => showResultPanel('home'));
     const btnToggleOpeningLb = document.getElementById('btn-toggle-opening-leaderboard');
     const openingLbBox = document.getElementById('opening-lb-box');
     if (btnToggleOpeningLb && openingLbBox) {
@@ -7489,14 +7824,17 @@
     loadLeaderboard();
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
-      document.querySelector('#start-overlay .note')
-        .insertAdjacentHTML('beforeend', `<br>🏆 현재 최고 기록: <b>${best}</b> <img class="ico-bill" src="${ASSET_DIR}bill.png" alt="">`);
+      const desc = document.querySelector('#start-overlay .guide-desc');
+      if (desc) {
+        desc.insertAdjacentHTML('afterend', `<p class="guide-best">🏆 최고 기록 ${best.toLocaleString()}</p>`);
+      }
     }
     requestAnimationFrame(loop);
     loadArt().catch((err) => {
       console.warn('PRISM TYCOON art load:', err);
       setArtReady();
     });
+    if (isResultPreview()) openResultPreview();
   })();
   </script>
 </body>
