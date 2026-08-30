@@ -3060,6 +3060,34 @@
       return s.carry.some((g) => m.ops[g.kind]);
     }
 
+    function carryOnlyRawOrTrap(s) {
+      if (!s.carry.length) return false;
+      for (let i = 0; i < s.carry.length; i++) {
+        const k = s.carry[i].kind;
+        if (k !== 'raw' && k !== 'trap') return false;
+      }
+      return true;
+    }
+
+    function factoryConfusedTip(s) {
+      const m = MACHINES.find((mm) => mLv(mm.id) >= 1 && inRect(s.player, mm.input));
+      if (!m || (m.id !== 'adjacent' && m.id !== 'right')) return '';
+      if (s.fedPara && s.fedPara[m.id]) return '';
+      if (!carryOnlyRawOrTrap(s)) return '';
+      return '?';
+    }
+
+    function applyFactoryConfusedTip(s) {
+      if (s.tip && s.tip.hold) return false;
+      const confused = factoryConfusedTip(s);
+      if (confused) {
+        setGuideTip(confused, 999);
+        return true;
+      }
+      if (s.tip && s.tip.text === '?') setGuideTip(null);
+      return false;
+    }
+
     function factoryStandTip(s) {
       const m = machineAtFront(s.player);
       if (!m) return '';
@@ -3260,6 +3288,7 @@
         eventWait: 12,
         seed: 1,
         lessons: { parallel: false },
+        fedPara: { adjacent: false, right: false },
         cutLesson: null,
         targetPos: null,
         ripples: [],
@@ -3851,6 +3880,10 @@
               y: s.player.y - 24 - stackStep(idx, s.carry.length)
             };
             const g = s.carry.splice(idx, 1)[0];
+            if ((m.id === 'adjacent' || m.id === 'right') && g.kind === 'para') {
+              s.fedPara = s.fedPara || { adjacent: false, right: false };
+              s.fedPara[m.id] = true;
+            }
             const slot = shelfSlot(m.input, ws.queue.length);
             startFly(g, from.x, from.y, slot.x, slot.y);
             ws.queue.push(g);
@@ -4132,6 +4165,7 @@
       const s = state;
       if (s.tip) s.tip.t += dt;
       if (!s.guide || s.guide.step === 'done' || s.phase !== 'play') {
+        if (s.phase === 'play') applyFactoryConfusedTip(s);
         if (s.tip && s.tip.t >= s.tip.max) s.tip = null;
         return;
       }
@@ -4217,6 +4251,7 @@
       } else if (step === 'diagHint') {
         text = '사각형의 성질이 많을수록 판매금액이 올라가요';
       }
+      if (applyFactoryConfusedTip(s)) return;
       if (text && !(s.tip && s.tip.hold)) setGuideTip(text, step === 'orderTime' ? 7 : ((step === 'order' || step === 'diagHint') ? 5.5 : 999));
     }
 
@@ -6881,7 +6916,8 @@
       const p = state.player;
       ctx.save();
       ctx.globalAlpha = Math.max(0, fade);
-      ctx.font = '700 15px Pretendard, sans-serif';
+      const puzzled = tip.text === '?';
+      ctx.font = puzzled ? '800 22px Pretendard, sans-serif' : '700 15px Pretendard, sans-serif';
       const maxW = 300;
       let lines = tip.text.split('\n');
       if (lines.length === 1 && ctx.measureText(tip.text).width > maxW) {
@@ -6903,8 +6939,9 @@
       for (let i = 0; i < lines.length; i++) {
         textW = Math.max(textW, ctx.measureText(lines[i]).width);
       }
-      const w = Math.min(328, textW + 28);
-      const h = 16 + lines.length * 20;
+      const lineH = puzzled ? 26 : 20;
+      const w = puzzled ? Math.max(44, textW + 22) : Math.min(328, textW + 28);
+      const h = puzzled ? 40 : (16 + lines.length * 20);
       const x = Math.max(40, Math.min(MAP_W - w - 40, p.x - w / 2));
       const y = p.y < 240 ? p.y + 40 : p.y - 28 - h;
       ctx.fillStyle = 'rgba(20,12,28,0.92)';
@@ -6915,13 +6952,16 @@
       roundRect(x, y, w, h, 12);
       ctx.stroke();
       ctx.textAlign = 'center';
+      ctx.textBaseline = puzzled ? 'middle' : 'alphabetic';
       for (let i = 0; i < lines.length; i++) {
-        if (tip.gold) fillGoldGlowText(lines[i], x + w / 2, y + 22 + i * 20);
+        const ty = puzzled ? y + h / 2 : y + 22 + i * lineH;
+        if (tip.gold) fillGoldGlowText(lines[i], x + w / 2, ty);
         else {
           ctx.fillStyle = '#f5e9d6';
-          ctx.fillText(lines[i], x + w / 2, y + 22 + i * 20);
+          ctx.fillText(lines[i], x + w / 2, ty);
         }
       }
+      ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
       ctx.restore();
     }
