@@ -7315,7 +7315,7 @@
       resultOverlay.classList.add('hidden');
       if (el && el.hud) el.hud.classList.remove('hidden');
       updateHud();
-      requestAppFullscreen();
+      requestAppFullscreenIfMobile();
       syncFullscreenBtn();
     }
 
@@ -7383,19 +7383,21 @@
     }
 
     function requestAppFullscreen() {
-      if (!wantsMobileFullscreen() || !fullscreenSupported() || isAppFullscreen()) return;
+      if (!fullscreenSupported() || isAppFullscreen()) return;
       const req = appEl.requestFullscreen
         ? appEl.requestFullscreen()
         : appEl.webkitRequestFullscreen();
       if (req && typeof req.catch === 'function') req.catch(() => {});
     }
 
+    function requestAppFullscreenIfMobile() {
+      if (!wantsMobileFullscreen()) return;
+      requestAppFullscreen();
+    }
+
     function syncFullscreenBtn() {
       if (!btnFullscreen) return;
-      const show = wantsMobileFullscreen()
-        && fullscreenSupported()
-        && state && state.phase === 'play'
-        && !isAppFullscreen();
+      const show = fullscreenSupported() && !isAppFullscreen();
       btnFullscreen.classList.toggle('hidden', !show);
     }
 

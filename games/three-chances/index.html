@@ -11,7 +11,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:image" content="https://math-game-zeta-one.vercel.app/og-image.jpg">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=fs1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700;800&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -42,6 +42,7 @@
           <div class="tool-slots" id="tool-slots" aria-label="입에 문 도구"></div>
           <div class="tank-pips" id="tank-pips" aria-label="수조 진행"></div>
           <button id="btn-sound-toggle" class="btn-sound" type="button" title="음소거">🔊</button>
+          <button id="btn-fullscreen" class="btn-fullscreen hidden" type="button" title="전체화면" aria-label="전체화면">⛶</button>
         </div>
       </div>
     </header>
@@ -230,7 +231,7 @@
 
       <form id="profile-form" class="profile-form">
         <label id="label-player-name">이름
-          <input id="input-player-name" type="text" maxlength="12" placeholder="이름 입력" required autocomplete="nickname">
+          <input id="input-player-name" type="text" maxlength="12" placeholder="닉네임" required autocomplete="nickname">
         </label>
         <label id="label-student-id">학번
           <input id="input-student-id" type="text" maxlength="12" placeholder="학번 입력" autocomplete="off">
@@ -265,8 +266,6 @@
     </div>
   </div>
 
-  <button id="btn-fullscreen" class="btn-fullscreen hidden" type="button" title="전체화면" aria-label="전체화면">⛶</button>
-
   <div id="rotate-gate" class="rotate-gate hidden" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="rotate-gate-title">
     <div class="rotate-gate-card">
       <div class="rotate-phone" aria-hidden="true"></div>
@@ -275,7 +274,7 @@
     </div>
   </div>
 
-  <script src="../../shared/mobile-fullscreen.js"></script>
-  <script src="game.js"></script>
+  <script src="../../shared/mobile-fullscreen.js?v=fs1"></script>
+  <script src="game.js?v=fs1"></script>
 </body>
 </html>

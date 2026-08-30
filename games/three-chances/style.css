@@ -92,7 +92,7 @@ html, body {
 .profile-text { display: flex; flex-direction: column; line-height: 1.2; }
 .profile-name { font-size: 0.85rem; font-weight: 700; }
 .profile-id { font-size: 0.7rem; color: var(--ink-dim); }
-.btn-small-edit, .btn-sound {
+.btn-small-edit, .btn-sound, .btn-fullscreen {
   background: transparent;
   border: 1px solid var(--stroke);
   border-radius: 8px;
@@ -103,21 +103,9 @@ html, body {
 .btn-sound.muted { opacity: 0.55; }
 
 .btn-fullscreen {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
-  right: 12px;
-  z-index: 80;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid var(--stroke);
-  background: rgba(8, 24, 40, 0.88);
-  color: var(--ink);
-  font-size: 18px;
+  min-width: 36px;
+  font-size: 16px;
   line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
 }
 .btn-fullscreen:hover { border-color: var(--accent-cyan); }
 

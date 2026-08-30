@@ -35,16 +35,21 @@
     }
 
     function request() {
-      if (!wants() || !supported() || isActive()) return;
+      if (!supported() || isActive()) return;
       const req = root.requestFullscreen
         ? root.requestFullscreen()
         : root.webkitRequestFullscreen();
       if (req && typeof req.catch === "function") req.catch(function () {});
     }
 
+    function requestIfMobile() {
+      if (!wants()) return;
+      request();
+    }
+
     function syncButton() {
       if (!btn) return;
-      const show = wants() && supported() && isPlaying() && !isActive();
+      const show = supported() && isPlaying() && !isActive();
       btn.classList.toggle("hidden", !show);
     }
 
@@ -68,7 +73,14 @@
 
     syncButton();
 
-    return { request: request, syncButton: syncButton, isActive: isActive, supported: supported, wants: wants };
+    return {
+      request: request,
+      requestIfMobile: requestIfMobile,
+      syncButton: syncButton,
+      isActive: isActive,
+      supported: supported,
+      wants: wants
+    };
   }
 
   global.MobileFullscreen = MobileFullscreen;

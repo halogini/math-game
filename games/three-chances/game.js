@@ -311,7 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
       root: document.getElementById("game-container"),
       button: document.getElementById("btn-fullscreen"),
       onResize: syncMobileLayout,
-      isPlaying: () => running && !portraitBlocked
+      isPlaying: () => !portraitBlocked
     })
     : null;
 
@@ -3102,7 +3102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     lastTs = performance.now();
     beginTank();
     if (mobileFs) {
-      mobileFs.request();
+      mobileFs.requestIfMobile();
       mobileFs.syncButton();
     }
   }
@@ -5693,7 +5693,7 @@ document.addEventListener("DOMContentLoaded", () => {
       labelName.textContent = "";
       labelName.append("닉네임");
       if (nameInput) {
-        nameInput.placeholder = "닉네임 입력";
+        nameInput.placeholder = "닉네임";
         nameInput.setAttribute("required", "");
         labelName.appendChild(document.createTextNode(" "));
         labelName.appendChild(nameInput);
@@ -5720,10 +5720,13 @@ document.addEventListener("DOMContentLoaded", () => {
     || (activeMode === "dorms" ? localStorage.getItem("halomath_name_dorms") : "");
   const savedId = localStorage.getItem("hm_student_id");
   const nameInputEl = document.getElementById("input-player-name");
-  if (savedName) {
-    nameInputEl.value = savedName;
-  } else if (activeMode === "dorms") {
-    nameInputEl.value = randomDormsNickname();
+  if (nameInputEl) {
+    if (activeMode === "dorms") nameInputEl.placeholder = "닉네임";
+    if (savedName) {
+      nameInputEl.value = savedName;
+    } else if (activeMode === "dorms") {
+      nameInputEl.value = randomDormsNickname();
+    }
   }
   if (savedId && activeMode !== "dorms") {
     document.getElementById("input-student-id").value = savedId;
