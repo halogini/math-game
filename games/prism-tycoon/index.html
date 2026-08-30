@@ -606,6 +606,23 @@
       border: 1px solid rgba(240, 195, 106, 0.45);
     }
     .opening.playing .opening-play { display: none; }
+    .opening-buffer {
+      display: none;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+      margin: 0;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(20, 12, 28, 0.72);
+      border: 1px solid rgba(240, 195, 106, 0.45);
+      font: 700 14px Pretendard, sans-serif;
+      color: #f5e9d6;
+      pointer-events: none;
+    }
+    .opening.playing.buffering .opening-buffer { display: block; }
 
     /* Rotate gate for portrait mobile */
     .rotate-gate {
@@ -783,6 +800,7 @@
         <button type="button" class="opening-play" id="btn-opening-play">오프닝 보기</button>
         <button type="button" class="opening-skip" id="btn-opening-skip">건너뛰기</button>
       </div>
+      <p class="opening-buffer" id="opening-buffer">영상 불러오는 중…</p>
     </div>
 
     <div class="overlay hidden" id="start-overlay">
@@ -7483,8 +7501,13 @@
     const btnOpeningPlay = document.getElementById('btn-opening-play');
     const btnOpeningSkip = document.getElementById('btn-opening-skip');
 
+    function setOpeningBuffering(on) {
+      if (openingEl) openingEl.classList.toggle('buffering', !!on);
+    }
+
     function finishOpening() {
       if (!openingEl || openingEl.classList.contains('hidden')) return;
+      setOpeningBuffering(false);
       if (openingVideo) {
         openingVideo.pause();
         try { openingVideo.removeAttribute('src'); openingVideo.load(); } catch (_) {}
@@ -7495,12 +7518,14 @@
     }
 
     function playOpening() {
+      requestAppFullscreen();
       if (!openingVideo) {
         finishOpening();
         return;
       }
       sound.init();
       openingEl.classList.add('playing');
+      if (openingVideo.readyState < 3) setOpeningBuffering(true);
       openingVideo.muted = false;
       const playP = openingVideo.play();
       if (playP && playP.catch) {
@@ -7515,9 +7540,19 @@
       openingVideo.src = ASSET_DIR + 'opening.mp4';
       openingVideo.addEventListener('ended', finishOpening);
       openingVideo.addEventListener('error', finishOpening);
+      openingVideo.addEventListener('playing', () => setOpeningBuffering(false));
+      openingVideo.addEventListener('canplay', () => setOpeningBuffering(false));
+      openingVideo.addEventListener('waiting', () => {
+        if (openingEl && openingEl.classList.contains('playing')) setOpeningBuffering(true);
+      });
     }
     if (btnOpeningPlay) btnOpeningPlay.addEventListener('click', playOpening);
-    if (btnOpeningSkip) btnOpeningSkip.addEventListener('click', finishOpening);
+    if (btnOpeningSkip) {
+      btnOpeningSkip.addEventListener('click', () => {
+        requestAppFullscreen();
+        finishOpening();
+      });
+    }
     if (/[?&](skipopen|preview|result)=/.test(location.search)) finishOpening();
 
     function openResultPreview() {
