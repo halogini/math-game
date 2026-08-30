@@ -839,6 +839,7 @@
         <div class="game-guide-box short-banner">
           <div class="guide-title">보석 타이쿤</div>
           <p class="guide-desc">동굴이 무너지기 전에 최대한 많은 정사각형 보석을 만들어라!</p>
+          <p class="guide-best hidden" id="guide-best"></p>
         </div>
         <form id="profile-form" class="profile-form" autocomplete="on">
           <p class="profile-lead" id="profile-lead">랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.</p>
@@ -932,6 +933,7 @@
     const ctx = cv.getContext('2d');
 
     const SOUND_KEY = 'prism-tycoon-muted';
+    const BEST_KEY = 'prism-tycoon-best';
     const GAME_ID = 'prism-tycoon';
     const SCORES_URL = 'https://math-game-halogini-default-rtdb.firebaseio.com/scores.json';
     const KIND_STEP = { raw: 0, trap: 1, para: 2, rhombus: 3, rect: 3, square: 5 };
@@ -1045,6 +1047,8 @@
       }
       setErr('');
       syncPlayerDisplays();
+      mergeLocalBestFromServer(lastTycoonScores);
+      renderGuideBest();
       return true;
     }
 
@@ -1063,6 +1067,60 @@
     }
     function playerRecordKey(name, sid) {
       return activeMode === 'dorms' ? name : `${name}_${sid}`;
+    }
+
+    let lastTycoonScores = [];
+
+    function lookupIdentity() {
+      const nameIn = document.getElementById('input-player-name');
+      const idIn = document.getElementById('input-student-id');
+      const name = sanitizeInput((nameIn && nameIn.value) || playerName || '', 12);
+      const sid = activeMode === 'school'
+        ? sanitizeInput((idIn && idIn.value) || studentId || '', 10)
+        : 'DORMS';
+      return { name, sid, ready: !!(name && (activeMode !== 'school' || sid)) };
+    }
+
+    function getLocalBest() {
+      return Math.max(0, Number(localStorage.getItem(BEST_KEY) || 0) || 0);
+    }
+
+    function myServerBest(fullList) {
+      const { name, sid, ready } = lookupIdentity();
+      if (!ready || !fullList || !fullList.length) return null;
+      const myKey = playerRecordKey(name, sid);
+      const row = fullList.find((item) => playerRecordKey(item.name, item.studentId) === myKey);
+      return row ? Math.max(0, Number(row.score) || 0) : null;
+    }
+
+    function mergeLocalBestFromServer(fullList) {
+      if (!hasValidProfile()) return getLocalBest();
+      const server = myServerBest(fullList);
+      const local = getLocalBest();
+      if (server != null && server > local) {
+        try { localStorage.setItem(BEST_KEY, String(server)); } catch (_) {}
+        return server;
+      }
+      return local;
+    }
+
+    function renderGuideBest(fullList) {
+      const elBest = document.getElementById('guide-best');
+      if (!elBest) return;
+      const list = fullList || lastTycoonScores;
+      const { ready } = lookupIdentity();
+      const local = getLocalBest();
+      const server = ready ? myServerBest(list) : null;
+      const best = Math.max(local, server || 0);
+      if (best <= 0) {
+        elBest.textContent = '';
+        elBest.classList.add('hidden');
+        return;
+      }
+      elBest.classList.remove('hidden');
+      elBest.textContent = (ready && server != null)
+        ? `🏆 내 최고 기록 ${best.toLocaleString()}`
+        : `🏆 이 기기 최고 기록 ${local.toLocaleString()}`;
     }
 
     function collectTycoonScores(dataObj) {
@@ -1219,12 +1277,15 @@
       if (result) result.innerHTML = emptyHint;
       const data = await fetchScoresMap();
       const saved = collectTycoonScores(data || {});
+      lastTycoonScores = saved;
       const top = saved.slice(0, 20);
       const myKey = myPlayerKey();
+      mergeLocalBestFromServer(saved);
       renderOpeningChamp(top);
       renderLbRows(opening, top, myKey);
       renderLbRows(result, top, myKey);
       renderMyRank(saved);
+      renderGuideBest(saved);
     }
 
     function syncRankUi() {
@@ -1701,7 +1762,6 @@
         a.markT = 0;
       }
     }
-    const BEST_KEY = 'prism-tycoon-best';
     const CAT_SIZE = 52;
     const WALK_FPS = 9;
 
@@ -4118,7 +4178,7 @@
       } else if (step === 'feed') {
         text = '원석을 공장 입구에 넣으세요';
       } else if (step === 'order') {
-        if ((s.guide.orderT || 0) <= 5.5) text = '특별요청이 올라왔어요';
+        if ((s.guide.orderT || 0) <= 5.5) text = '특별요청이 올라왔어요. 확인해보세요!';
       } else if (step === 'orderTime') {
         text = '특별요청을 해결했어요!\n특별요청은 시간이 지나면 사라지니 주의하세요.';
       } else if (step === 'diagHint') {
@@ -6586,32 +6646,67 @@
       );
 
       const hasTimer = !hold;
-      const gemSize = 30;
-      const half = gemVisualExtents(ord.kind, gemSize, 4);
-      const statsH = 34;
-      const titleH = 18;
-      const timerH = hasTimer ? 14 : 0;
-      const rowGap = 4;
-      const rowH = Math.max(half.h, statsH);
-      const contentH = titleH + rowGap + rowH + (hasTimer ? rowGap + timerH : 0);
-      const top = by + (bh - contentH) / 2;
-      const rowY = top + titleH + rowGap + half.top;
-      const rowLeft = bx + (bw - (gemSize * 2 + 54)) / 2;
+      const info = GEMS[ord.kind];
+      const qtyText = ord.need <= 1 ? '1개' : (ord.got + '/' + ord.need + '개');
+      const payText = '팔면 ' + ord.mult + '배';
+      const padX = 16;
+      const minGap = 22;
+      const strokePad = 3;
+      const titleH = 16;
+      const nameH = 16;
+      const lineH = 15;
+      const timerH = hasTimer ? 12 : 0;
+      const textBlockH = nameH + 6 + lineH + 5 + lineH;
 
-      ctx.fillStyle = urgent ? '#fb7185' : '#f9a8d4';
+      ctx.font = '800 13px Pretendard, sans-serif';
+      const nameW = ctx.measureText(info.name).width;
+      ctx.font = '800 12px Pretendard, sans-serif';
+      const qtyW = ctx.measureText(qtyText).width;
+      const payW = ctx.measureText(payText).width;
+      const textW = Math.max(nameW, qtyW, payW);
+
+      let gemSize = 30;
+      let half = gemVisualExtents(ord.kind, gemSize, 4);
+      let gemW = half.w + strokePad * 2;
+      const budget = bw - padX * 2 - minGap - textW;
+      while (gemW > budget && gemSize > 18) {
+        gemSize -= 2;
+        half = gemVisualExtents(ord.kind, gemSize, 4);
+        gemW = half.w + strokePad * 2;
+      }
+
+      const colGap = Math.max(minGap, bw - padX * 2 - gemW - textW);
+      const blockW = gemW + colGap + textW;
+      const blockLeft = bx + (bw - blockW) / 2;
+      const rowH = Math.max(half.h + strokePad * 2, textBlockH);
+      const contentH = titleH + 8 + rowH + (hasTimer ? 8 + timerH : 0);
+      const top = by + (bh - contentH) / 2;
+      const rowTop = top + titleH + 8;
+      const gemCx = blockLeft + strokePad + half.left;
+      const gemCy = rowTop + rowH / 2;
+      const textLeft = blockLeft + gemW + colGap;
+      const textTop = rowTop + (rowH - textBlockH) / 2;
+      const accent = urgent ? '#fb7185' : '#f9a8d4';
+
+      ctx.fillStyle = accent;
       ctx.font = '800 15px Pretendard, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('특별요청', bx + bw / 2, top + titleH / 2);
-      ctx.textBaseline = 'alphabetic';
-      ctx.textAlign = 'left';
 
-      gemAt(ord.kind, rowLeft + gemSize * 0.85, rowY, gemSize, 4);
-      ctx.fillStyle = urgent ? '#fb7185' : '#f9a8d4';
-      ctx.font = '800 22px Outfit, sans-serif';
-      ctx.fillText('×' + ord.mult, rowLeft + gemSize * 1.85 + 6, rowY - 2);
-      ctx.font = '800 18px Outfit, sans-serif';
-      ctx.fillText(ord.got + '/' + ord.need, rowLeft + gemSize * 1.85 + 6, rowY + 22);
+      gemAt(ord.kind, gemCx, gemCy, gemSize, 4);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '800 13px Pretendard, sans-serif';
+      ctx.fillText(info.name, textLeft, textTop + nameH / 2);
+
+      ctx.font = '800 12px Pretendard, sans-serif';
+      ctx.fillStyle = accent;
+      ctx.fillText(qtyText, textLeft, textTop + nameH + 6 + lineH / 2);
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText(payText, textLeft, textTop + nameH + 6 + lineH + 5 + lineH / 2);
+      ctx.textBaseline = 'alphabetic';
 
       if (hasTimer) {
         const p = Math.max(0, ord.t / ord.maxT);
@@ -7657,8 +7752,8 @@
       if (el && el.hud) el.hud.classList.add('hidden');
 
       const preview = !!(state && state.resultPreview);
-      const best = Number(localStorage.getItem(BEST_KEY) || 0);
-      const isRecord = !preview && state.gold > best;
+      const prevBest = Math.max(getLocalBest(), myServerBest(lastTycoonScores) || 0);
+      const isRecord = !preview && state.gold > prevBest;
       if (isRecord) localStorage.setItem(BEST_KEY, String(state.gold));
 
       document.getElementById('final-gold').textContent = state.gold;
@@ -7666,7 +7761,7 @@
       document.getElementById('record-badge').classList.toggle('hidden', !isRecord);
       document.getElementById('best-line').innerHTML = preview
         ? '미리보기 · 랭킹 미등록'
-        : ('최고 기록 ' + Math.max(best, state.gold));
+        : ('최고 기록 ' + Math.max(prevBest, state.gold).toLocaleString());
       fillResultHome(isRecord);
 
       const madeMap = (state && state.made) || {};
@@ -7813,6 +7908,10 @@
         start();
       });
     }
+    ['input-player-name', 'input-student-id'].forEach((id) => {
+      const field = document.getElementById(id);
+      if (field) field.addEventListener('input', () => renderGuideBest());
+    });
     const btnSendRank = document.getElementById('btn-send-rank');
     if (btnSendRank) btnSendRank.addEventListener('click', submitRank);
 
@@ -7859,13 +7958,7 @@
     syncFullscreenBtn();
     syncRankUi();
     loadLeaderboard();
-    const best = Number(localStorage.getItem(BEST_KEY) || 0);
-    if (best > 0) {
-      const desc = document.querySelector('#start-overlay .guide-desc');
-      if (desc) {
-        desc.insertAdjacentHTML('afterend', `<p class="guide-best">🏆 최고 기록 ${best.toLocaleString()}</p>`);
-      }
-    }
+    renderGuideBest();
     requestAnimationFrame(loop);
     loadArt().catch((err) => {
       console.warn('PRISM TYCOON art load:', err);
