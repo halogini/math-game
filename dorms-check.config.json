@@ -1,0 +1,16 @@
+{
+  "app": {
+    "name": "할로매쓰",
+    "url": "https://math-game-zeta-one.vercel.app/",
+    "stack": "정적 HTML"
+  },
+  "tracks": [
+    "security",
+    "edzip"
+  ],
+  "edzipCase": "D",
+  "teacher": {
+    "dormsHandle": ""
+  },
+  "ownershipConfirmed": true
+}

@@ -5,22 +5,10 @@
  * HaloMath Arcade Channel Isolated Edition
  */
 
-// Dynamic Firebase Configuration
-const defaultFirebaseConfig = {
-  apiKey: "AIzaSyBiY1JBwYxtROIGFW7RUIJ4k7QZHVfNcEA",
-  authDomain: "math-game-halogini.firebaseapp.com",
-  databaseURL: "https://math-game-halogini-default-rtdb.firebaseio.com",
-  projectId: "math-game-halogini",
-  storageBucket: "math-game-halogini.firebasestorage.app",
-  messagingSenderId: "42232060061",
-  appId: "1:42232060061:web:ad26f83ca7d1285b3e5c74",
-  measurementId: "G-F13LE342GQ"
-};
-
-const firebaseConfig = (window.ENV && window.ENV.FIREBASE_CONFIG) ? window.ENV.FIREBASE_CONFIG : defaultFirebaseConfig;
+const firebaseConfig = (window.ENV && window.ENV.FIREBASE_CONFIG) || null;
 
 let firebaseDb = null;
-if (window.firebase) {
+if (window.firebase && firebaseConfig && firebaseConfig.apiKey) {
   try {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);

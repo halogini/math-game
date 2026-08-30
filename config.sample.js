@@ -1,8 +1,9 @@
 /**
- * 할로매쓰 (HaloMath) Environment & Security Configuration Sample
- * 
- * 외부 배포 시 Firebase 설정 및 환경 변수를 소스 코드와 분리하여
- * 주입할 수 있도록 제공되는 구성 템플릿입니다.
+ * 할로매쓰 (HaloMath) 공개 웹 설정 템플릿
+ *
+ * Firebase 웹 API 키는 브라우저 SDK가 쓰는 공개 식별값입니다.
+ * 비밀 서버 키·service account 는 여기에 넣지 마세요.
+ * 실제 데이터 보호는 Firebase 보안 규칙으로 합니다.
  */
 
 window.ENV = window.ENV || {
