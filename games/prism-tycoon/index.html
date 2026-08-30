@@ -12,6 +12,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
   <style>
     :root {
       --bg: #160e22;
@@ -345,6 +348,52 @@
     .record { margin-top: 8px; font: 800 14px Pretendard, sans-serif; color: var(--teal); }
     .tally { display: grid; gap: 5px; margin-bottom: 12px; }
     .tally div { display: flex; align-items: center; gap: 8px; font: 600 13px Pretendard, sans-serif; }
+    .btn-rank {
+      display: block; width: 100%; margin-top: 8px; padding: 11px;
+      font: 800 15px Pretendard, sans-serif; cursor: pointer;
+      background: rgba(76, 29, 149, 0.55); border: 1px solid var(--teal);
+      border-radius: 12px; color: #f5e9d6;
+    }
+    .btn-rank:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rank-status {
+      min-height: 1.4em; margin: 8px 0 0; text-align: center;
+      font: 600 12px Pretendard, sans-serif; color: var(--muted);
+    }
+    .rank-status.ok { color: #86efac; }
+    .rank-status.err { color: #fda4af; }
+    .lb-box { margin-top: 12px; }
+    .lb-box h3 {
+      margin: 0 0 8px; font: 800 14px Pretendard, sans-serif;
+      color: var(--gold); text-align: center;
+    }
+    .lb-wrap { max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .lb-table { width: 100%; border-collapse: collapse; font: 600 12px Pretendard, sans-serif; }
+    .lb-table th, .lb-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(240, 195, 106, 0.14); }
+    .lb-table th { color: var(--muted); font-size: 11px; }
+    .lb-table td { color: var(--text); }
+    .profile-form {
+      display: grid; gap: 8px; margin-top: 12px;
+      padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .profile-lead {
+      margin: 0; font: 700 13px Pretendard, sans-serif; color: var(--gold);
+    }
+    .profile-form label {
+      display: grid; gap: 4px;
+      font: 700 12px Pretendard, sans-serif; color: var(--muted);
+    }
+    .profile-form input {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--line); background: rgba(8, 4, 18, 0.65);
+      color: var(--text); font: 700 15px Pretendard, sans-serif;
+    }
+    .profile-form input:focus { outline: 2px solid var(--gold); }
+    .profile-err { margin: 0; min-height: 1.2em; font: 600 12px Pretendard, sans-serif; color: #fda4af; }
+    .hud-player {
+      display: block; margin-top: 2px;
+      font: 700 11px Pretendard, sans-serif; color: var(--muted);
+      max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .hidden { display: none !important; }
 
     .opening {
@@ -512,6 +561,7 @@
     <div class="hud hidden">
       <div class="hud-left">
         <span class="hud-title">정사각형을 만들어라!</span>
+        <span class="hud-player" id="hud-player"></span>
       </div>
       <div class="hud-center">
         <div class="time-gauge" id="chip-time" aria-label="남은 시간">
@@ -550,6 +600,32 @@
           <div><span>⬆️</span><b>업그레이드</b><span>공장 앞에서 사고 강화합니다</span></div>
         </div>
         <div class="note" id="move-note">WASD(방향키), 드래그, 클릭으로 이동.</div>
+        <form id="profile-form" class="profile-form" autocomplete="on">
+          <p class="profile-lead" id="profile-lead">랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.</p>
+          <label id="label-player-name">닉네임
+            <input id="input-player-name" type="text" maxlength="12" required autocomplete="nickname" placeholder="1~12자">
+          </label>
+          <label id="label-student-id">학번
+            <input id="input-student-id" type="text" maxlength="10" autocomplete="off" placeholder="1~10자">
+          </label>
+          <p class="profile-err" id="profile-err"></p>
+        </form>
+        <div class="lb-box" id="opening-lb-box">
+          <h3 id="opening-lb-title">🏆 명예의 전당 (Top 20)</h3>
+          <div class="lb-wrap">
+            <table class="lb-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th id="th-opening-id">학번</th>
+                  <th>총 수익</th>
+                </tr>
+              </thead>
+              <tbody id="opening-leaderboard-tbody"></tbody>
+            </table>
+          </div>
+        </div>
         <div class="load-wrap" id="load-wrap" aria-live="polite">
           <div class="load-track">
             <div class="load-fill" id="load-fill"></div>
@@ -566,10 +642,29 @@
         <div class="final">
           <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
           <div class="sub">5분간 모은 금액</div>
+          <div class="sub" id="result-player"></div>
           <div class="record hidden" id="record-badge">🏆 최고 기록 달성!</div>
           <div class="sub" id="best-line">최고 기록 0</div>
         </div>
         <div class="tally" id="tally"></div>
+        <button type="button" class="btn-rank" id="btn-send-rank">랭킹 등록하기</button>
+        <p class="rank-status" id="rank-status"></p>
+        <div class="lb-box">
+          <h3 id="result-lb-title">🏆 명예의 전당 (Top 20)</h3>
+          <div class="lb-wrap">
+            <table class="lb-table">
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>이름</th>
+                  <th id="th-result-id">학번</th>
+                  <th>총 수익</th>
+                </tr>
+              </thead>
+              <tbody id="result-leaderboard-tbody"></tbody>
+            </table>
+          </div>
+        </div>
         <button class="btn-main" id="btn-restart">다시 도전하기</button>
       </div>
     </div>
@@ -583,7 +678,363 @@
     const ctx = cv.getContext('2d');
 
     const SOUND_KEY = 'prism-tycoon-muted';
+    const GAME_ID = 'prism-tycoon';
+    const SCORES_URL = 'https://math-game-halogini-default-rtdb.firebaseio.com/scores.json';
     const KIND_STEP = { raw: 0, trap: 1, para: 2, rhombus: 3, rect: 3, square: 5 };
+
+    const defaultFirebaseConfig = {
+      apiKey: 'AIzaSyBiY1JBwYxtROIGFW7RUIJ4k7QZHVfNcEA',
+      authDomain: 'math-game-halogini.firebaseapp.com',
+      databaseURL: 'https://math-game-halogini-default-rtdb.firebaseio.com',
+      projectId: 'math-game-halogini',
+      storageBucket: 'math-game-halogini.firebasestorage.app',
+      messagingSenderId: '42232060061',
+      appId: '1:42232060061:web:ad26f83ca7d1285b3e5c74',
+      measurementId: 'G-F13LE342GQ'
+    };
+    const firebaseConfig = (window.ENV && window.ENV.FIREBASE_CONFIG)
+      ? window.ENV.FIREBASE_CONFIG
+      : defaultFirebaseConfig;
+    let firebaseDb = null;
+    if (window.firebase) {
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        firebaseDb = firebase.database();
+      } catch (err) {
+        console.error('Firebase init failed:', err);
+      }
+    }
+
+    function sanitizeInput(str, maxLen) {
+      if (typeof str !== 'string') return '';
+      return str.replace(/[<>'"/]/g, '').trim().slice(0, maxLen);
+    }
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+    function detectActiveMode() {
+      const href = (window.location.href || '').toLowerCase();
+      const search = (window.location.search || '').toLowerCase();
+      if (search.includes('mode=dorms') || search.includes('mode=dorems')
+          || href.includes('/dorms') || href.includes('/dorems')) {
+        return 'dorms';
+      }
+      return 'school';
+    }
+    const activeMode = detectActiveMode();
+    const nameStorageKey = `halomath_name_${activeMode}`;
+    const idStorageKey = `halomath_id_${activeMode}`;
+    let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
+    let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
+
+    function isDevPreview() {
+      return /[?&]preview=\d+/.test(location.search);
+    }
+    function hasValidProfile() {
+      if (isDevPreview()) return true;
+      if (!playerName) return false;
+      if (activeMode === 'school' && !/^[a-zA-Z0-9가-힣\-]{1,10}$/.test(studentId)) return false;
+      return true;
+    }
+    function playerLabel() {
+      if (!playerName) return '도전자 미등록';
+      return activeMode === 'school' && studentId ? `${playerName} · ${studentId}` : playerName;
+    }
+    function syncPlayerDisplays() {
+      const hud = document.getElementById('hud-player');
+      const res = document.getElementById('result-player');
+      const label = playerLabel();
+      if (hud) hud.textContent = label;
+      if (res) res.textContent = '플레이어 ' + label;
+    }
+    function commitProfile() {
+      const err = document.getElementById('profile-err');
+      const setErr = (t) => { if (err) err.textContent = t || ''; };
+      if (isDevPreview()) return true;
+      const nameIn = document.getElementById('input-player-name');
+      const idIn = document.getElementById('input-student-id');
+      const cleanName = sanitizeInput(nameIn ? nameIn.value : playerName, 12);
+      if (!cleanName) {
+        setErr('닉네임을 입력해야 시작할 수 있습니다.');
+        if (nameIn) nameIn.focus();
+        return false;
+      }
+      playerName = cleanName;
+      try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
+      if (activeMode === 'school') {
+        const cleanId = sanitizeInput(idIn ? idIn.value : studentId, 10);
+        if (!cleanId || !/^[a-zA-Z0-9가-힣\-]+$/.test(cleanId)) {
+          setErr('학번을 1~10자 영문·숫자·한글로 입력해 주세요.');
+          if (idIn) idIn.focus();
+          return false;
+        }
+        studentId = cleanId;
+        try { localStorage.setItem(idStorageKey, studentId); } catch (_) {}
+      } else {
+        studentId = '';
+      }
+      setErr('');
+      syncPlayerDisplays();
+      return true;
+    }
+
+    function isTycoonEntry(val) {
+      const id = String((val && val.gameId) || '').trim();
+      return id === GAME_ID || id === 'tycoon';
+    }
+    function isDormsRecord(val, key, isDormsSubtree) {
+      const sid = String((val && val.studentId) || '').trim();
+      const ch = String((val && val.channel) || '').trim();
+      return !!(isDormsSubtree || sid === 'DORMS' || sid === 'DOREMS' || ch === 'dorms' || ch === 'dorems' || key === 'dorms');
+    }
+    function matchesMode(val, key, isDormsSubtree) {
+      const dorms = isDormsRecord(val, key, isDormsSubtree);
+      return activeMode === 'dorms' ? dorms : !dorms;
+    }
+    function playerRecordKey(name, sid) {
+      return activeMode === 'dorms' ? name : `${name}_${sid}`;
+    }
+
+    function collectTycoonScores(dataObj) {
+      const bestMap = new Map();
+      const visit = (obj, isDormsSubtree) => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.keys(obj).forEach((key) => {
+          const item = obj[key];
+          if (!item || typeof item !== 'object') return;
+          if (item.name) {
+            if (!isTycoonEntry(item) || !matchesMode(item, key, isDormsSubtree)) return;
+            const name = sanitizeInput(item.name, 12);
+            const sid = sanitizeInput(item.studentId || '', 10);
+            const score = Math.max(0, Number(item.score) || 0);
+            const userKey = playerRecordKey(name, sid);
+            const prev = bestMap.get(userKey);
+            if (!prev || score > prev.score) {
+              bestMap.set(userKey, { key, name, studentId: sid, score });
+            }
+          } else {
+            visit(item, key === 'dorms' || isDormsSubtree);
+          }
+        });
+      };
+      visit(dataObj, false);
+      return Array.from(bestMap.values()).sort((a, b) => b.score - a.score).slice(0, 20);
+    }
+
+    function withCompetitionRanks(list) {
+      const ranks = [];
+      let lastScore = null;
+      let lastRank = 0;
+      for (let i = 0; i < list.length; i++) {
+        const s = list[i].score;
+        const rank = lastScore !== null && s === lastScore ? lastRank : i + 1;
+        lastScore = s;
+        lastRank = rank;
+        ranks.push(rank);
+      }
+      const counts = {};
+      ranks.forEach((r) => { counts[r] = (counts[r] || 0) + 1; });
+      return list.map((item, i) => ({ item, rank: ranks[i], tied: counts[ranks[i]] > 1 }));
+    }
+
+    function renderLbRows(tbody, list) {
+      if (!tbody) return;
+      const colSpan = activeMode === 'school' ? 4 : 3;
+      tbody.removeAttribute('aria-busy');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="padding:10px;color:#b8a48e;">아직 등록된 기록이 없습니다.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = withCompetitionRanks(list).map(({ item, rank, tied }) => {
+        const idTd = activeMode === 'school' ? `<td>${escapeHtml(item.studentId || '미입력')}</td>` : '';
+        const label = tied ? `공동 ${rank}위` : `${rank}위`;
+        return `<tr><td>${label}</td><td>${escapeHtml(item.name)}</td>${idTd}<td>${item.score.toLocaleString()} 💰</td></tr>`;
+      }).join('');
+    }
+
+    async function fetchScoresMap() {
+      if (firebaseDb) {
+        try {
+          const snap = await Promise.race([
+            firebaseDb.ref('scores').once('value'),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 2500))
+          ]);
+          return snap.val();
+        } catch (err) {
+          console.warn('SDK scores fetch failed:', err);
+        }
+      }
+      try {
+        const res = await fetch(SCORES_URL);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (err) {
+        console.error('REST scores fetch failed:', err);
+        return null;
+      }
+    }
+
+    async function loadLeaderboard() {
+      const opening = document.getElementById('opening-leaderboard-tbody');
+      const result = document.getElementById('result-leaderboard-tbody');
+      const emptyHint = `<tr><td colspan="${activeMode === 'school' ? 4 : 3}" style="padding:10px;color:#b8a48e;">불러오는 중…</td></tr>`;
+      if (opening) opening.innerHTML = emptyHint;
+      if (result) result.innerHTML = emptyHint;
+      const data = await fetchScoresMap();
+      const list = collectTycoonScores(data || {});
+      renderLbRows(opening, list);
+      renderLbRows(result, list);
+    }
+
+    function syncRankUi() {
+      const showId = activeMode === 'school';
+      ['th-opening-id', 'th-result-id'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = showId ? '' : 'none';
+      });
+      const idLabel = document.getElementById('label-student-id');
+      if (idLabel) idLabel.style.display = showId ? '' : 'none';
+      const nameIn = document.getElementById('input-player-name');
+      const idIn = document.getElementById('input-student-id');
+      const lead = document.getElementById('profile-lead');
+      if (nameIn && playerName) nameIn.value = playerName;
+      if (idIn && studentId) idIn.value = studentId;
+      if (lead) {
+        lead.textContent = showId
+          ? '이름과 학번을 입력해야 시작할 수 있습니다.'
+          : '랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.';
+      }
+      const title = activeMode === 'dorms' ? '🏆 dorms 명예의 전당 (Top 20)' : '🏆 명예의 전당 (Top 20)';
+      const ot = document.getElementById('opening-lb-title');
+      const rt = document.getElementById('result-lb-title');
+      if (ot) ot.textContent = title;
+      if (rt) rt.textContent = title;
+      syncPlayerDisplays();
+    }
+
+    async function submitRank() {
+      const msg = document.getElementById('rank-status');
+      const btn = document.getElementById('btn-send-rank');
+      const gold = Math.max(0, Math.floor(Number(state && state.gold) || 0));
+      playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || playerName || '', 12);
+      if (activeMode === 'school') {
+        studentId = sanitizeInput(localStorage.getItem(idStorageKey) || studentId || '', 10);
+      }
+      const setMsg = (text, kind) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.className = 'rank-status' + (kind ? ' ' + kind : '');
+      };
+      if (!playerName) {
+        setMsg('닉네임을 입력해야 랭킹에 등록할 수 있습니다.', 'err');
+        return;
+      }
+      if (activeMode === 'school' && !studentId) {
+        setMsg('학번을 입력해야 랭킹에 등록할 수 있습니다.', 'err');
+        return;
+      }
+      if (btn) btn.disabled = true;
+      setMsg('등록 중…');
+
+      const payload = {
+        name: playerName,
+        studentId: activeMode === 'dorms' ? 'DORMS' : studentId,
+        score: gold,
+        channel: activeMode,
+        gameId: GAME_ID,
+        timestamp: Date.now()
+      };
+      const myKey = playerRecordKey(payload.name, payload.studentId);
+
+      const saveViaREST = async (existingKey) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const url = existingKey
+          ? `https://math-game-halogini-default-rtdb.firebaseio.com/scores/${encodeURIComponent(existingKey)}.json`
+          : SCORES_URL;
+        try {
+          const restRes = await fetch(url, {
+            method: existingKey ? 'PATCH' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          return restRes.ok;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          console.error('REST score save error:', err);
+          return false;
+        }
+      };
+
+      const saveRecord = async (existingKey) => {
+        if (firebaseDb) {
+          const sdkSave = (async () => {
+            if (existingKey) await firebaseDb.ref(`scores/${existingKey}`).update(payload);
+            else await firebaseDb.ref('scores').push(payload);
+            return true;
+          })();
+          const timedOut = await Promise.race([
+            sdkSave.then(() => false).catch((err) => {
+              console.warn('SDK push failed:', err);
+              return 'fail';
+            }),
+            new Promise((resolve) => setTimeout(() => resolve('timeout'), 2500))
+          ]);
+          if (timedOut === false) return true;
+          return saveViaREST(existingKey);
+        }
+        return saveViaREST(existingKey);
+      };
+
+      try {
+        const data = await fetchScoresMap();
+        let existingBest = null;
+        if (data) {
+          const visit = (obj, isDormsSubtree) => {
+            if (!obj || typeof obj !== 'object') return;
+            Object.keys(obj).forEach((key) => {
+              const item = obj[key];
+              if (!item || typeof item !== 'object') return;
+              if (item.name) {
+                if (!isTycoonEntry(item) || !matchesMode(item, key, isDormsSubtree)) return;
+                const name = sanitizeInput(item.name, 12);
+                const sid = sanitizeInput(item.studentId || '', 10);
+                if (playerRecordKey(name, sid) !== myKey) return;
+                const score = Math.max(0, Number(item.score) || 0);
+                if (!existingBest || score > existingBest.score) existingBest = { key, score };
+              } else {
+                visit(item, key === 'dorms' || isDormsSubtree);
+              }
+            });
+          };
+          visit(data, false);
+        }
+        if (existingBest && gold <= existingBest.score) {
+          setMsg(`이미 더 높거나 같은 수익(${existingBest.score.toLocaleString()} 💰)이 등록되어 있어요.`, 'ok');
+          loadLeaderboard();
+          return;
+        }
+        const ok = await saveRecord(existingBest ? existingBest.key : null);
+        if (ok) {
+          setMsg(existingBest
+            ? `수익이 ${gold.toLocaleString()} 💰로 갱신되었습니다!`
+            : `${gold.toLocaleString()} 💰 기록이 등록되었습니다!`, 'ok');
+          loadLeaderboard();
+        } else {
+          setMsg('등록 실패. 잠시 후 다시 시도하세요.', 'err');
+        }
+      } catch (err) {
+        console.error('score submit failed:', err);
+        setMsg('등록 실패. 잠시 후 다시 시도하세요.', 'err');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
 
     class SoundEngine {
       constructor() {
@@ -833,6 +1284,68 @@
     const EVENT_GAP_MIN = 36;
     const EVENT_GAP_MAX = 62;
     const APPRAISE_SHOW = 3.2;
+    const APPRAISE_MARK_TRAP_DUR = 0.95;
+    const APPRAISE_MARK_DIAG_DUR = 1.65;
+    const APPRAISAL_GEM_SIZE = 36;
+
+    function appraisalMarkDur(kind) {
+      if (kind === 'raw') return 0;
+      return kind === 'trap' ? APPRAISE_MARK_TRAP_DUR : APPRAISE_MARK_DIAG_DUR;
+    }
+
+    function appraisalMarkDone(a) {
+      return a.markT >= appraisalMarkDur(a.markKind);
+    }
+
+    function noteAppraisalSale(s, gem, value, wanted, mult) {
+      const sale = { kind: gem.kind, seed: gem.seed, value, wanted, mult };
+      if (!s.appraisal) {
+        s.appraisal = {
+          ...sale,
+          life: 0,
+          markKind: gem.kind,
+          markSeed: gem.seed,
+          markT: 0,
+          markQueue: []
+        };
+        return;
+      }
+      const a = s.appraisal;
+      a.life = 0;
+      a.kind = gem.kind;
+      a.seed = gem.seed;
+      a.value = value;
+      a.wanted = wanted;
+      a.mult = mult;
+
+      if (gem.kind === a.markKind) {
+        a.markSeed = gem.seed;
+        if (appraisalMarkDone(a)) a.markT = 0;
+        return;
+      }
+
+      if (appraisalMarkDone(a)) {
+        a.markKind = gem.kind;
+        a.markSeed = gem.seed;
+        a.markT = 0;
+      } else {
+        a.markQueue.push(sale);
+      }
+    }
+
+    function advanceAppraisalMarks(a) {
+      while (a.markT >= appraisalMarkDur(a.markKind) && a.markQueue.length) {
+        const next = a.markQueue.shift();
+        a.kind = next.kind;
+        a.seed = next.seed;
+        a.value = next.value;
+        a.wanted = next.wanted;
+        a.mult = next.mult;
+        a.markKind = next.kind;
+        a.markSeed = next.seed;
+        a.markT = 0;
+      }
+    }
     const BEST_KEY = 'prism-tycoon-best';
     const CAT_SIZE = 52;
     const WALK_FPS = 9;
@@ -1267,17 +1780,43 @@
     const GEMS = {
       // props = [이등분, 직교, 등변] — more specific shapes keep all of a parent’s props
       raw:     { name: '원석',       price: 9,   fill: GEM_FILL, line: '#1c1917', props: [0, 0, 0],
-        diag: '특별한 성질 없음' },
+        diag: '특별한 성질이 없는 사각형' },
       trap:    { name: '사다리꼴',   price: 22,  fill: GEM_FILL, line: '#15803d', props: [0, 0, 0],
         diag: '한 쌍의 대변이 평행' },
       para:    { name: '평행사변형', price: 38,  fill: GEM_FILL, line: '#1d4ed8', props: [1, 0, 0],
-        diag: '대각선이 서로를 이등분' },
+        diag: '두 대각선은 서로를 이등분' },
       rhombus: { name: '마름모',     price: 82,  fill: GEM_FILL, line: '#7c3aed', props: [1, 1, 0],
         diag: '두 대각선은 서로를 수직이등분' },
       rect:    { name: '직사각형',   price: 82,  fill: GEM_FILL, line: '#b45309', props: [1, 0, 1],
         diag: '두 대각선은 길이가 같고\n서로를 이등분' },
       square:  { name: '정사각형',   price: 240, fill: GEM_FILL, line: '#db2777', props: [1, 1, 1],
         diag: '두 대각선이 길이가 같고\n서로를 수직이등분' }
+    };
+
+    const APPRAISAL_STYLE = {
+      gemFill: '#f8f4ff',
+      gemLine: '#ac824e',
+      gemLw: 2.2,
+      trapGemFill: '#164a32',
+      trapGemLine: '#82a8c8',
+      trapGemHalo: 'rgba(21, 128, 61, 0.28)',
+      frameFill: 'rgba(36,22,12,0.82)',
+      frameFillEmpty: 'rgba(36,22,12,0.72)',
+      frameFillWanted: 'rgba(88,28,60,0.82)',
+      frameFillFlash: 'rgba(88, 28, 60, 0.92)',
+      frameStroke: 'rgba(140, 100, 55, 0.82)',
+      frameStrokeEmpty: 'rgba(172, 130, 78, 0.62)',
+      frameStrokeWanted: 'rgba(219, 120, 160, 0.82)',
+      frameStrokeUrgent: 'rgba(251, 113, 133, 0.95)',
+      framePinStroke: 'rgba(140, 100, 55, 0.55)',
+      nameFont: '800 13px Pretendard, sans-serif',
+      nameFontSquare: '800 16px Pretendard, sans-serif',
+      nameColor: '#f8fafc',
+      nameColorSquare: '#fde68a',
+      diagFont: '700 11px Pretendard, sans-serif',
+      diagColor: '#fde68a',
+      markInk: '#2a1f14',
+      trapMarkInk: '#e8c878'
     };
 
     // 포함관계: 주문 도형의 성질을 모두 갖춘 더 특수한 사각형도 인정
@@ -1592,7 +2131,9 @@
       if (loadLabelEl) loadLabelEl.textContent = '준비 완료';
       if (btnStart) {
         btnStart.disabled = false;
-        btnStart.textContent = '게임 시작';
+        btnStart.textContent = hasValidProfile()
+          ? '게임 시작'
+          : (activeMode === 'school' ? '이름·학번 입력 후 시작' : '닉네임 입력 후 시작');
       }
     }
 
@@ -1891,7 +2432,7 @@
 
     function orderBoardBox() {
       const s = stallBox();
-      const bw = 168, bh = 142;
+      const bw = 176, bh = 152;
       return {
         x: Math.round(s.x + s.w / 2 - bw / 2),
         y: Math.max(YARD.y - 8, Math.round(s.y - bh + 18)),
@@ -2976,14 +3517,7 @@
           const mult = wanted ? ord.mult : 1;
           const value = GEMS[gem.kind].price * mult;
           s.sold[gem.kind] = (s.sold[gem.kind] || 0) + 1;
-          if (s.appraisal && s.appraisal.kind === gem.kind) {
-            s.appraisal.life = 0;
-            s.appraisal.value = value;
-            s.appraisal.wanted = wanted;
-            s.appraisal.mult = mult;
-          } else {
-            s.appraisal = { kind: gem.kind, seed: gem.seed, value, wanted, mult, t: 0, life: 0 };
-          }
+          noteAppraisalSale(s, gem, value, wanted, mult);
           let bonus = 0;
           if (wanted) {
             s.shake = Math.max(s.shake, 0.22);
@@ -3045,8 +3579,9 @@
       }
       for (const id in s.glow) s.glow[id] = Math.max(0, s.glow[id] - dt * 2.4);
       if (s.appraisal) {
-        s.appraisal.t += dt;
+        s.appraisal.markT += dt;
         s.appraisal.life += dt;
+        advanceAppraisalMarks(s.appraisal);
         if (s.appraisal.life > APPRAISE_SHOW) s.appraisal = null;
       }
       s.floaters = s.floaters.filter((f) => (f.t += dt) < 1);
@@ -3121,7 +3656,7 @@
       if (step === 'cash') {
         return { x: CASH_ANCHOR.x - 38, y: CASH_ANCHOR.y - 42, w: 76, h: 58 };
       }
-      if (step === 'buy') return kioskRect(MACHINES[0]);
+      if (step === 'buy') return MACHINES[0].input;
       if (step === 'feed') return MACHINES[0].input;
       if (step === 'order' || step === 'orderTime') return orderBoardBox();
       return null;
@@ -3317,15 +3852,24 @@
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       const quiet = !!(opt && opt.quiet);
+      const board = !!(opt && opt.board);
 
-      if (opt && opt.fill) {
+      if (opt && opt.fill && !opt.fx) {
         poly(pts, opt.fill, line, lw, join);
+      } else if (quiet && board) {
+        poly(pts, g.fill, line, Math.max(1.05, lw * 0.72), join);
       } else {
         const h = hash(seed || 1);
-        const glow = quiet
-          ? '#2a1c24'
-          : (h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24');
-        const halo = h < 0.34 ? 'rgba(196,181,253,0.28)' : h < 0.67 ? 'rgba(94,234,212,0.28)' : 'rgba(251,191,36,0.28)';
+        const glow = opt && opt.fill
+          ? opt.fill
+          : quiet
+            ? g.fill
+            : (h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24');
+        const halo = opt && opt.halo
+          ? opt.halo
+          : opt && opt.fill
+            ? 'rgba(130, 168, 200, 0.28)'
+            : (h < 0.34 ? 'rgba(196,181,253,0.28)' : h < 0.67 ? 'rgba(94,234,212,0.28)' : 'rgba(251,191,36,0.28)');
         if (!quiet) {
           ctx.fillStyle = halo;
           ctx.beginPath();
@@ -3617,6 +4161,80 @@
       }
     }
 
+    function tickHalfProgress(p, q, n, len, gap, u) {
+      if (u <= 0) return;
+      const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+      const dx = q[0] - p[0], dy = q[1] - p[1];
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const g = gap == null ? 4.6 : gap;
+      for (let i = 0; i < n; i++) {
+        const slotStart = i / n;
+        const slotEnd = (i + 1) / n;
+        let tu = 1;
+        if (u < slotEnd) tu = u > slotStart ? (u - slotStart) / (slotEnd - slotStart) : 0;
+        if (tu <= 0) continue;
+        const halfLen = len * tu;
+        const off = (i - (n - 1) / 2) * g;
+        const cx = mx + ux * off, cy = my + uy * off;
+        ctx.moveTo(cx + uy * halfLen, cy - ux * halfLen);
+        ctx.lineTo(cx - uy * halfLen, cy + ux * halfLen);
+      }
+    }
+
+    function cornerMarkProgress(m, a, b, size, u) {
+      if (u <= 0) return;
+      const unit = (p) => {
+        const L = Math.hypot(p[0] - m[0], p[1] - m[1]) || 1;
+        return [(p[0] - m[0]) / L, (p[1] - m[1]) / L];
+      };
+      const [ax, ay] = unit(a), [bx, by] = unit(b);
+      const x1 = m[0] + ax * size, y1 = m[1] + ay * size;
+      const x2 = m[0] + (ax + bx) * size, y2 = m[1] + (ay + by) * size;
+      const x3 = m[0] + bx * size, y3 = m[1] + by * size;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      if (u <= 0.5) {
+        const t = u / 0.5;
+        ctx.lineTo(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t);
+      } else {
+        ctx.lineTo(x2, y2);
+        const t = (u - 0.5) / 0.5;
+        ctx.lineTo(x2 + (x3 - x2) * t, y2 + (y3 - y2) * t);
+      }
+    }
+
+    function centerDotProgress(m, r, lw, u) {
+      if (u <= 0) return;
+      ctx.beginPath();
+      ctx.arc(m[0], m[1], r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, u));
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    }
+
+    function strokeChevronProgress(w1x, w1y, tipx, tipy, w2x, w2y, u) {
+      if (u <= 0) return;
+      const segs = [[w1x, w1y, tipx, tipy], [tipx, tipy, w2x, w2y]];
+      const lens = segs.map((s) => Math.hypot(s[2] - s[0], s[3] - s[1]));
+      let rem = (lens[0] + lens[1]) * Math.min(1, u);
+      ctx.beginPath();
+      for (let i = 0; i < segs.length; i++) {
+        const [x0, y0, x1, y1] = segs[i];
+        const L = lens[i];
+        if (rem <= 0) break;
+        if (i === 0) ctx.moveTo(x0, y0);
+        if (rem >= L) {
+          ctx.lineTo(x1, y1);
+          rem -= L;
+        } else {
+          const t = rem / L;
+          ctx.lineTo(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+          break;
+        }
+      }
+      ctx.stroke();
+    }
+
     function cornerMark(m, a, b, size) {
       const u = (p) => { const L = Math.hypot(p[0] - m[0], p[1] - m[1]) || 1; return [(p[0] - m[0]) / L, (p[1] - m[1]) / L]; };
       const [ax, ay] = u(a), [bx, by] = u(b);
@@ -3643,10 +4261,141 @@
       ctx.restore();
     }
 
-    function drawDiagonals(pts, props, progress, size) {
+    function buildAppraisalDiagPlan(props) {
       const [bisect, perp, equal] = props;
-      const k = Math.max(0.85, (size || 36) / 36);
+      const plan = [
+        { kind: 'diag', i: 0, j: 2 },
+        { kind: 'diag', i: 1, j: 3 },
+        { kind: 'center' }
+      ];
+      if (perp) plan.push({ kind: 'perp' });
+      if (bisect) {
+        plan.push({ kind: 'tick', vi: 0, n: 1 });
+        plan.push({ kind: 'tick', vi: 2, n: 1 });
+        plan.push({ kind: 'tick', vi: 1, n: equal ? 1 : 2 });
+        plan.push({ kind: 'tick', vi: 3, n: equal ? 1 : 2 });
+      }
+      return plan;
+    }
+
+    function appraisalStepAnim(progress, stepIdx, total) {
+      const start = stepIdx / total;
+      const end = (stepIdx + 1) / total;
+      if (progress <= start) return 0;
+      if (progress >= end) return 1;
+      return (progress - start) / (end - start);
+    }
+
+    function drawDiagonals(pts, props, progress, size, style) {
+      const [bisect, perp, equal] = props;
+      const appraisal = style === 'appraisal';
+      const thin = style === true;
+      const k = Math.max(0.75, (size || 36) / 40);
       const m = segCross(pts[0], pts[2], pts[1], pts[3]);
+      if (appraisal) {
+        const ink = APPRAISAL_STYLE.markInk;
+        const k = Math.max(0.75, (size || 36) / 40);
+        const plan = buildAppraisalDiagPlan(props);
+        const total = plan.length;
+        const tickLen = 6.4 * k;
+        const gap = 5.2 * k;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.9 * k;
+        ctx.beginPath();
+        for (let s = 0; s < plan.length; s++) {
+          const step = plan[s];
+          if (step.kind !== 'diag') continue;
+          const u = appraisalStepAnim(progress, s, total);
+          if (u <= 0) continue;
+          ctx.moveTo(pts[step.i][0], pts[step.i][1]);
+          ctx.lineTo(
+            pts[step.i][0] + (pts[step.j][0] - pts[step.i][0]) * u,
+            pts[step.i][1] + (pts[step.j][1] - pts[step.i][1]) * u
+          );
+        }
+        ctx.stroke();
+        for (let s = 0; s < plan.length; s++) {
+          const step = plan[s];
+          if (step.kind === 'diag') continue;
+          const u = appraisalStepAnim(progress, s, total);
+          if (u <= 0) continue;
+          if (step.kind === 'center') {
+            const dotR = 3.0 * k;
+            const dotLw = 1.5 * k;
+            centerDotProgress(m, dotR, dotLw, u);
+            if (u >= 1) {
+              ctx.fillStyle = ink;
+              ctx.beginPath();
+              ctx.arc(m[0], m[1], dotR, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (step.kind === 'perp') {
+            ctx.lineCap = 'butt';
+            ctx.lineJoin = 'miter';
+            ctx.miterLimit = 2;
+            ctx.lineWidth = 3.6 * k;
+            cornerMarkProgress(m, pts[0], pts[1], 8.5 * k, u);
+            ctx.stroke();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+          } else if (step.kind === 'tick') {
+            ctx.lineWidth = 2.1 * k;
+            ctx.beginPath();
+            tickHalfProgress(pts[step.vi], m, step.n, tickLen, gap, u);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+        return;
+      }
+      if (thin) {
+        const ink = 'rgba(32,24,18,0.72)';
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.05 * k;
+        ctx.beginPath();
+        [[0, 2], [1, 3]].forEach(([i, j]) => {
+          ctx.moveTo(pts[i][0], pts[i][1]);
+          ctx.lineTo(
+            pts[i][0] + (pts[j][0] - pts[i][0]) * progress,
+            pts[i][1] + (pts[j][1] - pts[i][1]) * progress
+          );
+        });
+        ctx.stroke();
+        if (progress < 1) { ctx.restore(); return; }
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.arc(m[0], m[1], 2.2 * k, 0, Math.PI * 2);
+        ctx.fill();
+        if (bisect) {
+          const tickLen = 4.8 * k;
+          const gap = 4.4 * k;
+          ctx.lineWidth = 0.95 * k;
+          ctx.beginPath();
+          tickHalf(pts[0], m, 1, tickLen, gap);
+          tickHalf(pts[2], m, 1, tickLen, gap);
+          tickHalf(pts[1], m, equal ? 1 : 2, tickLen, gap);
+          tickHalf(pts[3], m, equal ? 1 : 2, tickLen, gap);
+          ctx.stroke();
+        }
+        if (perp) {
+          const s = 6.2 * k;
+          ctx.lineWidth = 0.95 * k;
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          ctx.miterLimit = 2;
+          ctx.beginPath();
+          cornerMark(m, pts[0], pts[1], s);
+          ctx.stroke();
+        }
+        ctx.restore();
+        return;
+      }
       const ink = 'rgba(18,10,6,0.95)';
       const gold = '#ffe566';
       strokeHalo(ink, gold, 1.9 * k, () => {
@@ -3696,7 +4445,9 @@
       }
     }
 
-    function drawParaArrow(x0, y0, x1, y1, scale) {
+    function drawParaArrow(x0, y0, x1, y1, scale, style, drawU) {
+      const appraisal = style === 'appraisal';
+      const thin = style === true;
       const dx = x1 - x0, dy = y1 - y0;
       const L = Math.hypot(dx, dy) || 1;
       const ux = dx / L, uy = dy / L;
@@ -3711,7 +4462,7 @@
       const head = Math.min(4.4 * s, half * 0.28);
       const wing = head * 0.82;
       const gap = head * 0.72;
-      const ink = 'rgba(18,10,6,0.95)';
+      const ink = appraisal ? (APPRAISAL_STYLE.trapMarkInk || APPRAISAL_STYLE.markInk) : (thin ? 'rgba(32,24,18,0.72)' : 'rgba(18,10,6,0.95)');
       const gold = '#ffe566';
 
       function shaft(from, to) {
@@ -3724,6 +4475,34 @@
       ctx.save();
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      if (appraisal) {
+        const u = drawU == null ? 1 : drawU;
+        const head = Math.min(5.6 * s, L * 0.18);
+        const wing = head * 0.88;
+        const tipx = mx + ux * head * 0.58, tipy = my + uy * head * 0.58;
+        const bx = mx - ux * head * 0.42, by = my - uy * head * 0.42;
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 3.4 * s;
+        strokeChevronProgress(bx + px * wing, by + py * wing, tipx, tipy, bx - px * wing, by - py * wing, u);
+        ctx.restore();
+        return;
+      }
+      if (thin) {
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 0.95 * s;
+        shaft(-half, -gap);
+        shaft(gap, half);
+        const tipx = ox + ux * head * 0.55, tipy = oy + uy * head * 0.55;
+        const bx = ox - ux * head * 0.55, by = oy - uy * head * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(tipx, tipy);
+        ctx.lineTo(bx + px * wing * 0.65, by + py * wing * 0.65);
+        ctx.lineTo(bx - px * wing * 0.65, by - py * wing * 0.65);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
       ctx.strokeStyle = ink;
       ctx.lineWidth = 3.4 * s;
       shaft(-half, -gap);
@@ -3752,10 +4531,41 @@
       ctx.restore();
     }
 
-    function drawTrapParallel(pts, progress, size) {
+    function drawTrapParallel(pts, progress, size, style) {
       const u = Math.max(0, Math.min(1, progress));
-      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 200);
+      const appraisal = style === 'appraisal';
+      const thin = style === true;
       const k = Math.max(0.85, (size || 36) / 36);
+      if (appraisal) {
+        const plan = [
+          { kind: 'edge', i: 0, j: 1 },
+          { kind: 'edge', i: 3, j: 2 },
+          { kind: 'arrow', i: 0, j: 1 },
+          { kind: 'arrow', i: 3, j: 2 }
+        ];
+        const total = plan.length;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = APPRAISAL_STYLE.trapMarkInk || APPRAISAL_STYLE.markInk;
+        ctx.lineWidth = 3.4 * k;
+        for (let s = 0; s < plan.length; s++) {
+          const step = plan[s];
+          const su = appraisalStepAnim(u, s, total);
+          if (su <= 0) continue;
+          const x0 = pts[step.i][0], y0 = pts[step.i][1];
+          const x1 = pts[step.j][0], y1 = pts[step.j][1];
+          if (step.kind === 'edge') {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + (x1 - x0) * su, y0 + (y1 - y0) * su);
+            ctx.stroke();
+          } else {
+            drawParaArrow(x0, y0, x1, y1, k, 'appraisal', su);
+          }
+        }
+        ctx.restore();
+        return;
+      }
       const pairs = [[0, 1], [3, 2]];
       pairs.forEach(([i, j]) => {
         const x0 = pts[i][0], y0 = pts[i][1];
@@ -3764,21 +4574,31 @@
         const y = y0 + (y1 - y0) * u;
         ctx.save();
         ctx.lineCap = 'round';
-        ctx.strokeStyle = `rgba(16, 80, 55,${0.55 + pulse * 0.25})`;
-        ctx.lineWidth = 6.5 * k;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        ctx.strokeStyle = `rgba(52, 211, 153,${0.85 + pulse * 0.15})`;
-        ctx.lineWidth = 3.1 * k;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        if (thin) {
+          ctx.strokeStyle = 'rgba(32,24,18,0.72)';
+          ctx.lineWidth = 1.2 * k;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        } else {
+          const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 200);
+          ctx.strokeStyle = `rgba(16, 80, 55,${0.55 + pulse * 0.25})`;
+          ctx.lineWidth = 6.5 * k;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.strokeStyle = `rgba(52, 211, 153,${0.85 + pulse * 0.15})`;
+          ctx.lineWidth = 3.1 * k;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
         ctx.restore();
         if (u < 0.95) return;
-        drawParaArrow(x0, y0, x1, y1, k);
+        drawParaArrow(x0, y0, x1, y1, k, thin);
       });
     }
 
@@ -4947,7 +5767,7 @@
           ctx.strokeStyle = `rgba(240,195,106,${0.4 + 0.4 * Math.sin(performance.now() / 280)})`;
           ctx.lineWidth = 3;
           ctx.setLineDash([6, 4]);
-          roundRect(m.body.x - 6, m.body.y - 28, m.body.w + 22, m.body.h + m.input.h + 40, 12);
+          roundRect(m.input.x - 6, m.input.y - 6, m.input.w + 12, m.input.h + 12, 12);
           ctx.stroke();
           ctx.setLineDash([]);
         }
@@ -5189,7 +6009,8 @@
       // Gems are drawn per-machine inside drawLanes depth pass.
     }
 
-    function wrapBoardText(text, maxW) {
+    function wrapBoardText(text, maxW, font) {
+      if (font) ctx.font = font;
       const parts = String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
       const lines = [];
       for (let p = 0; p < parts.length; p++) {
@@ -5209,6 +6030,73 @@
         if (acc) lines.push(acc);
       }
       return lines.slice(0, 2);
+    }
+
+    function gemVisualExtents(kind, size, seed) {
+      const pts = shapeFor(kind, size, seed);
+      let minX = 0, maxX = 0, minY = 0, maxY = 0;
+      for (let i = 0; i < pts.length; i++) {
+        minX = Math.min(minX, pts[i][0]);
+        maxX = Math.max(maxX, pts[i][0]);
+        minY = Math.min(minY, pts[i][1]);
+        maxY = Math.max(maxY, pts[i][1]);
+      }
+      return { top: -minY, bottom: maxY, left: -minX, right: maxX, w: maxX - minX, h: maxY - minY };
+    }
+
+    function appraisalMarkPad(kind) {
+      return kind === 'trap' ? 18 : 12;
+    }
+
+    function layoutAppraisalBoard(bw, bh, kind, seed, diagText) {
+      const padX = 8;
+      const padY = 5;
+      const innerW = bw - padX * 2;
+      const diagFont = APPRAISAL_STYLE.diagFont;
+      const lineH = 13;
+      const nameH = 16;
+      const nameGap = 4;
+      const diagGap = 8;
+
+      const lines = wrapBoardText(diagText, innerW, diagFont);
+      const diagH = lines.length * lineH;
+      const ext = gemVisualExtents(kind, APPRAISAL_GEM_SIZE, seed);
+      const markPad = appraisalMarkPad(kind);
+      const gemBlockH = ext.h + markPad * 2;
+      const avail = bh - padY * 2;
+      const overhead = nameH + nameGap + diagGap + diagH;
+      const gemSpace = Math.max(28, avail - overhead);
+      const drawScale = gemBlockH > gemSpace ? gemSpace / gemBlockH : 1;
+      const slotH = gemBlockH * drawScale;
+      const contentH = overhead + slotH;
+      const top = padY + Math.max(0, (avail - contentH) / 2);
+      const gemCy = top + nameH + nameGap + slotH / 2;
+      return {
+        lines, diagFont, lineH, nameGap, diagGap,
+        nameY: top + nameH / 2,
+        gemCy,
+        diagY: top + nameH + nameGap + slotH + diagGap,
+        drawScale
+      };
+    }
+
+    function drawAppraisalGem(kind, size, seed, props, markT) {
+      const pts = shapeFor(kind, size, seed);
+      const st = APPRAISAL_STYLE;
+      const g = GEMS[kind];
+      if (kind === 'trap') {
+        paintGem(kind, size, seed, {
+          fill: st.trapGemFill || st.gemFill,
+          line: g.line,
+          lw: st.gemLw,
+          fx: true,
+          halo: st.trapGemHalo
+        });
+        drawTrapParallel(pts, markT, size, 'appraisal');
+      } else {
+        paintGem(kind, size, seed, null);
+        if (kind !== 'raw') drawDiagonals(pts, props, markT, size, 'appraisal');
+      }
     }
 
     function drawBoardFrame(bx, by, bw, bh, fill, stroke, lw) {
@@ -5238,48 +6126,56 @@
     }
 
     function drawSoldOnBoard(bx, by, bw, bh, a) {
-      const info = GEMS[a.kind];
+      const mk = a.markKind;
+      const info = GEMS[mk];
       const wanted = !!a.wanted;
+      const st = APPRAISAL_STYLE;
       drawBoardFrame(
         bx, by, bw, bh,
-        wanted ? 'rgba(88,28,60,0.82)' : 'rgba(36,22,12,0.82)',
-        wanted ? 'rgba(249,168,212,0.75)' : (info.line || 'rgba(180,120,60,0.65)'),
+        wanted ? st.frameFillWanted : st.frameFill,
+        wanted ? st.frameStrokeWanted : (info.line || st.frameStroke),
         2
       );
-      ctx.font = a.kind === 'square' ? '800 16px Pretendard, sans-serif' : '800 13px Pretendard, sans-serif';
+
+      const layout = layoutAppraisalBoard(bw, bh, mk, a.markSeed, info.diag);
+
+      ctx.save();
+      roundRect(bx + 3, by + 3, bw - 6, bh - 6, 8);
+      ctx.clip();
+
       ctx.textAlign = 'center';
-      if (a.kind === 'square') fillGoldGlowText(info.name, bx + bw / 2, by + 18);
+      ctx.textBaseline = 'middle';
+      ctx.font = mk === 'square' ? st.nameFontSquare : st.nameFont;
+      if (mk === 'square') fillGoldGlowText(info.name, bx + bw / 2, by + layout.nameY);
       else {
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillText(info.name, bx + bw / 2, by + 18);
+        ctx.fillStyle = st.nameColor;
+        ctx.fillText(info.name, bx + bw / 2, by + layout.nameY);
       }
 
-      const cx = bx + bw / 2;
-      const cy = by + 64;
       ctx.save();
-      ctx.translate(cx, cy);
-      const size = 36;
-      const pts = shapeFor(a.kind, size, a.seed);
-      paintGem(a.kind, size, a.seed, { quiet: true, lw: 2.2 });
-      const markT = Math.min(1, a.t / 0.32);
-      if (a.kind === 'trap') drawTrapParallel(pts, markT, size);
-      else if (a.kind !== 'raw') drawDiagonals(pts, info.props, markT, size);
+      ctx.translate(bx + bw / 2, by + layout.gemCy);
+      const size = APPRAISAL_GEM_SIZE;
+      ctx.scale(layout.drawScale, layout.drawScale);
+      const markDur = appraisalMarkDur(mk);
+      const markT = markDur <= 0 ? 0 : Math.min(1, a.markT / markDur);
+      drawAppraisalGem(mk, size, a.markSeed, info.props, markT);
       ctx.restore();
 
-      ctx.font = '800 11px Pretendard, sans-serif';
-      ctx.fillStyle = '#fde68a';
-      const lines = wrapBoardText(info.diag, bw - 18);
-      const base = by + bh - 8 - (lines.length - 1) * 14;
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], bx + bw / 2, base + i * 14);
+      ctx.font = layout.diagFont;
+      ctx.fillStyle = st.diagColor;
+      ctx.textBaseline = 'alphabetic';
+      for (let i = 0; i < layout.lines.length; i++) {
+        ctx.fillText(layout.lines[i], bx + bw / 2, by + layout.diagY + i * layout.lineH);
       }
       ctx.textAlign = 'left';
+      ctx.restore();
     }
 
     function drawOrderBoard() {
       const { x: bx, y: by, w: bw, h: bh } = orderBoardBox();
+      const st = APPRAISAL_STYLE;
 
-      ctx.strokeStyle = 'rgba(180,120,60,0.55)';
+      ctx.strokeStyle = st.framePinStroke;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(bx + 20, by - 8); ctx.lineTo(bx + 20, by + 6);
@@ -5295,11 +6191,13 @@
       }
 
       if (!ord) {
-        drawBoardFrame(bx, by, bw, bh, 'rgba(36,22,12,0.72)', 'rgba(180,120,60,0.45)', 2);
+        drawBoardFrame(bx, by, bw, bh, st.frameFillEmpty, st.frameStrokeEmpty, 2);
         ctx.fillStyle = 'rgba(148,163,184,0.75)';
         ctx.font = '700 15px Pretendard, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('…', bx + bw / 2, by + 70);
+        ctx.textBaseline = 'middle';
+        ctx.fillText('…', bx + bw / 2, by + bh / 2);
+        ctx.textBaseline = 'alphabetic';
         ctx.textAlign = 'left';
         return;
       }
@@ -5310,33 +6208,49 @@
 
       drawBoardFrame(
         bx, by, bw, bh,
-        flash > 0 ? `rgba(88,28,60,${0.75 + 0.2 * flash})` : 'rgba(36,22,12,0.82)',
+        flash > 0 ? `rgba(88,28,60,${0.75 + 0.2 * flash})` : st.frameFill,
         urgent
-          ? 'rgba(251,113,133,0.95)'
-          : (flash > 0 ? `rgba(249,168,212,${0.5 + 0.5 * flash})` : 'rgba(180,120,60,0.65)'),
+          ? st.frameStrokeUrgent
+          : (flash > 0 ? `rgba(249,168,212,${0.5 + 0.5 * flash})` : st.frameStroke),
         urgent || flash > 0.3 ? 3 : 2
       );
+
+      const hasTimer = !hold;
+      const gemSize = 30;
+      const half = gemVisualExtents(ord.kind, gemSize, 4);
+      const statsH = 34;
+      const titleH = 18;
+      const timerH = hasTimer ? 14 : 0;
+      const rowGap = 4;
+      const rowH = Math.max(half.h, statsH);
+      const contentH = titleH + rowGap + rowH + (hasTimer ? rowGap + timerH : 0);
+      const top = by + (bh - contentH) / 2;
+      const rowY = top + titleH + rowGap + half.top;
+      const rowLeft = bx + (bw - (gemSize * 2 + 54)) / 2;
 
       ctx.fillStyle = urgent ? '#fb7185' : '#f9a8d4';
       ctx.font = '800 15px Pretendard, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('특별요청', bx + bw / 2, by + 22);
+      ctx.textBaseline = 'middle';
+      ctx.fillText('특별요청', bx + bw / 2, top + titleH / 2);
+      ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
 
-      gemAt(ord.kind, bx + 44, by + 62, 26, 4);
+      gemAt(ord.kind, rowLeft + gemSize * 0.85, rowY, gemSize, 4);
       ctx.fillStyle = urgent ? '#fb7185' : '#f9a8d4';
       ctx.font = '800 22px Outfit, sans-serif';
-      ctx.fillText('×' + ord.mult, bx + 88, by + 58);
+      ctx.fillText('×' + ord.mult, rowLeft + gemSize * 1.85 + 6, rowY - 2);
       ctx.font = '800 18px Outfit, sans-serif';
-      ctx.fillText(ord.got + '/' + ord.need, bx + 88, by + 84);
+      ctx.fillText(ord.got + '/' + ord.need, rowLeft + gemSize * 1.85 + 6, rowY + 22);
 
-      if (!hold) {
+      if (hasTimer) {
         const p = Math.max(0, ord.t / ord.maxT);
+        const barY = top + contentH - timerH;
         ctx.fillStyle = 'rgba(148,163,184,0.3)';
-        roundRect(bx + 16, by + bh - 22, bw - 32, 6, 3);
+        roundRect(bx + 14, barY, bw - 28, 6, 3);
         ctx.fill();
         ctx.fillStyle = urgent ? '#fb7185' : '#f472b6';
-        roundRect(bx + 16, by + bh - 22, (bw - 32) * p, 6, 3);
+        roundRect(bx + 14, barY, (bw - 28) * p, 6, 3);
         ctx.fill();
       }
     }
@@ -5528,16 +6442,27 @@
       roundRect(r.x - 8, r.y - 8, r.w + 16, r.h + 16, 14);
       ctx.stroke();
       ctx.setLineDash([]);
-      const ax = r.x + r.w / 2;
-      const ay = r.y - 16 + Math.sin(performance.now() / 180) * 6;
       ctx.fillStyle = '#f0c36a';
       ctx.strokeStyle = 'rgba(20,10,4,0.7)';
       ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay + 14);
-      ctx.lineTo(ax - 11, ay - 4);
-      ctx.lineTo(ax + 11, ay - 4);
-      ctx.closePath();
+      const wobble = Math.sin(performance.now() / 180) * 6;
+      if (s.guide.step === 'order') {
+        const ax = r.x - 22 + wobble;
+        const ay = r.y + r.h / 2;
+        ctx.beginPath();
+        ctx.moveTo(ax + 14, ay);
+        ctx.lineTo(ax - 4, ay - 11);
+        ctx.lineTo(ax - 4, ay + 11);
+        ctx.closePath();
+      } else {
+        const ax = r.x + r.w / 2;
+        const ay = r.y - 16 + wobble;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay + 14);
+        ctx.lineTo(ax - 11, ay - 4);
+        ctx.lineTo(ax + 11, ay - 4);
+        ctx.closePath();
+      }
       ctx.fill();
       ctx.stroke();
       ctx.restore();
@@ -5647,6 +6572,7 @@
       const ratio = Math.max(0, Math.min(1, state.time / GAME_TIME));
       if (el.timeFill) el.timeFill.style.transform = 'scaleX(' + ratio + ')';
       el.gold.textContent = state.gold;
+      syncPlayerDisplays();
       el.chipTime.classList.toggle('warn', state.time <= 30);
       if (el.chipGold) {
         el.chipGold.classList.toggle('pulse', state.earnFlash > 0);
@@ -6243,6 +7169,7 @@
 
     function start() {
       if (!loadTrack.ready) return;
+      if (!commitProfile()) return;
       sound.init();
       sound.click();
       state = newState();
@@ -6301,6 +7228,7 @@
       if (isRecord) localStorage.setItem(BEST_KEY, String(state.gold));
 
       document.getElementById('final-gold').textContent = state.gold;
+      syncPlayerDisplays();
       document.getElementById('record-badge').classList.toggle('hidden', !isRecord);
       document.getElementById('best-line').innerHTML = '최고 기록 ' + Math.max(best, state.gold);
 
@@ -6314,10 +7242,17 @@
         tally.appendChild(row);
       });
 
+      const rankStatus = document.getElementById('rank-status');
+      if (rankStatus) {
+        rankStatus.textContent = '';
+        rankStatus.className = 'rank-status';
+      }
       resultOverlay.classList.remove('hidden');
       updateHud();
       syncFullscreenBtn();
       sound.finish(isRecord);
+      loadLeaderboard();
+      if (hasValidProfile()) submitRank();
     }
 
     const appEl = document.getElementById('app');
@@ -6334,7 +7269,14 @@
     }
 
     function wantsMobileFullscreen() {
-      return isTouchDevice();
+      try {
+        if (window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches) {
+          return false;
+        }
+        return window.matchMedia('(pointer: coarse)').matches;
+      } catch (_) {
+        return false;
+      }
     }
 
     function requestAppFullscreen() {
@@ -6375,6 +7317,15 @@
 
     btnStart.addEventListener('click', start);
     document.getElementById('btn-restart').addEventListener('click', start);
+    const profileForm = document.getElementById('profile-form');
+    if (profileForm) {
+      profileForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        start();
+      });
+    }
+    const btnSendRank = document.getElementById('btn-send-rank');
+    if (btnSendRank) btnSendRank.addEventListener('click', submitRank);
 
     const btnSound = document.getElementById('btn-sound-toggle');
     function syncMuteBtn() {
@@ -6417,6 +7368,8 @@
     state = newState();
     updateHud();
     syncFullscreenBtn();
+    syncRankUi();
+    loadLeaderboard();
     const best = Number(localStorage.getItem(BEST_KEY) || 0);
     if (best > 0) {
       document.querySelector('#start-overlay .note')

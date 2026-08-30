@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>감정창 — 커밋 vs 현재 비교</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: #1a120c;
+      color: #f5e9d6;
+      font-family: Pretendard, sans-serif;
+    }
+    header {
+      padding: 18px 22px 8px;
+      border-bottom: 1px solid rgba(180, 120, 60, 0.35);
+    }
+    h1 { margin: 0 0 6px; font-size: 18px; }
+    p { margin: 0; font-size: 13px; color: #c4a882; max-width: 920px; line-height: 1.5; }
+    .panels {
+      display: flex;
+      gap: 18px;
+      padding: 18px 22px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    figure { margin: 0; text-align: center; }
+    figcaption {
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e8d5a8;
+    }
+    figcaption small {
+      display: block;
+      margin-top: 4px;
+      font-weight: 500;
+      color: #9a8268;
+    }
+    canvas {
+      display: block;
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    }
+    .controls {
+      margin: 0 22px 24px;
+      padding: 16px 18px;
+      background: rgba(36, 22, 12, 0.92);
+      border: 1px solid rgba(180, 120, 60, 0.45);
+      border-radius: 12px;
+      display: grid;
+      gap: 12px;
+      max-width: 960px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    label { font-size: 13px; color: #e8d5a8; min-width: 72px; }
+    input[type="range"] { flex: 1; min-width: 160px; }
+    button, .chip {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font: 700 13px Pretendard, sans-serif;
+      cursor: pointer;
+      background: #44403c;
+      color: #f5e9d6;
+    }
+    button.primary { background: #b45309; color: #fff7ed; }
+    button.active, .chip.active {
+      background: #d97706;
+      color: #fff7ed;
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);
+    }
+    .chip { padding: 7px 12px; font-size: 12px; }
+    .val { font-size: 12px; color: #d6c4a8; min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+    .hint { font-size: 12px; color: #8a7358; line-height: 1.45; margin: 0; }
+    .shape-row { gap: 6px; }
+    label.check { min-width: auto; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>감정창 — 커밋 vs 현재 비교</h1>
+    <p>왼쪽은 커밋된 감정창(도종별 외곽색 · 녹색 펄스 평행선 · ink+gold 기호), 오른쪽은 현재 감정창(크림 배경 · 브론즈 외곽 · 검정 기호)입니다. 도형·특별요청·모션을 바꿔 가며 나란히 확인하세요.</p>
+  </header>
+
+  <div class="panels">
+    <figure>
+      <canvas id="cCommitted" width="352" height="304"></canvas>
+      <figcaption>커밋 버전<small id="capCommitted">size 36 · 도종별 외곽 · 녹색 펄스 · ink+gold</small></figcaption>
+    </figure>
+    <figure>
+      <canvas id="cCurrent" width="352" height="304"></canvas>
+      <figcaption>현재 감정창<small id="capCurrent">size 36 · 브론즈 외곽 · 검정 기호</small></figcaption>
+    </figure>
+  </div>
+
+  <div class="controls">
+    <div class="row shape-row">
+      <span style="min-width:72px;font-size:13px;color:#e8d5a8">도형</span>
+      <button type="button" class="chip" data-kind="raw">원석</button>
+      <button type="button" class="chip active" data-kind="trap">사다리꼴</button>
+      <button type="button" class="chip" data-kind="para">평행사변형</button>
+      <button type="button" class="chip" data-kind="rhombus">마름모</button>
+      <button type="button" class="chip" data-kind="rect">직사각형</button>
+      <button type="button" class="chip" data-kind="square">정사각형</button>
+    </div>
+    <div class="row">
+      <label class="check"><input id="wanted" type="checkbox"> 특별요청 맞춤 (핑크 프레임)</label>
+    </div>
+    <div class="row">
+      <button id="btnPlay" type="button" class="primary">▶ 재생</button>
+      <button id="btnRestart" type="button">↺ 처음부터</button>
+      <button id="btnStep" type="button">한 프레임</button>
+      <span class="hint">사다리꼴 0.95s · 그 외 1.65s · 원석 기호 없음</span>
+    </div>
+    <div class="row">
+      <label for="scrub">진행</label>
+      <input id="scrub" type="range" min="0" max="1000" value="0">
+      <span id="scrubVal" class="val">0%</span>
+    </div>
+    <div class="row">
+      <label for="seed">seed</label>
+      <input id="seed" type="range" min="1" max="99" value="7">
+      <span id="seedVal" class="val">7</span>
+      <button id="btnRandSeed" type="button">랜덤</button>
+    </div>
+    <div class="row">
+      <label for="speed">속도</label>
+      <input id="speed" type="range" min="25" max="200" value="100">
+      <span id="speedVal" class="val">1.0×</span>
+    </div>
+    <p class="hint">파일: <code>trap-appraisal-preview.html</code></p>
+  </div>
+
+  <script>
+    const BOARD_W = 176, BOARD_H = 152, SCALE = 2, PAD = 16;
+    const APPRAISE_MARK_TRAP_DUR = 0.95;
+    const APPRAISE_MARK_DIAG_DUR = 1.65;
+    const APPRAISE_MARK_HOLD = 0.45;
+    const APPRAISAL_GEM_SIZE = 36;
+    const GEM_FILL = '#e9d5ff';
+    const GEMS = {
+      raw:     { name: '원석',       line: '#1c1917', props: [0, 0, 0], diag: '특별한 성질이 없는 사각형' },
+      trap:    { name: '사다리꼴',   line: '#15803d', props: [0, 0, 0], diag: '한 쌍의 대변이 평행' },
+      para:    { name: '평행사변형', line: '#1d4ed8', props: [1, 0, 0], diag: '두 대각선은 서로를 이등분' },
+      rhombus: { name: '마름모',     line: '#7c3aed', props: [1, 1, 0], diag: '두 대각선은 서로를 수직이등분' },
+      rect:    { name: '직사각형',   line: '#b45309', props: [1, 0, 1], diag: '두 대각선은 길이가 같고\n서로를 이등분' },
+      square:  { name: '정사각형',   line: '#db2777', props: [1, 1, 1], diag: '두 대각선이 길이가 같고\n서로를 수직이등분' }
+    };
+    const COMMITTED_STYLE = {
+      frameFill: 'rgba(36,22,12,0.82)',
+      frameFillWanted: 'rgba(88,28,60,0.82)',
+      frameStroke: 'rgba(180,120,60,0.65)',
+      frameStrokeWanted: 'rgba(249,168,212,0.75)',
+      nameFont: '800 13px Pretendard, sans-serif',
+      nameFontSquare: '800 16px Pretendard, sans-serif',
+      nameColor: '#f8fafc',
+      diagFont: '800 11px Pretendard, sans-serif',
+      diagColor: '#fde68a'
+    };
+    const APPRAISAL_STYLE = {
+      gemFill: '#f8f4ff',
+      gemLine: '#ac824e',
+      gemLw: 2.2,
+      trapGemFill: '#164a32',
+      trapGemLine: '#82a8c8',
+      trapGemHalo: 'rgba(21, 128, 61, 0.28)',
+      frameFill: 'rgba(36,22,12,0.82)',
+      frameFillWanted: 'rgba(88,28,60,0.82)',
+      frameStroke: 'rgba(140, 100, 55, 0.82)',
+      frameStrokeWanted: 'rgba(219, 120, 160, 0.82)',
+      nameFont: '800 13px Pretendard, sans-serif',
+      nameFontSquare: '800 16px Pretendard, sans-serif',
+      nameColor: '#f8fafc',
+      nameColorSquare: '#fde68a',
+      diagFont: '700 11px Pretendard, sans-serif',
+      diagColor: '#fde68a',
+      markInk: '#2a1f14',
+      trapMarkInk: '#e8c878'
+    };
+
+    const canvases = {
+      committed: document.getElementById('cCommitted'),
+      current: document.getElementById('cCurrent')
+    };
+    const ctxs = {
+      committed: canvases.committed.getContext('2d'),
+      current: canvases.current.getContext('2d')
+    };
+    const caps = {
+      committed: document.getElementById('capCommitted'),
+      current: document.getElementById('capCurrent')
+    };
+    const ui = {
+      play: document.getElementById('btnPlay'),
+      restart: document.getElementById('btnRestart'),
+      step: document.getElementById('btnStep'),
+      scrub: document.getElementById('scrub'),
+      scrubVal: document.getElementById('scrubVal'),
+      seed: document.getElementById('seed'),
+      seedVal: document.getElementById('seedVal'),
+      randSeed: document.getElementById('btnRandSeed'),
+      speed: document.getElementById('speed'),
+      speedVal: document.getElementById('speedVal'),
+      wanted: document.getElementById('wanted')
+    };
+
+    let playing = true, t = 0, seed = 7, lastTs = 0;
+    let kind = 'trap', wanted = false;
+
+    function hash(n) {
+      const x = Math.sin(n * 12.9898) * 43758.5453;
+      return x - Math.floor(x);
+    }
+
+    function shapeFor(k, s, sd) {
+      const j = (n, amt) => (hash(sd + n) - 0.5) * amt;
+      if (k === 'raw') {
+        const base = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+        return base.map((p, i) => [
+          p[0] * s * (0.7 + hash(sd + i * 7.1) * 0.55),
+          p[1] * s * (0.5 + hash(sd + i * 13.3) * 0.5)
+        ]);
+      }
+      if (k === 'trap') {
+        const long = s * 2.85, short = s * 1.15, h = s * 0.52, lean = j(1, 0.05) * s;
+        return [[-short * 0.5 + lean, -h], [short * 0.5 + lean, -h], [long * 0.5, h], [-long * 0.5, h]];
+      }
+      if (k === 'rhombus') {
+        const w = s * 0.88, h = s * 1.08;
+        return [[0, -h], [w, 0], [0, h], [-w, 0]];
+      }
+      if (k === 'para') {
+        const a = s * 0.95, b = s * 0.55, sh = s * 0.36;
+        return [[-a - sh, -b], [a - sh, -b], [a + sh, b], [-a + sh, b]];
+      }
+      if (k === 'rect') {
+        const a = s * 1.05, b = s * 0.58;
+        return [[-a, -b], [a, -b], [a, b], [-a, b]];
+      }
+      const z = s * 0.78;
+      return [[-z, -z], [z, -z], [z, z], [-z, z]];
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function poly(ctx, pts, fill, stroke, lw, join) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lw || 2;
+        ctx.lineJoin = join || 'miter';
+        ctx.miterLimit = 2.2;
+        ctx.stroke();
+      }
+    }
+
+    function segCross(a, b, c, d) {
+      const r = [b[0] - a[0], b[1] - a[1]], s = [d[0] - c[0], d[1] - c[1]];
+      const den = r[0] * s[1] - r[1] * s[0];
+      if (!den) return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const t0 = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
+      return [a[0] + t0 * r[0], a[1] + t0 * r[1]];
+    }
+
+    function tickHalf(ctx, p, q, n, len, gap) {
+      const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+      const dx = q[0] - p[0], dy = q[1] - p[1];
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const g = gap == null ? 4.6 : gap;
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * g;
+        const cx = mx + ux * off, cy = my + uy * off;
+        ctx.moveTo(cx + uy * len, cy - ux * len);
+        ctx.lineTo(cx - uy * len, cy + ux * len);
+      }
+    }
+
+    function tickHalfProgress(ctx, p, q, n, len, gap, u) {
+      if (u <= 0) return;
+      const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+      const dx = q[0] - p[0], dy = q[1] - p[1];
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const g = gap == null ? 4.6 : gap;
+      for (let i = 0; i < n; i++) {
+        const slotStart = i / n;
+        const slotEnd = (i + 1) / n;
+        let tu = 1;
+        if (u < slotEnd) tu = u > slotStart ? (u - slotStart) / (slotEnd - slotStart) : 0;
+        if (tu <= 0) continue;
+        const halfLen = len * tu;
+        const off = (i - (n - 1) / 2) * g;
+        const cx = mx + ux * off, cy = my + uy * off;
+        ctx.moveTo(cx + uy * halfLen, cy - ux * halfLen);
+        ctx.lineTo(cx - uy * halfLen, cy + ux * halfLen);
+      }
+    }
+
+    function cornerMarkProgress(ctx, m, a, b, size, u) {
+      if (u <= 0) return;
+      const unit = (p) => {
+        const L = Math.hypot(p[0] - m[0], p[1] - m[1]) || 1;
+        return [(p[0] - m[0]) / L, (p[1] - m[1]) / L];
+      };
+      const [ax, ay] = unit(a), [bx, by] = unit(b);
+      const x1 = m[0] + ax * size, y1 = m[1] + ay * size;
+      const x2 = m[0] + (ax + bx) * size, y2 = m[1] + (ay + by) * size;
+      const x3 = m[0] + bx * size, y3 = m[1] + by * size;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      if (u <= 0.5) {
+        const t = u / 0.5;
+        ctx.lineTo(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t);
+      } else {
+        ctx.lineTo(x2, y2);
+        const t = (u - 0.5) / 0.5;
+        ctx.lineTo(x2 + (x3 - x2) * t, y2 + (y3 - y2) * t);
+      }
+    }
+
+    function centerDotProgress(ctx, m, r, lw, u) {
+      if (u <= 0) return;
+      ctx.beginPath();
+      ctx.arc(m[0], m[1], r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, u));
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    }
+
+    function strokeChevronProgress(ctx, w1x, w1y, tipx, tipy, w2x, w2y, u) {
+      if (u <= 0) return;
+      const segs = [[w1x, w1y, tipx, tipy], [tipx, tipy, w2x, w2y]];
+      const lens = segs.map((s) => Math.hypot(s[2] - s[0], s[3] - s[1]));
+      let rem = (lens[0] + lens[1]) * Math.min(1, u);
+      ctx.beginPath();
+      for (let i = 0; i < segs.length; i++) {
+        const [x0, y0, x1, y1] = segs[i];
+        const L = lens[i];
+        if (rem <= 0) break;
+        if (i === 0) ctx.moveTo(x0, y0);
+        if (rem >= L) {
+          ctx.lineTo(x1, y1);
+          rem -= L;
+        } else {
+          const t = rem / L;
+          ctx.lineTo(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+          break;
+        }
+      }
+      ctx.stroke();
+    }
+
+    function cornerMark(ctx, m, a, b, size) {
+      const u = (p) => {
+        const L = Math.hypot(p[0] - m[0], p[1] - m[1]) || 1;
+        return [(p[0] - m[0]) / L, (p[1] - m[1]) / L];
+      };
+      const [ax, ay] = u(a), [bx, by] = u(b);
+      ctx.beginPath();
+      ctx.moveTo(m[0] + ax * size, m[1] + ay * size);
+      ctx.lineTo(m[0] + (ax + bx) * size, m[1] + (ay + by) * size);
+      ctx.lineTo(m[0] + bx * size, m[1] + by * size);
+    }
+
+    function strokeHalo(ctx, ink, glow, width, draw) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = width + 2.6;
+      ctx.beginPath();
+      draw();
+      ctx.stroke();
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      draw();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawParaArrowCommitted(ctx, x0, y0, x1, y1, scale) {
+      const dx = x1 - x0, dy = y1 - y0;
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      let px = -uy, py = ux;
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      if (mx * px + my * py > 0) { px = -px; py = -py; }
+      const s = scale || 1;
+      const lift = 1.6 * s;
+      const ox = mx + px * lift, oy = my + py * lift;
+      const inset = Math.min(4.5 * s, L * 0.07);
+      const half = Math.max(L / 2 - inset, L * 0.38);
+      const head = Math.min(4.4 * s, half * 0.28);
+      const wing = head * 0.82;
+      const gap = head * 0.72;
+      const ink = 'rgba(18,10,6,0.95)';
+      const gold = '#ffe566';
+
+      function shaft(from, to) {
+        ctx.beginPath();
+        ctx.moveTo(ox + ux * from, oy + uy * from);
+        ctx.lineTo(ox + ux * to, oy + uy * to);
+        ctx.stroke();
+      }
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3.4 * s;
+      shaft(-half, -gap);
+      shaft(gap, half);
+      ctx.strokeStyle = gold;
+      ctx.lineWidth = 1.9 * s;
+      shaft(-half, -gap);
+      shaft(gap, half);
+      const tipx = ox + ux * head * 0.55, tipy = oy + uy * head * 0.55;
+      const bx = ox - ux * head * 0.55, by = oy - uy * head * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(tipx, tipy);
+      ctx.lineTo(bx + px * wing, by + py * wing);
+      ctx.lineTo(bx - px * wing, by - py * wing);
+      ctx.closePath();
+      ctx.fillStyle = ink;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(tipx, tipy);
+      ctx.lineTo(bx + px * wing * 0.7, by + py * wing * 0.7);
+      ctx.lineTo(bx - px * wing * 0.7, by - py * wing * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = gold;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawTrapParallelCommitted(ctx, pts, progress, size, now) {
+      const u = Math.max(0, Math.min(1, progress));
+      const pulse = 0.55 + 0.45 * Math.sin(now / 200);
+      const k = Math.max(0.85, (size || 36) / 36);
+      [[0, 1], [3, 2]].forEach(([i, j]) => {
+        const x0 = pts[i][0], y0 = pts[i][1];
+        const x1 = pts[j][0], y1 = pts[j][1];
+        const x = x0 + (x1 - x0) * u;
+        const y = y0 + (y1 - y0) * u;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(16, 80, 55,${0.55 + pulse * 0.25})`;
+        ctx.lineWidth = 6.5 * k;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(52, 211, 153,${0.85 + pulse * 0.15})`;
+        ctx.lineWidth = 3.1 * k;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.restore();
+        if (u < 0.95) return;
+        drawParaArrowCommitted(ctx, x0, y0, x1, y1, k);
+      });
+    }
+
+    function drawDiagonalsCommitted(ctx, pts, props, progress, size) {
+      const [bisect, perp, equal] = props;
+      const k = Math.max(0.85, (size || 36) / 36);
+      const m = segCross(pts[0], pts[2], pts[1], pts[3]);
+      const ink = 'rgba(18,10,6,0.95)';
+      const gold = '#ffe566';
+      strokeHalo(ctx, ink, gold, 1.9 * k, () => {
+        [[0, 2], [1, 3]].forEach(([i, j]) => {
+          ctx.moveTo(pts[i][0], pts[i][1]);
+          ctx.lineTo(
+            pts[i][0] + (pts[j][0] - pts[i][0]) * progress,
+            pts[i][1] + (pts[j][1] - pts[i][1]) * progress
+          );
+        });
+      });
+      if (progress < 1) return;
+      ctx.save();
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.arc(m[0], m[1], 4.4 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = gold;
+      ctx.beginPath();
+      ctx.arc(m[0], m[1], 2.7 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      if (bisect) {
+        const tickLen = 6.4 * k, gap = 5.2 * k;
+        strokeHalo(ctx, ink, gold, 2.1 * k, () => {
+          tickHalf(ctx, pts[0], m, 1, tickLen, gap);
+          tickHalf(ctx, pts[2], m, 1, tickLen, gap);
+          tickHalf(ctx, pts[1], m, equal ? 1 : 2, tickLen, gap);
+          tickHalf(ctx, pts[3], m, equal ? 1 : 2, tickLen, gap);
+        });
+      }
+      if (perp) {
+        const s = 8.5 * k;
+        ctx.save();
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
+        ctx.miterLimit = 2;
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 3.6 * k;
+        ctx.beginPath();
+        cornerMark(ctx, m, pts[0], pts[1], s);
+        ctx.stroke();
+        ctx.strokeStyle = gold;
+        ctx.lineWidth = 2 * k;
+        ctx.beginPath();
+        cornerMark(ctx, m, pts[0], pts[1], s);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawParaArrowAppraisal(ctx, x0, y0, x1, y1, scale, drawU) {
+      const ink = APPRAISAL_STYLE.trapMarkInk || APPRAISAL_STYLE.markInk;
+      const dx = x1 - x0, dy = y1 - y0;
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      let px = -uy, py = ux;
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      if (mx * px + my * py > 0) { px = -px; py = -py; }
+      const s = scale || 1;
+      const u = drawU == null ? 1 : drawU;
+      const head = Math.min(5.6 * s, L * 0.18);
+      const wing = head * 0.88;
+      const tipx = mx + ux * head * 0.58, tipy = my + uy * head * 0.58;
+      const bx = mx - ux * head * 0.42, by = my - uy * head * 0.42;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3.4 * s;
+      strokeChevronProgress(ctx, bx + px * wing, by + py * wing, tipx, tipy, bx - px * wing, by - py * wing, u);
+      ctx.restore();
+    }
+
+    function drawTrapParallelAppraisal(ctx, pts, progress, size) {
+      const u = Math.max(0, Math.min(1, progress));
+      const k = Math.max(0.85, (size || 36) / 36);
+      const ink = APPRAISAL_STYLE.trapMarkInk || APPRAISAL_STYLE.markInk;
+      const plan = [
+        { kind: 'edge', i: 0, j: 1 },
+        { kind: 'edge', i: 3, j: 2 },
+        { kind: 'arrow', i: 0, j: 1 },
+        { kind: 'arrow', i: 3, j: 2 }
+      ];
+      const total = plan.length;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3.4 * k;
+      for (let s = 0; s < plan.length; s++) {
+        const step = plan[s];
+        const su = appraisalStepAnim(u, s, total);
+        if (su <= 0) continue;
+        const x0 = pts[step.i][0], y0 = pts[step.i][1];
+        const x1 = pts[step.j][0], y1 = pts[step.j][1];
+        if (step.kind === 'edge') {
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x0 + (x1 - x0) * su, y0 + (y1 - y0) * su);
+          ctx.stroke();
+        } else {
+          drawParaArrowAppraisal(ctx, x0, y0, x1, y1, k, su);
+        }
+      }
+      ctx.restore();
+    }
+
+    function buildAppraisalDiagPlan(props) {
+      const [bisect, perp, equal] = props;
+      const plan = [
+        { kind: 'diag', i: 0, j: 2 },
+        { kind: 'diag', i: 1, j: 3 },
+        { kind: 'center' }
+      ];
+      if (perp) plan.push({ kind: 'perp' });
+      if (bisect) {
+        plan.push({ kind: 'tick', vi: 0, n: 1 });
+        plan.push({ kind: 'tick', vi: 2, n: 1 });
+        plan.push({ kind: 'tick', vi: 1, n: equal ? 1 : 2 });
+        plan.push({ kind: 'tick', vi: 3, n: equal ? 1 : 2 });
+      }
+      return plan;
+    }
+
+    function appraisalStepAnim(progress, stepIdx, total) {
+      const start = stepIdx / total;
+      const end = (stepIdx + 1) / total;
+      if (progress <= start) return 0;
+      if (progress >= end) return 1;
+      return (progress - start) / (end - start);
+    }
+
+    function drawDiagonalsAppraisal(ctx, pts, props, progress, size) {
+      const ink = APPRAISAL_STYLE.markInk;
+      const k = Math.max(0.75, (size || 36) / 40);
+      const m = segCross(pts[0], pts[2], pts[1], pts[3]);
+      const plan = buildAppraisalDiagPlan(props);
+      const total = plan.length;
+      const tickLen = 6.4 * k;
+      const gap = 5.2 * k;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.9 * k;
+      ctx.beginPath();
+      for (let s = 0; s < plan.length; s++) {
+        const step = plan[s];
+        if (step.kind !== 'diag') continue;
+        const u = appraisalStepAnim(progress, s, total);
+        if (u <= 0) continue;
+        ctx.moveTo(pts[step.i][0], pts[step.i][1]);
+        ctx.lineTo(
+          pts[step.i][0] + (pts[step.j][0] - pts[step.i][0]) * u,
+          pts[step.i][1] + (pts[step.j][1] - pts[step.i][1]) * u
+        );
+      }
+      ctx.stroke();
+      for (let s = 0; s < plan.length; s++) {
+        const step = plan[s];
+        if (step.kind === 'diag') continue;
+        const u = appraisalStepAnim(progress, s, total);
+        if (u <= 0) continue;
+        if (step.kind === 'center') {
+          const dotR = 3.0 * k;
+          const dotLw = 1.5 * k;
+          centerDotProgress(ctx, m, dotR, dotLw, u);
+          if (u >= 1) {
+            ctx.fillStyle = ink;
+            ctx.beginPath();
+            ctx.arc(m[0], m[1], dotR, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (step.kind === 'perp') {
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          ctx.miterLimit = 2;
+          ctx.lineWidth = 3.6 * k;
+          cornerMarkProgress(ctx, m, pts[0], pts[1], 8.5 * k, u);
+          ctx.stroke();
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+        } else if (step.kind === 'tick') {
+          ctx.lineWidth = 2.1 * k;
+          ctx.beginPath();
+          tickHalfProgress(ctx, pts[step.vi], m, step.n, tickLen, gap, u);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function gemJoin(k) {
+      return k === 'raw' ? 'round' : 'miter';
+    }
+
+    function gemInnerScale(k) {
+      return k === 'raw' ? 0.80 : 0.90;
+    }
+
+    function paintGemPreview(ctx, k, size, sd, opt) {
+      const info = GEMS[k];
+      const line = (opt && opt.line) || info.line;
+      const pts = shapeFor(k, size, sd);
+      const lw = (opt && opt.lw != null) ? opt.lw : Math.max(1.2, Math.min(1.85, size * 0.11));
+      const join = gemJoin(k);
+      const innerScale = gemInnerScale(k);
+
+      if (opt && opt.fill && !opt.fx) {
+        poly(ctx, pts, opt.fill, line, lw, join);
+        return;
+      }
+
+      const h = hash(sd || 1);
+      const glow = opt && opt.fill
+        ? opt.fill
+        : (h < 0.34 ? '#c4b5fd' : h < 0.67 ? '#5eead4' : '#fbbf24');
+      const halo = opt && opt.halo
+        ? opt.halo
+        : opt && opt.fill
+          ? 'rgba(130, 168, 200, 0.28)'
+          : (h < 0.34 ? 'rgba(196,181,253,0.28)' : h < 0.67 ? 'rgba(94,234,212,0.28)' : 'rgba(251,191,36,0.28)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.ellipse(0, 2, size * 0.72, size * 0.46, 0, 0, Math.PI * 2);
+      ctx.fill();
+      poly(ctx, pts, '#3f322e', line, lw, join);
+      const inner = pts.map((p) => [p[0] * innerScale, p[1] * innerScale]);
+      poly(ctx, inner, glow, null, 0, join);
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
+      ctx.beginPath();
+      ctx.moveTo(inner[0][0] * 0.55, inner[0][1] * 0.55);
+      ctx.lineTo(inner[1][0] * 0.45, inner[1][1] * 0.45);
+      ctx.lineTo(inner[2][0] * 0.22, inner[2][1] * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(-size * 0.22, -size * 0.28, size * 0.18, size * 0.12, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCommittedGem(ctx, k, size, sd, props, markT, now) {
+      const info = GEMS[k];
+      const pts = shapeFor(k, size, sd);
+      const join = k === 'raw' ? 'round' : 'miter';
+      poly(ctx, pts, GEM_FILL, info.line, 2.2, join);
+      if (k === 'trap') drawTrapParallelCommitted(ctx, pts, markT, size, now);
+      else if (k !== 'raw') drawDiagonalsCommitted(ctx, pts, props, markT, size);
+    }
+
+    function drawAppraisalGem(ctx, k, size, sd, props, markT) {
+      const st = APPRAISAL_STYLE;
+      const info = GEMS[k];
+      const pts = shapeFor(k, size, sd);
+      if (k === 'trap') {
+        paintGemPreview(ctx, k, size, sd, {
+          fill: st.trapGemFill || st.gemFill,
+          line: info.line,
+          lw: st.gemLw,
+          fx: true,
+          halo: st.trapGemHalo
+        });
+        drawTrapParallelAppraisal(ctx, pts, markT, size);
+      } else {
+        paintGemPreview(ctx, k, size, sd, null);
+        if (k !== 'raw') drawDiagonalsAppraisal(ctx, pts, props, markT, size);
+      }
+    }
+
+    function gemVisualExtents(k, size, sd) {
+      const pts = shapeFor(k, size, sd);
+      let minX = 0, maxX = 0, minY = 0, maxY = 0;
+      for (let i = 0; i < pts.length; i++) {
+        minX = Math.min(minX, pts[i][0]);
+        maxX = Math.max(maxX, pts[i][0]);
+        minY = Math.min(minY, pts[i][1]);
+        maxY = Math.max(maxY, pts[i][1]);
+      }
+      return { w: maxX - minX, h: maxY - minY };
+    }
+
+    function appraisalMarkPad(k) {
+      return k === 'trap' ? 18 : 12;
+    }
+
+    function wrapBoardText(ctx, text, maxW, font) {
+      if (font) ctx.font = font;
+      const parts = String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      const lines = [];
+      for (let p = 0; p < parts.length; p++) {
+        const src = parts[p];
+        if (ctx.measureText(src).width <= maxW) { lines.push(src); continue; }
+        let acc = '';
+        for (let i = 0; i < src.length; i++) {
+          const next = acc + src[i];
+          if (acc && ctx.measureText(next).width > maxW) { lines.push(acc); acc = src[i]; }
+          else acc = next;
+        }
+        if (acc) lines.push(acc);
+      }
+      return lines.slice(0, 2);
+    }
+
+    function layoutAppraisalBoard(ctx, bw, bh, k, sd, diagText) {
+      const padX = 8, padY = 5;
+      const innerW = bw - padX * 2;
+      const st = APPRAISAL_STYLE;
+      const lineH = 13, nameH = 16, nameGap = 4, diagGap = 8;
+      const lines = wrapBoardText(ctx, diagText, innerW, st.diagFont);
+      const diagH = lines.length * lineH;
+      const ext = gemVisualExtents(k, APPRAISAL_GEM_SIZE, sd);
+      const gemBlockH = ext.h + appraisalMarkPad(k) * 2;
+      const avail = bh - padY * 2;
+      const overhead = nameH + nameGap + diagGap + diagH;
+      const gemSpace = Math.max(28, avail - overhead);
+      const drawScale = gemBlockH > gemSpace ? gemSpace / gemBlockH : 1;
+      const slotH = gemBlockH * drawScale;
+      const contentH = overhead + slotH;
+      const top = padY + Math.max(0, (avail - contentH) / 2);
+      return {
+        lines, lineH, nameY: top + nameH / 2,
+        gemCy: top + nameH + nameGap + slotH / 2,
+        diagY: top + nameH + nameGap + slotH + diagGap,
+        drawScale
+      };
+    }
+
+    function fillGoldGlowText(ctx, text, x, y) {
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
+      ctx.save();
+      ctx.shadowColor = `rgba(253, 224, 71, ${0.75 + pulse * 0.25})`;
+      ctx.shadowBlur = 14 + pulse * 12;
+      ctx.fillStyle = '#fff3a8';
+      ctx.fillText(text, x, y);
+      ctx.shadowBlur = 6 + pulse * 6;
+      ctx.fillStyle = '#fde047';
+      ctx.fillText(text, x, y);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fffbeb';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawBoardFrame(ctx, bx, by, bw, bh, fill, stroke, lw) {
+      ctx.fillStyle = fill;
+      roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lw == null ? 2 : lw;
+      roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.stroke();
+    }
+
+    function drawSoldOnBoard(ctx, mode, markT, now) {
+      const info = GEMS[kind];
+      const bx = 0, by = 0, bw = BOARD_W, bh = BOARD_H;
+      const isCommitted = mode === 'committed';
+      const st = isCommitted ? COMMITTED_STYLE : APPRAISAL_STYLE;
+
+      drawBoardFrame(
+        ctx, bx, by, bw, bh,
+        wanted ? st.frameFillWanted : st.frameFill,
+        wanted ? st.frameStrokeWanted : (info.line || st.frameStroke),
+        2
+      );
+
+      const layout = layoutAppraisalBoard(ctx, bw, bh, kind, seed, info.diag);
+
+      ctx.save();
+      roundRect(ctx, bx + 3, by + 3, bw - 6, bh - 6, 8);
+      ctx.clip();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (kind === 'square') {
+        ctx.font = st.nameFontSquare || st.nameFont;
+        fillGoldGlowText(ctx, info.name, bx + bw / 2, by + layout.nameY);
+      } else {
+        ctx.font = st.nameFont;
+        ctx.fillStyle = st.nameColor;
+        ctx.fillText(info.name, bx + bw / 2, by + layout.nameY);
+      }
+
+      ctx.save();
+      ctx.translate(bx + bw / 2, by + layout.gemCy);
+      ctx.scale(layout.drawScale, layout.drawScale);
+      if (isCommitted) drawCommittedGem(ctx, kind, APPRAISAL_GEM_SIZE, seed, info.props, markT, now);
+      else drawAppraisalGem(ctx, kind, APPRAISAL_GEM_SIZE, seed, info.props, markT);
+      ctx.restore();
+
+      ctx.font = st.diagFont;
+      ctx.fillStyle = st.diagColor;
+      ctx.textBaseline = 'alphabetic';
+      for (let i = 0; i < layout.lines.length; i++) {
+        ctx.fillText(layout.lines[i], bx + bw / 2, by + layout.diagY + i * layout.lineH);
+      }
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+
+    function renderPanel(canvas, ctx, mode, markT, now) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#120c08';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(PAD, PAD);
+      ctx.scale(SCALE, SCALE);
+      drawSoldOnBoard(ctx, mode, markT, now);
+      ctx.restore();
+    }
+
+    function markTFromTime(time) {
+      const dur = kind === 'trap' ? APPRAISE_MARK_TRAP_DUR : APPRAISE_MARK_DIAG_DUR;
+      return Math.min(1, time / dur);
+    }
+
+    function markDurForKind(k) {
+      if (k === 'raw') return 0.01;
+      return k === 'trap' ? APPRAISE_MARK_TRAP_DUR : APPRAISE_MARK_DIAG_DUR;
+    }
+
+    function markLoopDurForKind(k) {
+      return markDurForKind(k) + APPRAISE_MARK_HOLD;
+    }
+
+    function syncUi() {
+      const pct = Math.round(markTFromTime(t) * 1000);
+      ui.scrub.value = String(pct);
+      ui.scrubVal.textContent = `${(pct / 10).toFixed(1)}%`;
+      ui.seedVal.textContent = String(seed);
+      ui.speedVal.textContent = `${(Number(ui.speed.value) / 100).toFixed(1)}×`;
+      ui.play.textContent = playing ? '⏸ 일시정지' : '▶ 재생';
+      const info = GEMS[kind];
+      const suffix = wanted ? ' · 특별요청' : '';
+      caps.committed.textContent = kind === 'raw'
+        ? `${info.name}${suffix} · 게임 보석색 · 기호 없음`
+        : `${info.name}${suffix} · 도종별 외곽 · 녹색 펄스 · ink+gold`;
+      caps.current.textContent = kind === 'raw'
+        ? `${info.name}${suffix} · 게임 보석 · 기호 없음`
+        : kind === 'trap'
+          ? `${info.name}${suffix} · 진한 녹색+효과 · 금색 기호`
+          : `${info.name}${suffix} · 게임 보석 · 검정 기호`;
+    }
+
+    function render(now) {
+      const markT = markTFromTime(t);
+      renderPanel(canvases.committed, ctxs.committed, 'committed', markT, now);
+      renderPanel(canvases.current, ctxs.current, 'current', markT, now);
+      syncUi();
+    }
+
+    function frame(ts) {
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      if (playing) {
+        t += dt * (Number(ui.speed.value) / 100);
+        if (t > markLoopDurForKind(kind)) t = 0;
+      }
+      render(ts);
+      requestAnimationFrame(frame);
+    }
+
+    document.querySelectorAll('[data-kind]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        kind = btn.dataset.kind;
+        document.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('active', b === btn));
+        t = 0;
+        playing = true;
+        syncUi();
+      });
+    });
+
+    ui.wanted.addEventListener('change', () => {
+      wanted = ui.wanted.checked;
+      syncUi();
+    });
+
+    ui.play.addEventListener('click', () => { playing = !playing; syncUi(); });
+    ui.restart.addEventListener('click', () => { t = 0; playing = true; syncUi(); });
+    ui.step.addEventListener('click', () => { playing = false; t = Math.min(markLoopDurForKind(kind), t + 0.016); syncUi(); });
+    ui.scrub.addEventListener('input', () => {
+      playing = false;
+      t = (Number(ui.scrub.value) / 1000) * markDurForKind(kind);
+      syncUi();
+    });
+    ui.seed.addEventListener('input', () => { seed = Number(ui.seed.value); syncUi(); });
+    ui.randSeed.addEventListener('click', () => {
+      seed = 1 + Math.floor(Math.random() * 99);
+      ui.seed.value = String(seed);
+      syncUi();
+    });
+    ui.speed.addEventListener('input', syncUi);
+
+    syncUi();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
