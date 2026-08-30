@@ -37,6 +37,13 @@ function sanitizeInput(str, maxLen = 12) {
   return str.replace(/[<>'"/]/g, '').trim().slice(0, maxLen);
 }
 
+function randomDormsNickname() {
+  const prefixes = ['도름', '별빛', '반짝', '똑똑', '신난', '고냥', '빙수', '프라즘'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const num = String(Math.floor(10 + Math.random() * 90));
+  return sanitizeInput(prefix + num, 12);
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, function(m) {
@@ -160,7 +167,14 @@ function initCongruenceGame() {
     }
   }
 
-  let playerName = sanitizeInput(safeGetStorage(nameStorageKey), 12);
+  let playerName = sanitizeInput(
+    safeGetStorage(nameStorageKey) || (activeMode === 'dorms' ? safeGetStorage('halomath_name_dorms') : '') || '',
+    12
+  );
+  if (activeMode === 'dorms' && (!playerName || playerName === '도전자')) {
+    playerName = randomDormsNickname();
+    safeSetStorage(nameStorageKey, playerName);
+  }
   let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey), 10) : '';
   let highScore = parseInt(safeGetStorage(highScoreStorageKey, '0'), 10);
 
@@ -324,7 +338,7 @@ function initCongruenceGame() {
   }
 
   updateProfileDisplay();
-  hudHighScore.textContent = `${highScore}점`;
+  if (hudHighScore) hudHighScore.textContent = `${highScore}점`;
 
   // Sound Toggle Listener
   if (btnSoundToggle) {
@@ -357,12 +371,44 @@ function initCongruenceGame() {
     });
   }
 
-  // Pre-fill profile inputs from localStorage on load
-  if (inputPlayerName) inputPlayerName.value = playerName;
-  if (inputStudentId) inputStudentId.value = studentId;
-  if (activeMode !== 'school' && studentIdGroup) {
-    studentIdGroup.style.display = 'none';
+  function applyDormsModeUi() {
+    if (activeMode !== 'dorms') return;
+    document.body.classList.add('mode-dorms');
+    const labelPlayerName = document.getElementById('label-player-name');
+    if (labelPlayerName) labelPlayerName.textContent = '닉네임';
+    if (studentIdGroup) studentIdGroup.style.display = 'none';
+    document.querySelectorAll('.th-student-id').forEach((el) => { el.style.display = 'none'; });
+    const champId = document.getElementById('opening-champ-id');
+    if (champId) champId.style.display = 'none';
+    const resultIdSpan = document.getElementById('result-locked-id-span');
+    if (resultIdSpan) resultIdSpan.style.display = 'none';
+    if (displayProfileId) displayProfileId.style.display = 'none';
+    if (inputStudentId) {
+      inputStudentId.removeAttribute('required');
+      inputStudentId.disabled = true;
+      inputStudentId.value = '';
+    }
   }
+
+  function fillNicknameInput() {
+    const nameEl = document.getElementById('input-player-name');
+    if (!nameEl) return;
+    if (activeMode === 'dorms') {
+      if (!playerName || playerName === '도전자') {
+        playerName = randomDormsNickname();
+        safeSetStorage(nameStorageKey, playerName);
+      }
+      nameEl.placeholder = '닉네임 입력';
+      nameEl.value = playerName;
+      nameEl.removeAttribute('required');
+    } else {
+      nameEl.value = playerName || '도전자';
+    }
+    if (inputStudentId && activeMode === 'school') inputStudentId.value = studentId;
+  }
+
+  applyDormsModeUi();
+  fillNicknameInput();
 
   let isTimerPaused = true;
 
@@ -376,8 +422,8 @@ function initCongruenceGame() {
 
     let cleanName = sanitizeInput(nameInput ? nameInput.value : '', 12);
     if (!cleanName) {
-      cleanName = '도전자';
-      if (nameInput) nameInput.value = '도전자';
+      cleanName = activeMode === 'dorms' ? randomDormsNickname() : '도전자';
+      if (nameInput) nameInput.value = cleanName;
     }
 
     if (activeMode === 'school' && idInput) {
@@ -2567,7 +2613,7 @@ function initCongruenceGame() {
 
   // Pre-fill profile inputs on load
   function openProfileModal() {
-    if (inputPlayerName) inputPlayerName.value = playerName || '도전자';
+    fillNicknameInput();
     if (activeMode === 'school' && inputStudentId) inputStudentId.value = studentId || '미입력';
     if (profileModal) {
       profileModal.classList.remove('hidden');
@@ -2587,11 +2633,7 @@ function initCongruenceGame() {
     });
   }
 
-  // Show profile modal on load
-  if (profileModal) {
-    profileModal.classList.remove('hidden');
-    profileModal.style.display = 'flex';
-  }
+  openProfileModal();
 }
 
 if (document.readyState === 'loading') {

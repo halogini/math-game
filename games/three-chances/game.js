@@ -33,6 +33,13 @@ function sanitizeInput(str, maxLen = 12) {
   return str.replace(/[<>'"/]/g, "").trim().slice(0, maxLen);
 }
 
+function randomDormsNickname() {
+  const prefixes = ["도름", "별빛", "반짝", "똑똑", "신난", "고냥", "빙수", "프라즘"];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const num = String(Math.floor(10 + Math.random() * 90));
+  return sanitizeInput(prefix + num, 12);
+}
+
 function escapeHtml(str) {
   if (str == null) return "";
   return String(str).replace(/[&<>"']/g, (m) => ({
@@ -5610,7 +5617,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   profileForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    playerName = sanitizeInput(document.getElementById("input-player-name").value) || "도전자";
+    playerName = sanitizeInput(document.getElementById("input-player-name").value)
+      || (activeMode === "dorms" ? randomDormsNickname() : "도전자");
     if (activeMode === "dorms") {
       studentId = "";
     } else {
@@ -5677,7 +5685,7 @@ document.addEventListener("DOMContentLoaded", () => {
       labelName.textContent = "";
       labelName.append("닉네임");
       if (nameInput) {
-        nameInput.placeholder = "닉네임 입력";
+        nameInput.placeholder = "비워두면 랜덤 닉네임";
         labelName.appendChild(document.createTextNode(" "));
         labelName.appendChild(nameInput);
       }
@@ -5699,9 +5707,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const savedName = localStorage.getItem("hm_player_name");
+  const savedName = localStorage.getItem("hm_player_name")
+    || (activeMode === "dorms" ? localStorage.getItem("halomath_name_dorms") : "");
   const savedId = localStorage.getItem("hm_student_id");
-  if (savedName) document.getElementById("input-player-name").value = savedName;
+  const nameInputEl = document.getElementById("input-player-name");
+  if (savedName) {
+    nameInputEl.value = savedName;
+  } else if (activeMode === "dorms") {
+    nameInputEl.value = randomDormsNickname();
+  }
   if (savedId && activeMode !== "dorms") {
     document.getElementById("input-student-id").value = savedId;
   }

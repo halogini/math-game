@@ -42,6 +42,13 @@ function sanitizeInput(str, maxLen = 12) {
     .slice(0, maxLen);
 }
 
+function randomDormsNickname() {
+  const prefixes = ['도름', '별빛', '반짝', '똑똑', '신난', '고냥', '빙수', '프라즘'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const num = String(Math.floor(10 + Math.random() * 90));
+  return sanitizeInput(prefix + num, 12);
+}
+
 function isValidName(name) {
   return typeof name === 'string' && name.trim().length >= 1 && name.trim().length <= 12;
 }
@@ -115,7 +122,16 @@ function initBingsooGame() {
   let popupTimeoutId = null;
 
   // Locked Player Info (Sanitized)
-  let playerName = sanitizeInput(safeGetStorage(nameStorageKey) || '도전자', 12);
+  let playerName = sanitizeInput(
+    safeGetStorage(nameStorageKey) || (activeMode === 'dorms' ? safeGetStorage('halomath_name_dorms') : '') || '',
+    12
+  );
+  if (activeMode === 'dorms' && !playerName) {
+    playerName = randomDormsNickname();
+    safeSetStorage(nameStorageKey, playerName);
+  } else if (!playerName) {
+    playerName = '도전자';
+  }
   let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey) || '', 10) : '';
 
   // DOM Elements
@@ -185,7 +201,10 @@ function initBingsooGame() {
     if (thResultId) thResultId.style.display = 'none';
     if (resultLockedIdSpan) resultLockedIdSpan.style.display = 'none';
     if (labelPlayerName) labelPlayerName.textContent = '도전자 닉네임:';
-    if (inputPlayerName) inputPlayerName.placeholder = '예: dorms마스터';
+    if (inputPlayerName) {
+      inputPlayerName.placeholder = '비워두면 랜덤 닉네임';
+      if (!inputPlayerName.value && playerName) inputPlayerName.value = playerName;
+    }
     if (inputStudentId) inputStudentId.removeAttribute('required');
     if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 dorms 명예의 전당 (1위 ~ 20위)';
   } else {
@@ -234,8 +253,8 @@ function initBingsooGame() {
     const rawName = inputPlayerName ? inputPlayerName.value : '';
     let cleanName = sanitizeInput(rawName, 12);
     if (!cleanName) {
-      cleanName = '도전자';
-      if (inputPlayerName) inputPlayerName.value = '도전자';
+      cleanName = activeMode === 'dorms' ? randomDormsNickname() : '도전자';
+      if (inputPlayerName) inputPlayerName.value = cleanName;
     }
 
     let cleanId = '';

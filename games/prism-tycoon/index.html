@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>보석동굴에서 정사각형 보석을 만들어라! | 할로매쓰</title>
-  <meta name="description" content="보석동굴에서 정사각형 보석을 만들어라! 보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
-  <meta property="og:title" content="보석동굴에서 정사각형 보석을 만들어라!">
-  <meta property="og:description" content="보물지도로 찾은 보석동굴. 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
+  <title>보석 타이쿤 | 할로매쓰</title>
+  <meta name="description" content="보석 타이쿤 — 보석동굴에서 정사각형 보석을 만들어라! 보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
+  <meta property="og:title" content="보석 타이쿤">
+  <meta property="og:description" content="보석 타이쿤. 보석동굴에서 정사각형 보석을 만들고 파세요. 다이너마이트 충격으로 무너지기까지 5분뿐입니다.">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,7 +89,7 @@
       pointer-events: auto;
     }
     .btn-fullscreen:hover { border-color: var(--gold); }
-    .hud-title { font: 800 16px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.02em; }
+    .hud-title { font: 800 16px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.06em; }
     .chip {
       display: flex; align-items: center; gap: 7px;
       background: rgba(15, 23, 42, 0.82); border: 1px solid var(--line);
@@ -281,9 +281,9 @@
       width: min(520px, 100%); background: #1a1026; border: 1px solid var(--line);
       border-radius: 20px; padding: 22px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
     }
-    .card h1 { margin: 0; font: 800 24px Pretendard, sans-serif; color: var(--gold); letter-spacing: -0.02em; line-height: 1.35; }
+    .card h1 { margin: 0; font: 800 36px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.04em; line-height: 1.2; }
     .card .tagline { margin: 8px 0 16px; font: 700 14px Pretendard, sans-serif; color: #f0c36a; line-height: 1.55; }
-    .card h2 { margin: 0 0 6px; font: 800 24px Pretendard, sans-serif; color: var(--gold); text-align: center; }
+    .card h2 { margin: 0 0 6px; font: 800 28px Pretendard, sans-serif; color: var(--gold); text-align: center; letter-spacing: 0.04em; }
     .flow { display: grid; gap: 7px; margin-bottom: 14px; }
     .flow div {
       display: flex; gap: 8px; align-items: baseline;
@@ -414,7 +414,7 @@
     .opening.playing .opening-ui { background: transparent; justify-content: flex-end; padding-bottom: calc(env(safe-area-inset-bottom) + 18px); }
     .opening.playing .opening-brand { display: none; }
     .opening-brand { text-align: center; pointer-events: none; }
-    .opening-brand .logo { margin: 0; max-width: 16em; font: 800 26px Pretendard, sans-serif; color: var(--gold); letter-spacing: -0.02em; line-height: 1.35; }
+    .opening-brand .logo { margin: 0; font: 800 42px Pretendard, sans-serif; color: var(--gold); letter-spacing: 0.08em; line-height: 1.2; }
     .opening-brand .hook { margin: 12px 0 0; max-width: 420px; font: 700 14px Pretendard, sans-serif; color: #f5e9d6; line-height: 1.55; }
     .opening-play, .opening-skip {
       pointer-events: auto;
@@ -499,8 +499,8 @@
         max-height: 94vh;
         overflow-y: auto;
       }
-      .card h1 { font-size: 18px; }
-      .card h2 { font-size: 18px; margin: 0 0 4px; }
+      .card h1 { font-size: 26px; }
+      .card h2 { font-size: 22px; margin: 0 0 4px; }
       .card .tagline { margin: 2px 0 8px; font-size: 12px; }
       .flow {
         grid-template-columns: 1fr 1fr;
@@ -539,7 +539,7 @@
       .chip { padding: 5px 9px; gap: 5px; }
       .chip.gold .value { font-size: 24px; }
       .card { padding: 18px; }
-      .card h1 { font-size: 24px; }
+      .card h1 { font-size: 32px; }
     }
   </style>
 </head>
@@ -560,7 +560,7 @@
 
     <div class="hud hidden">
       <div class="hud-left">
-        <span class="hud-title">정사각형을 만들어라!</span>
+        <span class="hud-title">보석 타이쿤</span>
         <span class="hud-player" id="hud-player"></span>
       </div>
       <div class="hud-center">
@@ -581,8 +581,8 @@
       <video id="opening-video" playsinline webkit-playsinline preload="auto"></video>
       <div class="opening-ui">
         <div class="opening-brand">
-          <p class="logo">보석동굴에서<br>정사각형 보석을 만들어라!</p>
-          <p class="hook">보물지도로 찾은 보석동굴.<br>다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
+          <p class="logo">보석 타이쿤</p>
+          <p class="hook">보석동굴에서 정사각형 보석을 만들어라!<br>보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
         </div>
         <button type="button" class="opening-play" id="btn-opening-play">오프닝 보기</button>
         <button type="button" class="opening-skip" id="btn-opening-skip">건너뛰기</button>
@@ -591,8 +591,8 @@
 
     <div class="overlay hidden" id="start-overlay">
       <div class="card">
-        <h1>보석동굴에서<br>정사각형 보석을 만들어라!</h1>
-        <p class="tagline">보물지도로 찾은 보석동굴. 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
+        <h1>보석 타이쿤</h1>
+        <p class="tagline">보석동굴에서 정사각형 보석을 만들어라!<br>보물지도로 찾은 동굴이 다이너마이트 충격으로 무너지기까지 5분뿐입니다.</p>
         <div class="flow">
           <div><span>⛏️</span><b>광맥</b><span>밟으면 원석이 등에 쌓입니다</span></div>
           <div><span>🏭</span><b>공장</b><span>↑(입구)에 넣고 ↓(출구)에서 꺼냅니다</span></div>
@@ -638,7 +638,7 @@
 
     <div class="overlay hidden" id="result-overlay">
       <div class="card">
-        <h2>동굴 마감!</h2>
+        <h2>보석 타이쿤</h2>
         <div class="final">
           <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
           <div class="sub">5분간 모은 금액</div>

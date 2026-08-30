@@ -37,6 +37,13 @@ function sanitizeInput(str, maxLen = 12) {
     .slice(0, maxLen);
 }
 
+function randomDormsNickname() {
+  const prefixes = ['도름', '별빛', '반짝', '똑똑', '신난', '고냥', '빙수', '프라즘'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const num = String(Math.floor(10 + Math.random() * 90));
+  return sanitizeInput(prefix + num, 12);
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, function(m) {
@@ -66,6 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
   let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
+
+  if (activeMode === 'dorms' && !playerName) {
+    playerName = randomDormsNickname();
+    localStorage.setItem(nameStorageKey, playerName);
+  }
 
   // DOM Elements
   const portalTitle = document.getElementById('portal-title');
@@ -142,7 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       modalTitle.textContent = '🌐 도전자 닉네임 설정';
       labelPlayerName.textContent = '도전자 닉네임:';
-      inputPlayerName.placeholder = '예: dorms마스터';
+      inputPlayerName.placeholder = '비워두면 랜덤 닉네임';
+      if (inputPlayerName && !inputPlayerName.value && playerName) {
+        inputPlayerName.value = playerName;
+      }
 
       // Completely Hide & Remove Student ID group for Dorems mode
       if (studentIdGroup) {
@@ -210,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnEditProfile) {
     btnEditProfile.addEventListener('click', () => {
-      inputPlayerName.value = playerName;
+      inputPlayerName.value = playerName || (activeMode === 'dorms' ? randomDormsNickname() : '');
       if (activeMode === 'school') {
         inputStudentId.value = studentId;
       }
@@ -220,8 +235,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   profileForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const cleanName = sanitizeInput(inputPlayerName.value, 12);
-    
+    let cleanName = sanitizeInput(inputPlayerName.value, 12);
+
+    if (!cleanName && activeMode === 'dorms') {
+      cleanName = randomDormsNickname();
+      if (inputPlayerName) inputPlayerName.value = cleanName;
+    }
+
     if (!cleanName) {
       alert('닉네임/이름을 올바르게 입력해 주세요.');
       return;
@@ -370,8 +390,10 @@ document.addEventListener('DOMContentLoaded', () => {
               });
             }
           } else {
-            const rawScore = parseInt(item.score, 10) || 0;
-            // 팥빙수나 합동게임은 500점, 100점 만점이 있을 수 있으나, 타이쿤은 제한 없음
+            const rawScore = gameKey === 'prism-tycoon'
+              ? (Number(item.score) || 0)
+              : (parseInt(item.score, 10) || 0);
+            // 팥빙수나 합동게임은 500점 캡, 타이쿤 수익은 상한 없음
             const score = gameKey === 'prism-tycoon' ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
             const prev = bestMap.get(userKey);
             if (!prev || score > prev.score) {
@@ -446,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ranked = activeLeaderboardGame === 'three-chances'
       ? withCompetitionRanks(list, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
-      : list.map((item, i) => ({ item, rank: i + 1, tied: false }));
+      : withCompetitionRanks(list, (item) => item.score);
 
     ranked.forEach(({ item, rank, tied }) => {
       const tr = document.createElement('tr');

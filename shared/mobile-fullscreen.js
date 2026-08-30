@@ -1,10 +1,14 @@
 (function (global) {
-  function isTouchDevice() {
+  function wantsMobileFullscreen() {
     try {
-      if (window.matchMedia("(hover: none) and (pointer: coarse)").matches) return true;
-      if (window.matchMedia("(pointer: coarse)").matches) return true;
-    } catch (_) {}
-    return (navigator.maxTouchPoints || 0) > 1;
+      // Touchscreen laptops still expose hover + fine pointer (trackpad/mouse).
+      if (window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches) {
+        return false;
+      }
+      return window.matchMedia("(pointer: coarse)").matches;
+    } catch (_) {
+      return false;
+    }
   }
 
   function MobileFullscreen(options) {
@@ -27,7 +31,7 @@
     }
 
     function wants() {
-      return isTouchDevice();
+      return wantsMobileFullscreen();
     }
 
     function request() {
