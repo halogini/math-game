@@ -77,6 +77,10 @@ body {
   letter-spacing: -0.5px;
 }
 
+.brand h1 .title-short {
+  display: none;
+}
+
 .brand .subtitle {
   font-size: 0.82rem;
   color: var(--text-muted);
@@ -208,6 +212,11 @@ body {
   background: #e0f2fe;
   border-color: #0284c7;
   color: #0369a1;
+}
+
+.tool-btn-short,
+.btn-label-short {
+  display: none;
 }
 
 .toolbar-right {
@@ -571,17 +580,20 @@ body {
   touch-action: none;
   transform-origin: 0px 0px; /* Pivots at right-angle corner */
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.15));
-  transition: filter 0.2s ease;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  opacity: 0.82;
 }
 
 .set-square-container:hover {
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.22));
+  opacity: 1;
 }
 
 .set-square-container.is-dragging {
   cursor: grabbing;
   filter: drop-shadow(0 12px 24px rgba(2, 132, 199, 0.35));
   z-index: 100 !important;
+  opacity: 1;
 }
 
 .set-square-svg {
@@ -728,6 +740,48 @@ body {
   cursor: grab;
 }
 
+.dpad-toggle-btn {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0369a1;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.dpad-toggle-btn:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+
+.dpad-controller.is-collapsed {
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.dpad-controller.is-collapsed .dpad-cross,
+.dpad-controller.is-collapsed .dpad-step-btn,
+.dpad-controller.is-collapsed .dpad-drag-handle {
+  display: none;
+}
+
+.dpad-controller.is-collapsed .dpad-header {
+  justify-content: center;
+  gap: 4px;
+}
+
+.dpad-controller.is-collapsed .dpad-toggle-btn {
+  transform: rotate(-90deg);
+}
+
 .dpad-controller.is-dragging .dpad-header {
   cursor: grabbing;
 }
@@ -838,7 +892,7 @@ body {
 /* Instruction Banner */
 .instruction-banner {
   position: absolute;
-  bottom: 12px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(15, 23, 42, 0.88);
@@ -852,13 +906,21 @@ body {
   pointer-events: none;
   z-index: 15;
   transition: opacity 0.3s ease;
-  white-space: nowrap;
+  max-width: min(92%, 560px);
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.35;
+}
+
+.instruction-banner.is-faded {
+  opacity: 0.18;
 }
 
 /* Score Popup Card */
 .score-popup {
   position: absolute;
-  top: 16px;
+  top: 52px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
@@ -1266,19 +1328,255 @@ body {
   display: none !important;
 }
 
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .game-app {
-    padding: 12px;
-    gap: 10px;
+/* Responsive adjustments — keep the play board, shrink chrome */
+@media (max-width: 640px), (max-height: 700px) {
+  html, body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
+
+  body.mobile-play-active {
+    top: var(--app-offset-top, 0px);
+    height: var(--app-vh, 100svh);
+  }
+
+  body {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .game-app {
+    max-width: none;
+    width: 100%;
+    min-height: var(--app-vh, 100svh);
+    height: var(--app-vh, 100svh);
+    max-height: var(--app-vh, 100svh);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    padding: 8px;
+    gap: 6px;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .app-header {
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .logo-emoji {
+    font-size: 1.6rem;
+  }
+
   .brand h1 {
+    font-size: 1.12rem;
+  }
+
+  .brand h1 .title-full {
+    display: none;
+  }
+
+  .brand h1 .title-short {
+    display: inline;
+  }
+
+  .brand .subtitle,
+  .toolbar-label,
+  .toolbar-right,
+  .tool-btn-full,
+  .btn-label-full {
+    display: none;
+  }
+
+  .tool-btn-short,
+  .btn-label-short {
+    display: inline;
+  }
+
+  .status-bar {
+    width: auto;
+    flex: 1;
+    justify-content: flex-end;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .player-info-card {
+    display: none;
+  }
+
+  .status-card {
+    min-width: 0;
+    flex: 1;
+    padding: 3px 6px;
+  }
+
+  .status-card .value {
+    font-size: 0.92rem;
+  }
+
+  .player-info-card {
+    padding: 3px 8px;
+  }
+
+  .ruler-toolbar {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    justify-content: stretch;
+    gap: 4px;
+  }
+
+  .tool-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 4px;
+    font-size: 0.72rem;
+  }
+
+  .game-container,
+  .board-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .game-board {
+    flex: 1;
+    height: auto;
+    min-height: 220px;
+  }
+
+  .instruction-banner {
+    top: 8px;
+    font-size: 0.72rem;
+    padding: 5px 10px;
+    max-width: 94%;
+  }
+
+  .score-popup {
+    top: 44px;
+  }
+
+  .score-card-inner {
+    padding: 8px 14px;
+  }
+
+  .score-number {
+    font-size: 1.5rem;
+  }
+
+  .dpad-controller {
+    right: 8px;
+    bottom: 8px;
+    padding: 5px 6px;
+    gap: 4px;
+  }
+
+  .dpad-cross {
+    grid-template-columns: 28px 28px 28px;
+    grid-template-rows: 28px 28px 28px;
+    gap: 2px;
+  }
+
+  .dpad-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.72rem;
+  }
+
+  .ruler-rotate-handle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .student-emoji-box {
+    width: 38px;
+    height: 38px;
     font-size: 1.25rem;
   }
-  .game-board {
-    height: 440px;
+
+  .bingsoo-icon-wrapper {
+    width: 42px;
+    height: 42px;
+    font-size: 1.5rem;
   }
-  .toolbar-right {
+
+  .controls-bar {
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .btn {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    flex: 1;
+  }
+
+  .app-footer {
+    margin-top: 0;
+  }
+
+  .privacy-link-btn {
+    font-size: 0.68rem;
+  }
+
+  .set-square-container {
+    opacity: 0.72;
+  }
+
+  .set-square-container.is-dragging,
+  .set-square-container:hover {
+    opacity: 1;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-app {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .app-header {
+    padding-bottom: 4px;
+  }
+
+  .status-card .label {
     display: none;
+  }
+
+  .player-details {
+    flex-direction: row;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .ruler-toolbar {
+    padding: 2px 6px;
+  }
+
+  .tool-btn {
+    padding: 4px 6px;
+  }
+
+  .app-footer {
+    display: none;
+  }
+
+  .instruction-banner {
+    font-size: 0.68rem;
+    padding: 4px 8px;
   }
 }

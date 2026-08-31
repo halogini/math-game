@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! | 할로매쓰</title>
   
   <!-- Security & Compliance Meta Tags -->
@@ -40,7 +40,10 @@
       <div class="brand">
         <span class="logo-emoji">📐🍧</span>
         <div>
-          <h1 id="game-main-title">팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</h1>
+          <h1 id="game-main-title">
+            <span class="title-full">팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</span>
+            <span class="title-short">팥빙수 2탄</span>
+          </h1>
           <p class="subtitle">세 친구가 이루는 삼각형의 수직이등분선을 직각자로 작도하여 완벽한 외심 위치를 찾으세요!</p>
         </div>
       </div>
@@ -74,13 +77,13 @@
       <div class="toolbar-left">
         <span class="toolbar-label">📐 직각자 도구함 (3개):</span>
         <button id="btn-reset-rulers" class="tool-btn" title="직각자 위치를 기본 배치로 되돌립니다">
-          🔄 직각자 제자리로
+          🔄 <span class="tool-btn-full">직각자 제자리로</span><span class="tool-btn-short">제자리</span>
         </button>
         <button id="btn-toggle-guide-rays" class="tool-btn active" title="직각자 연장 가이드선을 켜거나 끕니다">
-          ✨ 수직 가이드선 ON
+          ✨ <span class="tool-btn-full">수직 가이드선 ON</span><span class="tool-btn-short">가이드</span>
         </button>
         <button id="btn-toggle-midpoints" class="tool-btn active" title="삼각형 변의 중점 표시를 켜거나 끕니다">
-          📍 변의 중점 표시 ON
+          📍 <span class="tool-btn-full">변의 중점 표시 ON</span><span class="tool-btn-short">중점</span>
         </button>
       </div>
       <div class="toolbar-right">
@@ -110,15 +113,16 @@
 
           <!-- Floating Guidance Banner -->
           <div id="instruction-banner" class="instruction-banner">
-            👉 직각자 3개를 활용해 삼각형 변의 수직이등분선을 찾고, 교점에 팥빙수(🍨)를 놓아보세요!
+            👉 직각자로 외심을 찾아 🍨을 놓아보세요!
           </div>
 
-          <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable) -->
+          <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable, collapsible) -->
           <div id="dpad-controller" class="dpad-controller" title="드래그하여 원하는 위치로 컨트롤러를 이동할 수 있습니다 (방향키 세밀조정)">
             <div class="dpad-header" id="dpad-drag-header">
               <span class="dpad-drag-handle">⠿</span>
               <span class="dpad-title">세밀조정</span>
               <button type="button" id="btn-toggle-step" class="dpad-step-btn" title="이동 단위 변경 (1px / 5px)">1px</button>
+              <button type="button" id="btn-toggle-dpad" class="dpad-toggle-btn" title="세밀조정 접기/펼치기" aria-expanded="true" aria-label="세밀조정 접기">▾</button>
             </div>
             <div class="dpad-cross">
               <button type="button" class="dpad-btn dpad-up" data-dir="up" title="위로 (↑)">▲</button>
@@ -142,13 +146,13 @@
         <!-- Action Control Buttons -->
         <div class="controls-bar">
           <button id="btn-check-answer" class="btn btn-primary" disabled>
-            🎯 정답 확인하기
+            🎯 <span class="btn-label-full">정답 확인하기</span><span class="btn-label-short">확인</span>
           </button>
           <button id="btn-reset-to-submitted" class="btn btn-secondary hidden" title="내가 채점받았던 원래 제출 위치로 팥빙수를 되돌립니다">
-            📍 내 제출 위치로
+            📍 <span class="btn-label-full">내 제출 위치로</span><span class="btn-label-short">제출위치</span>
           </button>
           <button id="btn-next-round" class="btn btn-accent hidden">
-            ▶ 다음 라운드 진행
+            ▶ <span class="btn-label-full">다음 라운드 진행</span><span class="btn-label-short">다음</span>
           </button>
         </div>
       </div>

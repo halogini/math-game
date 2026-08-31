@@ -234,11 +234,93 @@ function initBingsoo2Game() {
     });
   }
 
+  function isCompactViewport() {
+    return window.matchMedia('(max-width: 640px), (max-height: 700px)').matches;
+  }
+
+  function isScrollableTouchTarget(target) {
+    return !!target.closest('.privacy-body, .leaderboard-table-wrapper, .opening-leaderboard-box, .modal-card');
+  }
+
+  function isGameTouchSurfaceActive() {
+    return playerModal.classList.contains('hidden')
+      && resultModal.classList.contains('hidden')
+      && privacyModal.classList.contains('hidden');
+  }
+
+  function setupMobileViewportLock() {
+    if (!isCompactViewport()) return;
+
+    const applyViewportMetrics = () => {
+      const vv = window.visualViewport;
+      const height = vv ? vv.height : window.innerHeight;
+      const offsetTop = vv ? vv.offsetTop : 0;
+      document.documentElement.style.setProperty('--app-vh', `${Math.round(height)}px`);
+      document.documentElement.style.setProperty('--app-offset-top', `${Math.round(offsetTop)}px`);
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+
+    applyViewportMetrics();
+    document.body.classList.add('mobile-play-active');
+
+    window.addEventListener('resize', applyViewportMetrics);
+    window.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: true });
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', applyViewportMetrics);
+      window.visualViewport.addEventListener('scroll', applyViewportMetrics);
+    }
+  }
+
+  document.addEventListener('touchmove', (e) => {
+    if (!isGameTouchSurfaceActive()) return;
+    if (isScrollableTouchTarget(e.target)) return;
+    if (e.target.closest('input, textarea')) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchstart', (e) => {
+    if (!isGameTouchSurfaceActive()) return;
+    if (isScrollableTouchTarget(e.target)) return;
+    if (e.target.closest('input, textarea, .controls-bar, .ruler-toolbar')) return;
+    if (e.target.closest('.game-board, .set-square-container, .dpad-controller, .placed-bingsoo-pin')) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  function setDualLabel(el, fullText, shortText) {
+    if (!el) return;
+    el.innerHTML = `<span class="btn-label-full">${fullText}</span><span class="btn-label-short">${shortText}</span>`;
+  }
+
+  function setToolBtnLabel(btn, emoji, fullText, shortText) {
+    if (!btn) return;
+    btn.innerHTML = `${emoji} <span class="tool-btn-full">${fullText}</span><span class="tool-btn-short">${shortText}</span>`;
+  }
+
+  let instructionFadeTimer = null;
+  function showInstruction(fullText, compactText) {
+    if (!instructionBanner) return;
+    instructionBanner.textContent = (compactText && isCompactViewport()) ? compactText : fullText;
+    instructionBanner.classList.remove('hidden', 'is-faded');
+    clearTimeout(instructionFadeTimer);
+    if (isCompactViewport()) {
+      instructionFadeTimer = setTimeout(() => {
+        instructionBanner.classList.add('is-faded');
+      }, 4800);
+    }
+  }
+
   if (btnToggleGuideRays) {
     btnToggleGuideRays.addEventListener('click', () => {
       showGuideRays = !showGuideRays;
       btnToggleGuideRays.classList.toggle('active', showGuideRays);
-      btnToggleGuideRays.textContent = showGuideRays ? '✨ 수직 가이드선 ON' : '✨ 수직 가이드선 OFF';
+      setToolBtnLabel(
+        btnToggleGuideRays,
+        '✨',
+        showGuideRays ? '수직 가이드선 ON' : '수직 가이드선 OFF',
+        showGuideRays ? '가이드' : '가이드OFF'
+      );
       renderRulers();
     });
   }
@@ -247,7 +329,12 @@ function initBingsoo2Game() {
     btnToggleMidpoints.addEventListener('click', () => {
       showMidpoints = !showMidpoints;
       btnToggleMidpoints.classList.toggle('active', showMidpoints);
-      btnToggleMidpoints.textContent = showMidpoints ? '📍 변의 중점 표시 ON' : '📍 변의 중점 표시 OFF';
+      setToolBtnLabel(
+        btnToggleMidpoints,
+        '📍',
+        showMidpoints ? '변의 중점 표시 ON' : '변의 중점 표시 OFF',
+        showMidpoints ? '중점' : '중점OFF'
+      );
       renderTriangleGeometry();
     });
   }
@@ -314,6 +401,7 @@ function initBingsoo2Game() {
 
     updateHeaderUI();
     setupCanvasResolution();
+    setupMobileViewportLock();
     loadRound(currentRound);
 
     window.addEventListener('resize', handleResize);
@@ -355,12 +443,16 @@ function initBingsoo2Game() {
     btnNextRound.classList.add('hidden');
     scorePopup.classList.add('hidden');
 
-    instructionBanner.textContent = '👉 직각자 3개를 활용해 삼각형 변의 수직이등분선을 찾고, 교점에 팥빙수(🍨)를 놓아보세요!';
-    instructionBanner.classList.remove('hidden');
+    showInstruction(
+      '👉 직각자 3개를 활용해 삼각형 변의 수직이등분선을 찾고, 교점에 팥빙수(🍨)를 놓아보세요!',
+      '👉 직각자로 외심을 찾아 🍨을 놓아보세요!'
+    );
 
     const width = gameBoard.clientWidth || 800;
     const height = gameBoard.clientHeight || 520;
-    const padding = 65;
+    const padding = isCompactViewport()
+      ? Math.max(36, Math.round(Math.min(width, height) * 0.1))
+      : 65;
 
     // Round progression:
     // Round 1, 2: Acute Triangle (예각삼각형 - 외심이 삼각형 내부)
@@ -374,7 +466,10 @@ function initBingsoo2Game() {
       generateObtuseLayout(width, height, padding);
     }
 
-    instructionBanner.textContent = `👉 [라운드 ${roundNum}] 직각자를 활용해 세 친구와 똑같은 거리에 팥빙수(🍨)를 놓아보세요!`;
+    showInstruction(
+      `👉 [라운드 ${roundNum}] 직각자를 활용해 세 친구와 똑같은 거리에 팥빙수(🍨)를 놓아보세요!`,
+      `👉 [라운드 ${roundNum}] 외심에 🍨을 놓으세요!`
+    );
 
     resetRulersPosition();
     renderStudents();
@@ -593,19 +688,33 @@ function initBingsoo2Game() {
   // ----------------------------------------------------
   // Set Square (직각자) Management & Interaction
   // ----------------------------------------------------
+  function getRulerSize() {
+    const width = gameBoard.clientWidth || 800;
+    const height = gameBoard.clientHeight || 520;
+    const scale = Math.min(1, Math.min(width / 720, height / 480));
+    const clamped = Math.max(isCompactViewport() ? 0.64 : 0.78, scale);
+    return {
+      width: Math.round(140 * clamped),
+      height: Math.round(110 * clamped)
+    };
+  }
+
   function resetRulersPosition() {
     const width = gameBoard.clientWidth || 800;
     const height = gameBoard.clientHeight || 520;
-    const rulerWidth = 140;
-    const bottomY = Math.max(20, height - 145);
+    const size = getRulerSize();
+    const compact = isCompactViewport();
+    const bottomY = Math.max(16, height - size.height - (compact ? 12 : 20));
+    const rightReserve = compact ? 52 : 16;
 
-    // 3개의 직각자를 하단에 수평으로 정렬하여 배치
     const count = 3;
-    const availableWidth = width - 40;
-    const spacing = Math.min(240, availableWidth / count);
-    const startX = Math.max(25, (width - ((count - 1) * spacing + rulerWidth)) / 2);
+    const availableWidth = Math.max(120, width - 28 - rightReserve);
+    const spacing = Math.min(compact ? 150 : 240, availableWidth / count);
+    const startX = Math.max(12, (width - rightReserve - ((count - 1) * spacing + size.width)) / 2);
 
     for (let i = 0; i < count; i++) {
+      rulers[i].width = size.width;
+      rulers[i].height = size.height;
       rulers[i].x = Math.round(startX + i * spacing);
       rulers[i].y = bottomY;
       rulers[i].angle = 0;
@@ -815,6 +924,8 @@ function initBingsoo2Game() {
       return;
     }
 
+    if (e.type === 'touchstart') e.preventDefault();
+
     const coords = getBoardCoords(e);
     placedPoint = coords;
     isDraggingBingsoo = true;
@@ -832,7 +943,7 @@ function initBingsoo2Game() {
 
   function handleBoardMove(e) {
     if (!isDraggingBingsoo) return;
-    if (e.type === 'touchmove') e.preventDefault();
+    if (e.cancelable) e.preventDefault();
 
     const coords = getBoardCoords(e);
     placedPoint = coords;
@@ -906,7 +1017,7 @@ function initBingsoo2Game() {
     let dpadStartPos = { x: 0, y: 0 };
 
     const onDpadStart = (e) => {
-      if (e.target.closest('.dpad-btn') || e.target.closest('.dpad-step-btn')) return;
+      if (e.target.closest('.dpad-btn') || e.target.closest('.dpad-step-btn') || e.target.closest('.dpad-toggle-btn')) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -971,6 +1082,26 @@ function initBingsoo2Game() {
 
     dpadController.addEventListener('mousedown', onDpadStart);
     dpadController.addEventListener('touchstart', onDpadStart, { passive: false });
+
+    const btnToggleDpad = document.getElementById('btn-toggle-dpad');
+    const applyDpadCollapsed = (collapsed) => {
+      dpadController.classList.toggle('is-collapsed', collapsed);
+      if (btnToggleDpad) {
+        btnToggleDpad.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        btnToggleDpad.setAttribute('aria-label', collapsed ? '세밀조정 펼치기' : '세밀조정 접기');
+        btnToggleDpad.textContent = collapsed ? '▸' : '▾';
+      }
+    };
+
+    applyDpadCollapsed(isCompactViewport());
+
+    if (btnToggleDpad) {
+      btnToggleDpad.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        applyDpadCollapsed(!dpadController.classList.contains('is-collapsed'));
+      });
+    }
   }
 
   if (btnToggleStep) {
@@ -1143,8 +1274,10 @@ function initBingsoo2Game() {
     if (!placedPoint || isAnswerChecked) return;
     isAnswerChecked = true;
 
-    instructionBanner.textContent = '👉 팥빙수를 움직여 정답 외심(초록점)과 비교해보세요!';
-    instructionBanner.classList.remove('hidden');
+    showInstruction(
+      '👉 팥빙수를 움직여 정답 외심(초록점)과 비교해보세요!',
+      '👉 🍨을 움직여 초록점과 비교하세요!'
+    );
 
     const errorDistance = Math.round(Math.hypot(placedPoint.x - targetPoint.x, placedPoint.y - targetPoint.y));
 
@@ -1175,9 +1308,9 @@ function initBingsoo2Game() {
     btnNextRound.classList.remove('hidden');
 
     if (currentRound === maxRounds) {
-      btnNextRound.textContent = '🏆 최종 결과 보기';
+      setDualLabel(btnNextRound, '🏆 최종 결과 보기', '🏆 결과');
     } else {
-      btnNextRound.textContent = '▶ 다음 라운드 진행';
+      setDualLabel(btnNextRound, '▶ 다음 라운드 진행', '▶ 다음');
     }
   });
 
@@ -1189,8 +1322,10 @@ function initBingsoo2Game() {
       updateIndividualStudentExpressions(placedPoint);
       drawVerificationLines();
       showScorePopup(initialSubmittedPoint.score, initialSubmittedPoint.errorPx);
-      instructionBanner.textContent = '📍 팥빙수를 원래 제출 위치로 되돌렸습니다!';
-      instructionBanner.classList.remove('hidden');
+      showInstruction(
+        '📍 팥빙수를 원래 제출 위치로 되돌렸습니다!',
+        '📍 제출 위치로 되돌렸습니다!'
+      );
     });
   }
 
