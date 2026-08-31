@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! | 할로매쓰</title>
+  
+  <!-- Security & Compliance Meta Tags -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:;">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
+  
+  <!-- SEO Description & Open Graph Meta Tags -->
+  <meta name="description" content="세 친구가 이루는 삼각형과 3개의 직각자를 활용해 외심(수직이등분선의 교점)을 찾아 완벽한 팥빙수 배달 위치를 지정해보세요!">
+  <meta property="og:title" content="🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! | 할로매쓰">
+  <meta property="og:description" content="세 친구가 이루는 삼각형과 3개의 직각자를 활용해 외심을 찾아 팥빙수를 배치하세요!">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Firebase App & Realtime Database SDKs (Compat v10) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
+</head>
+<body>
+  <div class="game-app">
+    <!-- Header Controls & Status -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-emoji">📐🍧</span>
+        <div>
+          <h1 id="game-main-title">팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</h1>
+          <p class="subtitle">세 친구가 이루는 삼각형의 수직이등분선을 직각자로 작도하여 완벽한 외심 위치를 찾으세요!</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <!-- Player Info Badge -->
+        <div class="player-info-card">
+          <span class="player-icon">👤</span>
+          <div class="player-details">
+            <span class="player-name" id="display-player-name">도전자</span>
+            <span class="player-id" id="display-student-id">학번: 2101</span>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <span class="label">라운드</span>
+          <span class="value" id="round-display">1 / 5</span>
+        </div>
+        <div class="status-card highlight">
+          <span class="label">총점</span>
+          <span class="value" id="total-score-display">0 <small>점</small></span>
+        </div>
+        <div class="status-card">
+          <span class="label">최고 기록</span>
+          <span class="value" id="high-score-display">0 <small>점</small></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Set Square Toolbar -->
+    <div class="ruler-toolbar">
+      <div class="toolbar-left">
+        <span class="toolbar-label">📐 직각자 도구함 (3개):</span>
+        <button id="btn-reset-rulers" class="tool-btn" title="직각자 위치를 기본 배치로 되돌립니다">
+          🔄 직각자 제자리로
+        </button>
+        <button id="btn-toggle-guide-rays" class="tool-btn active" title="직각자 연장 가이드선을 켜거나 끕니다">
+          ✨ 수직 가이드선 ON
+        </button>
+        <button id="btn-toggle-midpoints" class="tool-btn active" title="삼각형 변의 중점 표시를 켜거나 끕니다">
+          📍 변의 중점 표시 ON
+        </button>
+      </div>
+      <div class="toolbar-right">
+        <span class="guide-tip">💡 팁: 직각자를 드래그해 이동하고, <strong>초록 회전점(⟳)</strong>을 돌려 각도를 맞추세요!</span>
+      </div>
+    </div>
+
+    <!-- Main Game Section -->
+    <main class="game-container">
+      <!-- Game Canvas/Board Area -->
+      <div class="board-wrapper">
+        <div id="game-board" class="game-board">
+          <!-- Background Grid Pattern -->
+          <div class="board-grid-pattern"></div>
+          
+          <!-- SVG Geometry Layer (Draws Triangle, Midpoints, Set Squares, Guides) -->
+          <svg id="geometry-svg" class="geometry-svg"></svg>
+
+          <!-- Verification Canvas Layer -->
+          <canvas id="line-canvas" class="line-canvas"></canvas>
+
+          <!-- HTML Layer for Student Pins and Interactive Elements -->
+          <div id="elements-layer" class="elements-layer"></div>
+
+          <!-- Rulers Interactive Layer -->
+          <div id="rulers-layer" class="rulers-layer"></div>
+
+          <!-- Floating Guidance Banner -->
+          <div id="instruction-banner" class="instruction-banner">
+            👉 직각자 3개를 활용해 삼각형 변의 수직이등분선을 찾고, 교점에 팥빙수(🍨)를 놓아보세요!
+          </div>
+
+          <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable) -->
+          <div id="dpad-controller" class="dpad-controller" title="드래그하여 원하는 위치로 컨트롤러를 이동할 수 있습니다 (방향키 세밀조정)">
+            <div class="dpad-header" id="dpad-drag-header">
+              <span class="dpad-drag-handle">⠿</span>
+              <span class="dpad-title">세밀조정</span>
+              <button type="button" id="btn-toggle-step" class="dpad-step-btn" title="이동 단위 변경 (1px / 5px)">1px</button>
+            </div>
+            <div class="dpad-cross">
+              <button type="button" class="dpad-btn dpad-up" data-dir="up" title="위로 (↑)">▲</button>
+              <button type="button" class="dpad-btn dpad-left" data-dir="left" title="왼쪽 (←)">◀</button>
+              <div class="dpad-center-dot">✛</div>
+              <button type="button" class="dpad-btn dpad-right" data-dir="right" title="오른쪽 (→)">▶</button>
+              <button type="button" class="dpad-btn dpad-down" data-dir="down" title="아래로 (↓)">▼</button>
+            </div>
+          </div>
+
+          <!-- Top-Center Score Popup Effect -->
+          <div id="score-popup" class="score-popup hidden">
+            <div class="score-card-inner">
+              <span id="score-rating-badge" class="rating-badge">완벽해요!</span>
+              <div id="score-number" class="score-number">+100</div>
+              <p id="score-distance-info" class="distance-info">정답 외심과 오차: 0 px</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="controls-bar">
+          <button id="btn-check-answer" class="btn btn-primary" disabled>
+            🎯 정답 확인하기
+          </button>
+          <button id="btn-reset-to-submitted" class="btn btn-secondary hidden" title="내가 채점받았던 원래 제출 위치로 팥빙수를 되돌립니다">
+            📍 내 제출 위치로
+          </button>
+          <button id="btn-next-round" class="btn btn-accent hidden">
+            ▶ 다음 라운드 진행
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer Privacy Policy Link -->
+    <footer class="app-footer">
+      <a href="../../privacy.html" id="btn-privacy-policy" class="privacy-link-btn" target="_blank" rel="noopener noreferrer">
+        🔒 개인정보처리방침
+      </a>
+    </footer>
+
+    <!-- Opening Screen Modal -->
+    <div id="player-modal" class="modal-backdrop">
+      <div class="modal-card modal-opening">
+        <div class="opening-banner">
+          <span class="opening-subtitle">1위 챔피언 도전!</span>
+          <h2>👑 명예의 전당 랭킹 1위 (2탄)</h2>
+          
+          <div class="champ-card" id="champ-card-box">
+            <div class="champ-gold-shimmer"></div>
+            <div class="champ-trophy">🥇</div>
+            <div class="champ-info">
+              <span class="champ-name" id="opening-champ-name">빙수박사</span>
+              <span class="champ-id" id="opening-champ-id">학번: 2101</span>
+            </div>
+            <div class="champ-score" id="opening-champ-score">500<small>점</small></div>
+          </div>
+
+          <!-- Toggle Opening Leaderboard Button -->
+          <button type="button" id="btn-toggle-opening-leaderboard" class="btn btn-outline btn-sm style-toggle-btn">
+            🏆 명예의 전당 순위표 전체 보기
+          </button>
+
+          <!-- Collapsible Opening Leaderboard Box -->
+          <div id="opening-leaderboard-box" class="opening-leaderboard-box hidden">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr id="tr-opening-th">
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-opening-id">학번</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody id="opening-leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Game Purpose Banner -->
+        <div class="game-guide-box short-banner">
+          <div class="guide-title">🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</div>
+          <p class="guide-desc">
+            세 친구로 이루어진 삼각형의 각 변의 수직이등분선을 직각자로 맞춰보세요!<br>
+            수직이등분선들이 만나는 <strong>외심</strong>에 팥빙수를 배치하면 100점 만점!
+          </p>
+        </div>
+
+        <div class="modal-body">
+          <form id="player-form">
+            <div class="form-group">
+              <label for="input-player-name" id="label-player-name">도전자 이름:</label>
+              <input type="text" id="input-player-name" class="form-input" value="도전자" placeholder="예: 홍길동" maxlength="12" required />
+            </div>
+            <div class="form-group" id="student-id-group">
+              <label for="input-student-id">학번:</label>
+              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
+              ⚡ 직각자로 팥빙수 배달 작전 시작하기!
+            </button>
+            <p id="profile-err" class="profile-err"></p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Final Result Modal -->
+    <div id="result-modal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-trophy">🏆</span>
+          <h2>작전 완료! 종합 결과</h2>
+          <div id="new-record-badge" class="badge-new-record hidden">🎉 최고 기록 경신!</div>
+        </div>
+        
+        <div class="modal-body">
+          <div class="final-score-display">
+            <span class="label">최종 총점</span>
+            <span class="value" id="final-total-score">0 <small>/ 500</small></span>
+          </div>
+
+          <div class="player-meta-summary">
+            <p>도전자: <strong id="result-locked-name">도전자</strong> <span id="result-locked-id-span">(<span id="result-locked-id">2101</span>)</span></p>
+          </div>
+
+          <div class="round-history-box">
+            <h4>📊 라운드별 점수 및 오차</h4>
+            <ul id="round-history-list" class="round-history-list">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+
+          <!-- Leaderboard Section -->
+          <div class="leaderboard-section">
+            <h3 id="result-leaderboard-title">🏆 팥빙수 2탄 명예의 전당 (1위 ~ 20위)</h3>
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    <th id="th-result-id">학번</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="api-status-msg" class="api-status-msg"></div>
+
+          <div class="modal-actions">
+            <button id="btn-send-data" class="btn btn-primary">
+              💾 명예의 전당에 내 점수 등록하기
+            </button>
+            <button id="btn-modal-restart" class="btn btn-secondary">
+              🔄 다시 도전하기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacy-modal" class="modal-backdrop hidden">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <span class="modal-trophy">🔒</span>
+          <h2>개인정보처리방침</h2>
+        </div>
+        <div class="modal-body privacy-body" style="font-size:0.88rem; line-height:1.6; text-align:left; max-height:60vh; overflow-y:auto; padding:10px;">
+          <p><strong>1. 수집 항목 및 목적</strong>: 이름/닉네임, 학번(학교 모드 한정). 명예의 전당 랭킹 등록 목적.</p>
+          <p><strong>2. 만 14세 미만 아동의 개인정보 처리</strong>: 법정대리인/지도교사 동의 또는 수업 목적 범위 내 처리. 삭제/정지 요청 가능. (dorms 모드는 학번 수집 없음)</p>
+          <p><strong>3. 제3자 제공 및 국외 이전</strong>: 제3자 제공 및 판매 없음. 실시간 DB 저장을 위해 Google Cloud (Firebase) 이용.</p>
+          <p><strong>4. 처리 위탁</strong>: Google Cloud Platform (Firebase Realtime Database) 서버 저장소 위탁 운영.</p>
+          <p><strong>5. 안전조치</strong>: HTTPS 암호화, 접근 권한 최소화, 보안 헤더·데이터베이스 접근통제. 비밀번호·주민등록번호는 수집하지 않습니다.</p>
+          <p><strong>6. 개인정보 보호책임자 및 연락처</strong>: 할로매쓰 운영팀 (tendo04@naver.com)</p>
+        </div>
+        <div class="modal-footer" style="margin-top:12px; text-align:right;">
+          <button type="button" id="btn-close-privacy" class="btn btn-secondary">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

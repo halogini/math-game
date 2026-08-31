@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputStudentId = document.getElementById('input-student-id');
 
   const btnPlayBingsoo = document.getElementById('btn-play-bingsoo');
+  const btnPlayBingsoo2 = document.getElementById('btn-play-bingsoo2');
   const btnPlayCongruence = document.getElementById('btn-play-congruence');
   const btnPlayThreeChances = document.getElementById('btn-play-three-chances');
   const btnPlayPrismTycoon = document.getElementById('btn-play-prism-tycoon');
@@ -95,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
+  const BINGSOO2_GAME_IDS = new Set(['bingsoo2', 'bingsoo-2']);
   const PRISM_TYCOON_GAME_IDS = new Set(['prism-tycoon', 'tycoon']);
   let activeLeaderboardGame = 'bingsoo';
   let scoresUnsub = null;
@@ -184,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo/index.html');
+    if (btnPlayBingsoo2) btnPlayBingsoo2.href = gameHref('games/bingsoo2/index.html');
     if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
     if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
     if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon/index.html');
@@ -334,15 +337,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const bestMap = new Map();
 
     const acceptGame = (entry) => {
-      const id = String((entry && entry.gameId) || '').trim();
+      const id = String((entry && (entry.gameId || entry.game)) || '').trim();
       if (gameKey === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
       if (gameKey === 'prism-tycoon') return PRISM_TYCOON_GAME_IDS.has(id);
       if (gameKey === 'three-chances') {
         return id === 'three-chances' || id === 'three_chances';
       }
-      // bingsoo: explicit id, or legacy rows with no gameId and a numeric score (not clear-time)
+      if (gameKey === 'bingsoo2') {
+        return BINGSOO2_GAME_IDS.has(id);
+      }
+      // bingsoo 1: explicit id or legacy rows with no gameId and a numeric score (not clear-time)
       if (id === 'bingsoo') return true;
-      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id) && !PRISM_TYCOON_GAME_IDS.has(id)) {
+      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id) && !PRISM_TYCOON_GAME_IDS.has(id) && !BINGSOO2_GAME_IDS.has(id)) {
         return true;
       }
       return false;
