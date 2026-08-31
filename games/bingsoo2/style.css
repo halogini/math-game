@@ -143,18 +143,24 @@ body {
   font-size: 0.7rem;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .status-card .value {
   font-weight: 800;
   font-size: 1.05rem;
   color: #0284c7;
+  white-space: nowrap;
 }
 
 .status-card .value small {
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.label-short {
+  display: none;
 }
 
 /* Ruler Toolbar */
@@ -210,6 +216,19 @@ body {
   color: #0369a1;
 }
 
+.tool-lock-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+}
+
+#btn-lock-all-rulers.active .tool-lock-icon {
+  font-size: 1.15rem;
+}
+
 .tool-btn-short,
 .btn-label-short {
   display: none;
@@ -222,86 +241,145 @@ body {
 }
 
 .ruler-chip {
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: 10px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 3px;
+  border-radius: 11px;
   border: 2px solid #cbd5e1;
-  background: #ffffff;
+  background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
   touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
-.ruler-chip::before {
-  content: '';
+.ruler-chip-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.12));
+}
+
+.ruler-chip .chip-body {
+  fill: rgba(255, 255, 255, 0.15);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.ruler-chip .chip-inner {
+  fill: rgba(255, 255, 255, 0.72);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.ruler-chip .chip-corner {
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.ruler-chip-lock {
+  display: none;
   position: absolute;
-  inset: 7px;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-  border-radius: 2px 2px 2px 6px;
-  opacity: 0.92;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  line-height: 1;
+  background: rgba(15, 23, 42, 0.42);
+  border-radius: 9px;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .ruler-chip-blue {
   border-color: #0284c7;
-  background: #e0f2fe;
+  background: linear-gradient(145deg, #e0f2fe 0%, #bae6fd 100%);
 }
 
-.ruler-chip-blue::before {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+.ruler-chip-blue .chip-body {
+  fill: rgba(56, 189, 248, 0.45);
+  stroke: #0284c7;
+}
+
+.ruler-chip-blue .chip-inner {
+  fill: rgba(224, 242, 254, 0.95);
+  stroke: rgba(2, 132, 199, 0.55);
+}
+
+.ruler-chip-blue .chip-corner {
+  stroke: #0369a1;
 }
 
 .ruler-chip-green {
   border-color: #059669;
-  background: #d1fae5;
+  background: linear-gradient(145deg, #d1fae5 0%, #a7f3d0 100%);
 }
 
-.ruler-chip-green::before {
-  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+.ruler-chip-green .chip-body {
+  fill: rgba(52, 211, 153, 0.45);
+  stroke: #059669;
+}
+
+.ruler-chip-green .chip-inner {
+  fill: rgba(209, 250, 229, 0.95);
+  stroke: rgba(5, 150, 105, 0.55);
+}
+
+.ruler-chip-green .chip-corner {
+  stroke: #047857;
 }
 
 .ruler-chip-orange {
   border-color: #ea580c;
-  background: #ffedd5;
+  background: linear-gradient(145deg, #ffedd5 0%, #fed7aa 100%);
 }
 
-.ruler-chip-orange::before {
-  background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+.ruler-chip-orange .chip-body {
+  fill: rgba(251, 146, 60, 0.45);
+  stroke: #ea580c;
+}
+
+.ruler-chip-orange .chip-inner {
+  fill: rgba(255, 237, 213, 0.95);
+  stroke: rgba(234, 88, 12, 0.55);
+}
+
+.ruler-chip-orange .chip-corner {
+  stroke: #c2410c;
 }
 
 .ruler-chip.is-selected {
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.28);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.28), 0 4px 10px rgba(2, 132, 199, 0.18);
   transform: translateY(-1px);
 }
 
-.ruler-chip.is-locked::after {
-  content: '🔒';
-  position: absolute;
-  top: -7px;
-  right: -6px;
-  font-size: 0.62rem;
-  line-height: 1;
+.ruler-chip.is-locked .ruler-chip-lock {
+  display: flex;
 }
 
 .ruler-chip.is-locked {
-  opacity: 0.82;
+  opacity: 0.92;
 }
 
 .ruler-chip.is-hidden {
-  opacity: 0.34;
-  filter: grayscale(0.55);
+  opacity: 0.38;
+  filter: grayscale(0.45);
 }
 
-.ruler-chip.is-hidden::before {
-  opacity: 0.45;
+.ruler-chip.is-hidden .ruler-chip-svg {
+  opacity: 0.5;
 }
 
 .ruler-chip.is-hidden::after {
   content: '';
   position: absolute;
-  inset: 5px;
+  inset: 6px;
   background: linear-gradient(
     to top right,
     transparent calc(50% - 1px),
@@ -310,6 +388,7 @@ body {
     transparent calc(50% + 1px)
   );
   pointer-events: none;
+  z-index: 1;
 }
 
 .toolbar-right {
@@ -722,6 +801,10 @@ body {
   fill: none;
 }
 
+.ruler-theme-blue .ruler-angle-label {
+  fill: #0369a1;
+}
+
 .ruler-theme-green .ruler-body {
   fill: rgba(16, 185, 129, 0.22);
   stroke: #059669;
@@ -742,6 +825,10 @@ body {
   fill: none;
 }
 
+.ruler-theme-green .ruler-angle-label {
+  fill: #047857;
+}
+
 .ruler-theme-orange .ruler-body {
   fill: rgba(249, 115, 22, 0.22);
   stroke: #ea580c;
@@ -760,6 +847,28 @@ body {
   stroke: #ea580c;
   stroke-width: 2;
   fill: none;
+}
+
+.ruler-theme-orange .ruler-angle-label {
+  fill: #c2410c;
+}
+
+.ruler-lock-badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fbbf24;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 106;
+  border: 2px solid rgba(251, 191, 36, 0.65);
 }
 
 /* Rotation Knob Handle */
@@ -1551,8 +1660,14 @@ body {
   }
 
   .app-header {
+    flex-direction: column;
+    align-items: stretch;
     gap: 6px;
     padding-bottom: 8px;
+  }
+
+  .brand {
+    min-width: 0;
   }
 
   .logo-emoji {
@@ -1560,15 +1675,21 @@ body {
   }
 
   .brand h1 {
-    font-size: 1.2rem;
+    font-size: 1.05rem;
+    line-height: 1.15;
   }
 
   .brand .subtitle,
   .toolbar-label,
   .toolbar-right,
   .tool-btn-full,
-  .btn-label-full {
+  .btn-label-full,
+  .label-full {
     display: none;
+  }
+
+  .label-short {
+    display: inline;
   }
 
   .tool-btn-short,
@@ -1577,10 +1698,11 @@ body {
   }
 
   .status-bar {
-    width: auto;
-    flex: 1;
-    justify-content: flex-end;
-    gap: 4px;
+    width: 100%;
+    flex: none;
+    justify-content: stretch;
+    align-items: stretch;
+    gap: 6px;
     flex-wrap: nowrap;
   }
 
@@ -1591,11 +1713,26 @@ body {
   .status-card {
     min-width: 0;
     flex: 1;
-    padding: 3px 6px;
+    padding: 5px 6px;
+    min-height: 44px;
+    justify-content: center;
+    gap: 1px;
+  }
+
+  .status-card .label {
+    font-size: 0.62rem;
+    white-space: nowrap;
+    line-height: 1.1;
   }
 
   .status-card .value {
-    font-size: 0.92rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    line-height: 1.15;
+  }
+
+  .status-card .value small {
+    font-size: 0.62rem;
   }
 
   .player-info-card {
@@ -1621,9 +1758,19 @@ body {
   .ruler-chip {
     flex: 1;
     min-width: 0;
-    height: 30px;
-    font-size: 0.82rem;
-    padding: 0 4px;
+    height: 38px;
+    width: auto;
+    padding: 2px;
+  }
+
+  .ruler-chip-lock {
+    font-size: 1rem;
+  }
+
+  .ruler-lock-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 1.05rem;
   }
 
   .tool-btn {

@@ -63,7 +63,7 @@
           <span class="value" id="total-score-display">0 <small>점</small></span>
         </div>
         <div class="status-card">
-          <span class="label">최고 기록</span>
+          <span class="label"><span class="label-full">최고 기록</span><span class="label-short">최고</span></span>
           <span class="value" id="high-score-display">0 <small>점</small></span>
         </div>
       </div>
@@ -74,9 +74,30 @@
       <div class="toolbar-left">
         <span class="toolbar-label">📐 직각자:</span>
         <div class="ruler-chip-group" id="ruler-chip-group">
-          <button type="button" class="ruler-chip ruler-chip-blue" data-ruler-id="0" aria-label="파란 직각자"></button>
-          <button type="button" class="ruler-chip ruler-chip-green" data-ruler-id="1" aria-label="초록 직각자"></button>
-          <button type="button" class="ruler-chip ruler-chip-orange" data-ruler-id="2" aria-label="주황 직각자"></button>
+          <button type="button" class="ruler-chip ruler-chip-blue" data-ruler-id="0" aria-label="파란 직각자">
+            <svg class="ruler-chip-svg" viewBox="0 0 32 32" aria-hidden="true">
+              <polygon class="chip-body" points="3,3 29,3 3,29" />
+              <polygon class="chip-inner" points="9,9 22,9 9,22" />
+              <path class="chip-corner" d="M 7,3 L 7,9 L 3,9" />
+            </svg>
+            <span class="ruler-chip-lock" aria-hidden="true">🔒</span>
+          </button>
+          <button type="button" class="ruler-chip ruler-chip-green" data-ruler-id="1" aria-label="초록 직각자">
+            <svg class="ruler-chip-svg" viewBox="0 0 32 32" aria-hidden="true">
+              <polygon class="chip-body" points="3,3 29,3 3,29" />
+              <polygon class="chip-inner" points="9,9 22,9 9,22" />
+              <path class="chip-corner" d="M 7,3 L 7,9 L 3,9" />
+            </svg>
+            <span class="ruler-chip-lock" aria-hidden="true">🔒</span>
+          </button>
+          <button type="button" class="ruler-chip ruler-chip-orange" data-ruler-id="2" aria-label="주황 직각자">
+            <svg class="ruler-chip-svg" viewBox="0 0 32 32" aria-hidden="true">
+              <polygon class="chip-body" points="3,3 29,3 3,29" />
+              <polygon class="chip-inner" points="9,9 22,9 9,22" />
+              <path class="chip-corner" d="M 7,3 L 7,9 L 3,9" />
+            </svg>
+            <span class="ruler-chip-lock" aria-hidden="true">🔒</span>
+          </button>
         </div>
         <button id="btn-lock-all-rulers" class="tool-btn" title="직각자 3개 모두 고정합니다">
           🔓 <span class="tool-btn-full">전체 고정</span><span class="tool-btn-short">전체</span>

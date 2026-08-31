@@ -80,6 +80,7 @@ function initBingsoo2Game() {
   let targetPoint = { x: 0, y: 0, radius: 0 };
   let placedPoint = null;
   let initialSubmittedPoint = null;
+  let initialSubmittedRulersState = null;
   let isAnswerChecked = false;
   let isDraggingBingsoo = false;
   let popupTimeoutId = null;
@@ -421,10 +422,26 @@ function initBingsoo2Game() {
     }
   }
 
-  function setupCanvasResolution() {
+  function getBoardContentSize() {
+    return {
+      width: gameBoard.clientWidth || 800,
+      height: gameBoard.clientHeight || 520
+    };
+  }
+
+  function clientToBoardCoords(clientX, clientY) {
     const rect = gameBoard.getBoundingClientRect();
-    lineCanvas.width = rect.width;
-    lineCanvas.height = rect.height;
+    const { width, height } = getBoardContentSize();
+    return {
+      x: Math.max(10, Math.min(width - 10, clientX - rect.left - gameBoard.clientLeft)),
+      y: Math.max(10, Math.min(height - 10, clientY - rect.top - gameBoard.clientTop))
+    };
+  }
+
+  function setupCanvasResolution() {
+    const { width, height } = getBoardContentSize();
+    lineCanvas.width = width;
+    lineCanvas.height = height;
   }
 
   function updateHeaderUI() {
@@ -439,6 +456,7 @@ function initBingsoo2Game() {
     isAnswerChecked = false;
     placedPoint = null;
     initialSubmittedPoint = null;
+    initialSubmittedRulersState = null;
     ctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
     elementsLayer.innerHTML = '';
 
@@ -641,6 +659,8 @@ function initBingsoo2Game() {
   function renderTriangleGeometry() {
     if (studentPositions.length < 3) return;
     const [A, B, C] = studentPositions;
+    const { width, height } = getBoardContentSize();
+    geometrySvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
     const midAB = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
     const midBC = { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 };
@@ -687,6 +707,59 @@ function initBingsoo2Game() {
   // ----------------------------------------------------
   // Set Square (직각자) Management & Interaction
   // ----------------------------------------------------
+  function getRulerSvgMetrics(W, H) {
+    const insetX = Math.max(5, Math.round(W * (24 / 140)));
+    const insetY = Math.max(5, Math.round(H * (24 / 110)));
+    const farX = Math.max(insetX + 6, Math.round(W * (48 / 140)));
+    const farY = Math.max(insetY + 6, Math.round(H * (48 / 110)));
+    const innerTopX = Math.max(insetX + 8, W - farX);
+    const innerLeftY = Math.max(insetY + 8, H - farY);
+    const cornerMark = Math.max(7, Math.round(Math.min(insetX, insetY) * 0.58));
+    const fontSize = Math.max(7, Math.round(Math.min(W, H) * 0.071));
+    const tickStep = Math.max(6, Math.round(W / 14));
+    const tickMargin = Math.max(8, Math.round(Math.min(W, H) * 0.11));
+    const strokeOuter = Math.max(1.4, W / 56);
+    const strokeInner = Math.max(1, W / 93);
+
+    return {
+      insetX,
+      insetY,
+      innerTopX,
+      innerLeftY,
+      cornerMark,
+      fontSize,
+      tickStep,
+      tickMargin,
+      strokeOuter,
+      strokeInner,
+      lockX: Math.round(W / 3),
+      lockY: Math.round(H / 3)
+    };
+  }
+
+  function buildRulerSvgMarkup(W, H) {
+    const m = getRulerSvgMetrics(W, H);
+    let tickMarks = '';
+    for (let i = m.tickStep; i < W - m.tickMargin; i += m.tickStep) {
+      const h = i % (m.tickStep * 5) === 0 ? 8 : (i % (m.tickStep * 2) === 0 ? 5 : 3);
+      tickMarks += `<line x1="${i}" y1="0" x2="${i}" y2="${h}" class="ruler-ticks" />`;
+    }
+    for (let i = m.tickStep; i < H - m.tickMargin; i += m.tickStep) {
+      const w = i % (m.tickStep * 5) === 0 ? 8 : (i % (m.tickStep * 2) === 0 ? 5 : 3);
+      tickMarks += `<line x1="0" y1="${i}" x2="${w}" y2="${i}" class="ruler-ticks" />`;
+    }
+
+    return `
+      <line x1="0" y1="0" x2="${W * 4}" y2="0" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
+      <line x1="0" y1="0" x2="0" y2="${H * 4}" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
+      <polygon points="0,0 ${W},0 0,${H}" class="ruler-body" stroke-width="${m.strokeOuter}" />
+      <polygon points="${m.insetX},${m.insetY} ${m.innerTopX},${m.insetY} ${m.insetX},${m.innerLeftY}" class="ruler-inner-cutout" stroke-width="${m.strokeInner}" />
+      <path d="M ${m.cornerMark},0 L ${m.cornerMark},${m.cornerMark} L 0,${m.cornerMark}" class="ruler-right-angle-mark" stroke-width="${m.strokeInner}" />
+      ${tickMarks}
+      <text x="${m.cornerMark + 4}" y="${m.cornerMark + 6}" font-size="${m.fontSize}" font-weight="800" class="ruler-angle-label">90°</text>
+    `;
+  }
+
   function getRulerSize() {
     const width = gameBoard.clientWidth || 800;
     const height = gameBoard.clientHeight || 520;
@@ -696,6 +769,44 @@ function initBingsoo2Game() {
       width: Math.round(140 * clamped),
       height: Math.round(110 * clamped)
     };
+  }
+
+  function snapshotRulersState() {
+    return {
+      activeRulerId,
+      rulers: rulers.map(ruler => ({
+        id: ruler.id,
+        x: ruler.x,
+        y: ruler.y,
+        angle: ruler.angle,
+        width: ruler.width,
+        height: ruler.height,
+        locked: ruler.locked,
+        hidden: ruler.hidden
+      }))
+    };
+  }
+
+  function restoreRulersState(snapshot) {
+    if (!snapshot) return;
+
+    activeRulerId = snapshot.activeRulerId;
+    snapshot.rulers.forEach(saved => {
+      const ruler = rulers[saved.id];
+      if (!ruler) return;
+      ruler.x = saved.x;
+      ruler.y = saved.y;
+      ruler.angle = saved.angle;
+      ruler.width = saved.width;
+      ruler.height = saved.height;
+      ruler.locked = saved.locked;
+      ruler.hidden = saved.hidden;
+      ruler.isDragging = false;
+      ruler.isRotating = false;
+    });
+
+    updateRulerToolbar();
+    renderRulers();
   }
 
   function resetRulersState() {
@@ -737,8 +848,8 @@ function initBingsoo2Game() {
       const allLocked = visibleRulers.length > 0 && visibleRulers.every(ruler => ruler.locked);
       btnLockAllRulers.classList.toggle('active', allLocked);
       btnLockAllRulers.innerHTML = allLocked
-        ? '🔒 <span class="tool-btn-full">전체 고정됨</span><span class="tool-btn-short">고정됨</span>'
-        : '🔓 <span class="tool-btn-full">전체 고정</span><span class="tool-btn-short">전체</span>';
+        ? '<span class="tool-lock-icon">🔒</span><span class="tool-btn-full">전체 고정됨</span><span class="tool-btn-short">고정됨</span>'
+        : '<span class="tool-lock-icon">🔓</span><span class="tool-btn-full">전체 고정</span><span class="tool-btn-short">전체</span>';
       btnLockAllRulers.title = allLocked ? '표시 중인 직각자 전체 고정 해제' : '표시 중인 직각자 전체 고정';
     }
   }
@@ -841,44 +952,17 @@ function initBingsoo2Game() {
 
       const W = ruler.width;
       const H = ruler.height;
-
-      // SVG Set Square Shape with graduation tick marks & right-angle square
-      let tickMarks = '';
-      for (let i = 10; i < W - 15; i += 10) {
-        const h = i % 50 === 0 ? 8 : (i % 20 === 0 ? 5 : 3);
-        tickMarks += `<line x1="${i}" y1="0" x2="${i}" y2="${h}" class="ruler-ticks" />`;
-      }
-      for (let i = 10; i < H - 15; i += 10) {
-        const w = i % 50 === 0 ? 8 : (i % 20 === 0 ? 5 : 3);
-        tickMarks += `<line x1="0" y1="${i}" x2="${w}" y2="${i}" class="ruler-ticks" />`;
-      }
-
-      // Perpendicular Guide Ray
-      const guideRaySvg = `
-        <!-- Extended Perpendicular Rays from 90 deg corner -->
-        <line x1="0" y1="0" x2="${W * 4}" y2="0" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
-        <line x1="0" y1="0" x2="0" y2="${H * 4}" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
-      `;
+      const metrics = getRulerSvgMetrics(W, H);
 
       container.innerHTML = `
         <svg class="set-square-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-          ${guideRaySvg}
-          <!-- Outer Triangle Body -->
-          <polygon points="0,0 ${W},0 0,${H}" class="ruler-body" />
-          <!-- Inner Cutout Triangle -->
-          <polygon points="24,24 ${W - 48},24 24,${H - 48}" class="ruler-inner-cutout" />
-          <!-- 90 Degree Right Angle Symbol -->
-          <path d="M 14,0 L 14,14 L 0,14" class="ruler-right-angle-mark" />
-          <!-- Ticks -->
-          ${tickMarks}
-          <!-- 90 Deg Label -->
-          <text x="18" y="20" font-size="10" font-weight="800" fill="#0369a1">90°</text>
+          ${buildRulerSvgMarkup(W, H)}
         </svg>
 
-        <!-- Interactive Rotation Handle at Hypotenuse Center -->
         <div class="ruler-rotate-handle" id="rotate-handle-${ruler.id}" title="드래그하여 각도를 자유롭게 회전하세요!">
           ⟳
         </div>
+        ${ruler.locked ? `<div class="ruler-lock-badge" style="left:${metrics.lockX}px;top:${metrics.lockY}px;width:${Math.max(28, Math.round(Math.min(W, H) * 0.34))}px;height:${Math.max(28, Math.round(Math.min(W, H) * 0.34))}px;font-size:${Math.max(14, Math.round(Math.min(W, H) * 0.18))}px" aria-hidden="true">🔒</div>` : ''}
       `;
 
       // Position the rotation knob
@@ -931,9 +1015,9 @@ function initBingsoo2Game() {
       const dx = clientX - startPointer.x;
       const dy = clientY - startPointer.y;
 
-      const boardRect = gameBoard.getBoundingClientRect();
-      ruler.x = Math.max(-40, Math.min(boardRect.width - 60, startRulerPos.x + dx));
-      ruler.y = Math.max(-40, Math.min(boardRect.height - 60, startRulerPos.y + dy));
+      const { width, height } = getBoardContentSize();
+      ruler.x = Math.max(-40, Math.min(width - 60, startRulerPos.x + dx));
+      ruler.y = Math.max(-40, Math.min(height - 60, startRulerPos.y + dy));
 
       container.style.left = `${ruler.x}px`;
       container.style.top = `${ruler.y}px`;
@@ -977,9 +1061,9 @@ function initBingsoo2Game() {
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
         const boardRect = gameBoard.getBoundingClientRect();
-        // Pivot point is at ruler.x, ruler.y (relative to board)
-        const pivotScreenX = boardRect.left + ruler.x;
-        const pivotScreenY = boardRect.top + ruler.y;
+        // Pivot point is at ruler.x, ruler.y (relative to board content area)
+        const pivotScreenX = boardRect.left + gameBoard.clientLeft + ruler.x;
+        const pivotScreenY = boardRect.top + gameBoard.clientTop + ruler.y;
 
         const angleRad = Math.atan2(clientY - pivotScreenY, clientX - pivotScreenX);
         let angleDeg = angleRad * (180 / Math.PI) - 45; // Offset by handle vector
@@ -1008,7 +1092,6 @@ function initBingsoo2Game() {
   // Board Drag & Bingsoo Placement Handlers
   // ----------------------------------------------------
   function getBoardCoords(e) {
-    const rect = gameBoard.getBoundingClientRect();
     let clientX = e.clientX;
     let clientY = e.clientY;
 
@@ -1017,10 +1100,7 @@ function initBingsoo2Game() {
       clientY = e.touches[0].clientY;
     }
 
-    return {
-      x: Math.max(10, Math.min(rect.width - 10, clientX - rect.left)),
-      y: Math.max(10, Math.min(rect.height - 10, clientY - rect.top))
-    };
+    return clientToBoardCoords(clientX, clientY);
   }
 
   function handleBoardClick(e) {
@@ -1135,8 +1215,8 @@ function initBingsoo2Game() {
       const dpadRect = dpadController.getBoundingClientRect();
 
       dpadStartPos = {
-        x: dpadRect.left - boardRect.left,
-        y: dpadRect.top - boardRect.top
+        x: dpadRect.left - boardRect.left - gameBoard.clientLeft,
+        y: dpadRect.top - boardRect.top - gameBoard.clientTop
       };
 
       dpadController.style.left = `${dpadStartPos.x}px`;
@@ -1162,12 +1242,12 @@ function initBingsoo2Game() {
       const dx = clientX - dpadStartPointer.x;
       const dy = clientY - dpadStartPointer.y;
 
-      const boardRect = gameBoard.getBoundingClientRect();
+      const { width, height } = getBoardContentSize();
       const dpadWidth = dpadController.offsetWidth || 120;
       const dpadHeight = dpadController.offsetHeight || 140;
 
-      const newX = Math.max(5, Math.min(boardRect.width - dpadWidth - 5, dpadStartPos.x + dx));
-      const newY = Math.max(5, Math.min(boardRect.height - dpadHeight - 5, dpadStartPos.y + dy));
+      const newX = Math.max(5, Math.min(width - dpadWidth - 5, dpadStartPos.x + dx));
+      const newY = Math.max(5, Math.min(height - dpadHeight - 5, dpadStartPos.y + dy));
 
       dpadController.style.left = `${newX}px`;
       dpadController.style.top = `${newY}px`;
@@ -1196,15 +1276,15 @@ function initBingsoo2Game() {
   }
 
   function nudgeBingsoo(dx, dy) {
-    const boardRect = gameBoard.getBoundingClientRect();
+    const { width, height } = getBoardContentSize();
     if (!placedPoint) {
       placedPoint = {
-        x: Math.round(boardRect.width / 2),
-        y: Math.round(boardRect.height / 2)
+        x: Math.round(width / 2),
+        y: Math.round(height / 2)
       };
     } else {
-      placedPoint.x = Math.max(10, Math.min(boardRect.width - 10, placedPoint.x + dx));
-      placedPoint.y = Math.max(10, Math.min(boardRect.height - 10, placedPoint.y + dy));
+      placedPoint.x = Math.max(10, Math.min(width - 10, placedPoint.x + dx));
+      placedPoint.y = Math.max(10, Math.min(height - 10, placedPoint.y + dy));
     }
 
     renderPlacedBingsoo();
@@ -1376,6 +1456,7 @@ function initBingsoo2Game() {
       errorPx: errorDistance,
       score: roundScore
     };
+    initialSubmittedRulersState = snapshotRulersState();
 
     totalScore += roundScore;
     roundHistory.push({ round: currentRound, score: roundScore, errorPx: errorDistance });
@@ -1402,6 +1483,7 @@ function initBingsoo2Game() {
     btnResetToSubmitted.addEventListener('click', () => {
       if (!initialSubmittedPoint) return;
       placedPoint = { x: initialSubmittedPoint.x, y: initialSubmittedPoint.y };
+      restoreRulersState(initialSubmittedRulersState);
       renderPlacedBingsoo();
       updateIndividualStudentExpressions(placedPoint);
       drawVerificationLines();
@@ -1500,7 +1582,7 @@ function initBingsoo2Game() {
     drawPerpBisector(B, C);
     drawPerpBisector(C, A);
 
-    // 3. Draw Distance lines from placed Bingsoo to all 3 students
+    // 3. Draw distance lines from placed Bingsoo to all 3 students
     ctx.setLineDash([6, 6]);
     ctx.lineWidth = 2.5;
     studentPositions.forEach(st => {
