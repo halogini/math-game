@@ -1745,7 +1745,17 @@ function initBingsoo2Game() {
 
       if (apiStatusMsg) {
         apiStatusMsg.className = 'api-status-msg' + (result.success ? ' success' : ' error');
-        apiStatusMsg.textContent = result.message;
+        if (!result.updated && result.existingScore != null) {
+          if (result.existingScore > totalScore) {
+            apiStatusMsg.textContent = `ℹ️ 이미 등록된 팥빙수2 기록(${result.existingScore}점)이 더 좋아 갱신하지 않았습니다.`;
+          } else if (result.existingScore === totalScore) {
+            apiStatusMsg.textContent = `ℹ️ ${totalScore}점은 같지만, 기존 팥빙수2 기록(오차·시간)이 더 좋아 갱신하지 않았습니다.`;
+          } else {
+            apiStatusMsg.textContent = result.message;
+          }
+        } else {
+          apiStatusMsg.textContent = result.message;
+        }
       }
       listenRealtimeLeaderboard();
       return result;
@@ -1939,18 +1949,69 @@ function initBingsoo2Game() {
     }
   }
 
-  function listenRealtimeLeaderboard() {
-    if (!firebaseDb) return;
+  let bingsoo2FirebaseRetryCount = 0;
 
-    try {
-      const ref = firebaseDb.ref('scores');
-      ref.on('value', (snapshot) => {
-        const val = snapshot.val();
-        renderLeaderboardsFromData(val);
+  function fetchLeaderboardViaREST() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
+      signal: controller.signal
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        clearTimeout(timeoutId);
+        renderLeaderboardsFromData(data);
+      })
+      .catch((err) => {
+        clearTimeout(timeoutId);
+        console.warn('Bingsoo2 leaderboard REST fetch failed:', err);
       });
-    } catch (e) {
-      console.warn("Leaderboard listen error:", e);
+  }
+
+  function listenRealtimeLeaderboard() {
+    if (firebaseDb) {
+      let resolved = false;
+
+      const timeoutId = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        console.warn('Bingsoo2 leaderboard SDK timed out; using REST.');
+        fetchLeaderboardViaREST();
+      }, 3000);
+
+      firebaseDb.ref('scores').once('value')
+        .then((snapshot) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timeoutId);
+          renderLeaderboardsFromData(snapshot.val());
+        })
+        .catch((err) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timeoutId);
+          console.warn('Bingsoo2 leaderboard SDK failed; using REST.', err);
+          fetchLeaderboardViaREST();
+        });
+
+      try {
+        firebaseDb.ref('scores').on('value', (snapshot) => {
+          renderLeaderboardsFromData(snapshot.val());
+        });
+      } catch (err) {
+        console.warn('Leaderboard listen error:', err);
+      }
+      return;
     }
+
+    if (bingsoo2FirebaseRetryCount < 3) {
+      bingsoo2FirebaseRetryCount += 1;
+      setTimeout(listenRealtimeLeaderboard, 400);
+      return;
+    }
+
+    fetchLeaderboardViaREST();
   }
 
   function renderLeaderboardsFromData(data) {
