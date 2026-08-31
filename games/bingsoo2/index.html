@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! | 할로매쓰</title>
+  <title>🍧 팥빙수 똑같이 나눠주기 작전 2탄! | 할로매쓰 게임 #2</title>
   
   <!-- Security & Compliance Meta Tags -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:;">
@@ -13,9 +13,9 @@
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()">
   
   <!-- SEO Description & Open Graph Meta Tags -->
-  <meta name="description" content="세 친구가 이루는 삼각형과 3개의 직각자를 활용해 외심(수직이등분선의 교점)을 찾아 완벽한 팥빙수 배달 위치를 지정해보세요!">
-  <meta property="og:title" content="🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! | 할로매쓰">
-  <meta property="og:description" content="세 친구가 이루는 삼각형과 3개의 직각자를 활용해 외심을 찾아 팥빙수를 배치하세요!">
+  <meta name="description" content="세 명의 친구와 완벽히 똑같은 거리의 위치를 찾아 팥빙수를 배달하는 신나고 유쾌한 수학 미니 게임!">
+  <meta property="og:title" content="🍧 팥빙수 똑같이 나눠주기 작전 2탄! | 할로매쓰 게임 #2">
+  <meta property="og:description" content="세 명의 친구와 완벽히 똑같은 거리의 위치를 찾아 팥빙수를 배달하세요!">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
 
@@ -38,13 +38,10 @@
     <!-- Header Controls & Status -->
     <header class="app-header">
       <div class="brand">
-        <span class="logo-emoji">📐🍧</span>
+        <span class="logo-emoji">🍧</span>
         <div>
-          <h1 id="game-main-title">
-            <span class="title-full">팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</span>
-            <span class="title-short">팥빙수 2탄</span>
-          </h1>
-          <p class="subtitle">세 친구가 이루는 삼각형의 수직이등분선을 직각자로 작도하여 완벽한 외심 위치를 찾으세요!</p>
+          <h1 id="game-main-title">팥빙수 똑같이 나눠주기 작전 2탄!</h1>
+          <p class="subtitle">세 명의 친구와 똑같은 거리 위치를 찾아 팥빙수를 배치하세요!</p>
         </div>
       </div>
       <div class="status-bar">
@@ -75,13 +72,18 @@
     <!-- Set Square Toolbar -->
     <div class="ruler-toolbar">
       <div class="toolbar-left">
-        <span class="toolbar-label">📐 직각자 도구함 (3개):</span>
-        <button id="btn-reset-rulers" class="tool-btn" title="직각자 위치를 기본 배치로 되돌립니다">
-          🔄 <span class="tool-btn-full">직각자 제자리로</span><span class="tool-btn-short">제자리</span>
+        <span class="toolbar-label">📐 직각자:</span>
+        <div class="ruler-chip-group" id="ruler-chip-group">
+          <button type="button" class="ruler-chip ruler-chip-blue" data-ruler-id="0" aria-label="파란 직각자"></button>
+          <button type="button" class="ruler-chip ruler-chip-green" data-ruler-id="1" aria-label="초록 직각자"></button>
+          <button type="button" class="ruler-chip ruler-chip-orange" data-ruler-id="2" aria-label="주황 직각자"></button>
+        </div>
+        <button id="btn-lock-all-rulers" class="tool-btn" title="직각자 3개 모두 고정합니다">
+          🔓 <span class="tool-btn-full">전체 고정</span><span class="tool-btn-short">전체</span>
         </button>
       </div>
       <div class="toolbar-right">
-        <span class="guide-tip">💡 팁: 직각자를 드래그해 이동하고, <strong>초록 회전점(⟳)</strong>을 돌려 각도를 맞추세요!</span>
+        <span class="guide-tip">💡 색 버튼으로 직각자를 꺼내고 선택 · 다시 누르면 고정 · <strong>길게 누르면</strong> 숨기기</span>
       </div>
     </div>
 
@@ -107,7 +109,7 @@
 
           <!-- Floating Guidance Banner -->
           <div id="instruction-banner" class="instruction-banner">
-            👉 직각자로 외심을 찾아 🍨을 놓아보세요!
+            👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!
           </div>
 
           <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable) -->
@@ -131,7 +133,7 @@
             <div class="score-card-inner">
               <span id="score-rating-badge" class="rating-badge">완벽해요!</span>
               <div id="score-number" class="score-number">+100</div>
-              <p id="score-distance-info" class="distance-info">정답 외심과 오차: 0 px</p>
+              <p id="score-distance-info" class="distance-info">정답과 오차: 1</p>
             </div>
           </div>
         </div>
@@ -139,13 +141,13 @@
         <!-- Action Control Buttons -->
         <div class="controls-bar">
           <button id="btn-check-answer" class="btn btn-primary" disabled>
-            🎯 <span class="btn-label-full">정답 확인하기</span><span class="btn-label-short">확인</span>
+            🎯 정답 확인하기
           </button>
           <button id="btn-reset-to-submitted" class="btn btn-secondary hidden" title="내가 채점받았던 원래 제출 위치로 팥빙수를 되돌립니다">
             📍 <span class="btn-label-full">내 제출 위치로</span><span class="btn-label-short">제출위치</span>
           </button>
           <button id="btn-next-round" class="btn btn-accent hidden">
-            ▶ <span class="btn-label-full">다음 라운드 진행</span><span class="btn-label-short">다음</span>
+            ▶ 다음 라운드 진행
           </button>
         </div>
       </div>
@@ -163,13 +165,13 @@
       <div class="modal-card modal-opening">
         <div class="opening-banner">
           <span class="opening-subtitle">1위 챔피언 도전!</span>
-          <h2>👑 명예의 전당 랭킹 1위 (2탄)</h2>
+          <h2>👑 명예의 전당 랭킹 1위</h2>
           
           <div class="champ-card" id="champ-card-box">
             <div class="champ-gold-shimmer"></div>
             <div class="champ-trophy">🥇</div>
             <div class="champ-info">
-              <span class="champ-name" id="opening-champ-name">빙수박사</span>
+              <span class="champ-name" id="opening-champ-name">김빙수</span>
               <span class="champ-id" id="opening-champ-id">학번: 2101</span>
             </div>
             <div class="champ-score" id="opening-champ-score">500<small>점</small></div>
@@ -190,6 +192,7 @@
                     <th>이름</th>
                     <th id="th-opening-id">학번</th>
                     <th>점수</th>
+                    <th>총 오차</th>
                   </tr>
                 </thead>
                 <tbody id="opening-leaderboard-tbody">
@@ -202,11 +205,8 @@
 
         <!-- Game Purpose Banner -->
         <div class="game-guide-box short-banner">
-          <div class="guide-title">🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전!</div>
-          <p class="guide-desc">
-            세 친구로 이루어진 삼각형의 각 변의 수직이등분선을 직각자로 맞춰보세요!<br>
-            수직이등분선들이 만나는 <strong>외심</strong>에 팥빙수를 배치하면 100점 만점!
-          </p>
+          <div class="guide-title">🍧 팥빙수 똑같이 나눠주기 작전 2탄!</div>
+          <p class="guide-desc">세 명의 친구와 똑같은 거리에 팥빙수를 배치하세요!</p>
         </div>
 
         <div class="modal-body">
@@ -220,7 +220,7 @@
               <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" />
             </div>
             <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
-              ⚡ 직각자로 팥빙수 배달 작전 시작하기!
+              ⚡ 챔피언에 도전하기 (게임 시작)
             </button>
             <p id="profile-err" class="profile-err"></p>
           </form>
@@ -228,43 +228,45 @@
       </div>
     </div>
 
-    <!-- Final Result Modal -->
+    <!-- Final Result Modal (Round 5 Complete) -->
     <div id="result-modal" class="modal-backdrop hidden">
-      <div class="modal-card">
+      <div class="modal-card modal-lg">
         <div class="modal-header">
           <span class="modal-trophy">🏆</span>
-          <h2>작전 완료! 종합 결과</h2>
-          <div id="new-record-badge" class="badge-new-record hidden">🎉 최고 기록 경신!</div>
+          <h2>게임 완료</h2>
         </div>
-        
+
         <div class="modal-body">
-          <div class="final-score-display">
-            <span class="label">최종 총점</span>
-            <span class="value" id="final-total-score">0 <small>/ 500</small></span>
+          <div class="final-score-box">
+            <span class="final-label">최종 획득 점수</span>
+            <div id="final-total-score" class="final-score">0 <small>/ 500</small></div>
+            <div id="new-record-badge" class="new-record-badge hidden">🎉 최고 기록 달성!</div>
           </div>
 
-          <div class="player-meta-summary">
-            <p>도전자: <strong id="result-locked-name">도전자</strong> <span id="result-locked-id-span">(<span id="result-locked-id">2101</span>)</span></p>
+          <div class="send-action-box">
+            <div class="result-locked-player-box">
+              <span class="locked-icon">🔒</span>
+              <span class="locked-text">등록 참가자: <strong id="result-locked-name">도전자</strong> <span id="result-locked-id-span">(학번: <strong id="result-locked-id">2101</strong>)</span></span>
+            </div>
+            <button id="btn-send-data" class="btn btn-secondary btn-lg" style="width: 100%;">
+              🚀 점수 등록하기
+            </button>
+            <div id="api-status-msg" class="api-status-msg"></div>
           </div>
 
-          <div class="round-history-box">
-            <h4>📊 라운드별 점수 및 오차</h4>
-            <ul id="round-history-list" class="round-history-list">
-              <!-- Dynamically populated -->
-            </ul>
-          </div>
-
-          <!-- Leaderboard Section -->
           <div class="leaderboard-section">
-            <h3 id="result-leaderboard-title">🏆 팥빙수 2탄 명예의 전당 (1위 ~ 20위)</h3>
+            <div class="leaderboard-header">
+              <h3 id="result-leaderboard-title">🏆 명예의 전당 (1위 ~ 20위)</h3>
+            </div>
             <div class="leaderboard-table-wrapper">
               <table class="leaderboard-table">
                 <thead>
-                  <tr>
+                  <tr id="tr-result-th">
                     <th>순위</th>
                     <th>이름</th>
                     <th id="th-result-id">학번</th>
-                    <th>점수</th>
+                    <th>최종 점수</th>
+                    <th>총 오차</th>
                   </tr>
                 </thead>
                 <tbody id="leaderboard-tbody">
@@ -274,16 +276,18 @@
             </div>
           </div>
 
-          <div id="api-status-msg" class="api-status-msg"></div>
-
-          <div class="modal-actions">
-            <button id="btn-send-data" class="btn btn-primary">
-              💾 명예의 전당에 내 점수 등록하기
-            </button>
-            <button id="btn-modal-restart" class="btn btn-secondary">
-              🔄 다시 도전하기
-            </button>
+          <div class="round-breakdown">
+            <h3>라운드별 성적 요약</h3>
+            <ul id="round-history-list" class="history-list">
+              <!-- Dynamically populated -->
+            </ul>
           </div>
+        </div>
+
+        <div class="modal-footer centered-footer">
+          <button id="btn-modal-restart" class="btn btn-primary btn-lg">
+            🎮 새 게임 시작하기
+          </button>
         </div>
       </div>
     </div>

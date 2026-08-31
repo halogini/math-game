@@ -39,6 +39,56 @@ function escapeHtml(str) {
   });
 }
 
+function getBingsoo2TotalErrorPx(item) {
+  if (!item || typeof item !== 'object') return null;
+  if (item.totalErrorPx != null && Number.isFinite(Number(item.totalErrorPx))) {
+    return Math.max(0, parseInt(item.totalErrorPx, 10));
+  }
+  if (!Array.isArray(item.rounds)) return null;
+
+  let sum = 0;
+  for (const round of item.rounds) {
+    const px = parseInt(round && round.errorPx, 10);
+    if (!Number.isFinite(px)) return null;
+    sum += px;
+  }
+  return sum;
+}
+
+function getBingsoo2PlayTimeMs(item) {
+  if (!item || typeof item !== 'object') return null;
+  const playTimeMs = parseInt(item.playTimeMs, 10);
+  return Number.isFinite(playTimeMs) && playTimeMs >= 0 ? playTimeMs : null;
+}
+
+function compareAscendingNullable(a, b) {
+  if (a != null && b != null && a !== b) return a - b;
+  if (a != null && b == null) return -1;
+  if (a == null && b != null) return 1;
+  return 0;
+}
+
+function isBetterBingsoo2Record(candidate, previous) {
+  if (!previous) return true;
+  if (candidate.score !== previous.score) return candidate.score > previous.score;
+
+  const errCmp = compareAscendingNullable(candidate.totalErrorPx, previous.totalErrorPx);
+  if (errCmp !== 0) return errCmp < 0;
+
+  const timeCmp = compareAscendingNullable(candidate.playTimeMs, previous.playTimeMs);
+  if (timeCmp !== 0) return timeCmp < 0;
+
+  return (candidate.timestamp || 0) < (previous.timestamp || 0);
+}
+
+function getLeaderboardDisplayList(list, gameKey) {
+  if (gameKey === 'bingsoo2') {
+    const perfectCount = list.filter((item) => item.score === 500).length;
+    return list.slice(0, Math.max(20, perfectCount));
+  }
+  return list.slice(0, 20);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   // Channel Mode Detection Logic (?mode=dorms vs ?mode=school)
@@ -322,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Also watch scores/dorms for older dorms writes.
     const process = (rootVal) => {
       const list = collectGameScores(rootVal, activeLeaderboardGame);
-      renderLeaderboardTable(list.slice(0, 20));
+      renderLeaderboardTable(getLeaderboardDisplayList(list, activeLeaderboardGame));
     };
 
     const scoresRef = firebaseDb.ref('scores');
@@ -386,7 +436,30 @@ document.addEventListener('DOMContentLoaded', () => {
             // 팥빙수나 합동게임은 500점 캡, 타이쿤 수익은 상한 없음
             const score = gameKey === 'prism-tycoon' ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
             const prev = bestMap.get(userKey);
-            if (!prev || score > prev.score) {
+
+            if (gameKey === 'bingsoo2') {
+              const totalErrorPx = getBingsoo2TotalErrorPx(item);
+              const playTimeMs = getBingsoo2PlayTimeMs(item);
+              const candidate = { score, totalErrorPx, playTimeMs, timestamp: item.timestamp || 0 };
+              if (isBetterBingsoo2Record(candidate, prev)) {
+                const formattedScore = score.toLocaleString();
+                let metricLabel = totalErrorPx != null
+                  ? `${formattedScore}점 · ${totalErrorPx}px`
+                  : `${formattedScore}점`;
+                if (playTimeMs != null) {
+                  metricLabel += ` · ${Math.floor(playTimeMs / 60000)}:${String(Math.floor((playTimeMs % 60000) / 1000)).padStart(2, '0')}`;
+                }
+                bestMap.set(userKey, {
+                  name,
+                  studentId: sid,
+                  score,
+                  totalErrorPx,
+                  playTimeMs,
+                  timestamp: item.timestamp || 0,
+                  metricLabel
+                });
+              }
+            } else if (!prev || score > prev.score) {
               const formattedScore = score.toLocaleString();
               bestMap.set(userKey, {
                 name,
@@ -409,6 +482,18 @@ document.addEventListener('DOMContentLoaded', () => {
       list.sort((a, b) => {
         const da = Math.floor(a.clearTimeMs / 1000) - Math.floor(b.clearTimeMs / 1000);
         return da !== 0 ? da : a.clearTimeMs - b.clearTimeMs;
+      });
+    } else if (gameKey === 'bingsoo2') {
+      list.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+
+        const errCmp = compareAscendingNullable(a.totalErrorPx, b.totalErrorPx);
+        if (errCmp !== 0) return errCmp;
+
+        const timeCmp = compareAscendingNullable(a.playTimeMs, b.playTimeMs);
+        if (timeCmp !== 0) return timeCmp;
+
+        return (a.timestamp || 0) - (b.timestamp || 0);
       });
     } else {
       list.sort((a, b) => b.score - a.score);

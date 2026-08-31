@@ -1,5 +1,5 @@
 /**
- * 🍧 팥빙수 2탄: 세 친구 삼각형 & 직각자 작전! - Game Engine Logic
+ * 🍧 팥빙수 똑같이 나눠주기 작전 2탄! - Game Engine Logic
  * 
  * Includes interactive set squares (직각자 3개 with drag & rotate),
  * Triangle geometry rendering, perpendicular bisector guidance,
@@ -101,12 +101,17 @@ function initBingsoo2Game() {
   let isAnswerChecked = false;
   let isDraggingBingsoo = false;
   let popupTimeoutId = null;
+  let activeRulerId = null;
+  let gameStartedAt = null;
+  let sessionPlayTimeMs = null;
 
   // 3 Set Squares (직각자 3개 - 깔끔하게 정렬된 기본 배치)
+  const RULER_COLOR_NAMES = ['파란', '초록', '주황'];
+
   const rulers = [
-    { id: 0, theme: 'ruler-theme-blue', name: '자 A', x: 40, y: 380, angle: 0, width: 140, height: 110, isDragging: false, isRotating: false },
-    { id: 1, theme: 'ruler-theme-green', name: '자 B', x: 260, y: 380, angle: 0, width: 140, height: 110, isDragging: false, isRotating: false },
-    { id: 2, theme: 'ruler-theme-orange', name: '자 C', x: 480, y: 380, angle: 0, width: 140, height: 110, isDragging: false, isRotating: false }
+    { id: 0, theme: 'ruler-theme-blue', x: 40, y: 380, angle: 0, width: 140, height: 110, locked: false, hidden: false, isDragging: false, isRotating: false },
+    { id: 1, theme: 'ruler-theme-green', x: 260, y: 380, angle: 0, width: 140, height: 110, locked: false, hidden: true, isDragging: false, isRotating: false },
+    { id: 2, theme: 'ruler-theme-orange', x: 480, y: 380, angle: 0, width: 140, height: 110, locked: false, hidden: true, isDragging: false, isRotating: false }
   ];
 
   // Locked Player Info
@@ -130,7 +135,8 @@ function initBingsoo2Game() {
   const lineCanvas = document.getElementById('line-canvas');
   const ctx = lineCanvas.getContext('2d');
 
-  const btnResetRulers = document.getElementById('btn-reset-rulers');
+  const rulerChipGroup = document.getElementById('ruler-chip-group');
+  const btnLockAllRulers = document.getElementById('btn-lock-all-rulers');
 
   const playerModal = document.getElementById('player-modal');
   const playerForm = document.getElementById('player-form');
@@ -194,9 +200,9 @@ function initBingsoo2Game() {
       if (!inputPlayerName.value && playerName) inputPlayerName.value = playerName;
     }
     if (inputStudentId) inputStudentId.removeAttribute('required');
-    if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 dorms 팥빙수 2탄 명예의 전당';
+    if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 dorms 명예의 전당 (1위 ~ 20위)';
   } else {
-    if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 우리 학교 팥빙수 2탄 명예의 전당';
+    if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (1위 ~ 20위)';
   }
 
   // Privacy Policy Handlers
@@ -221,10 +227,49 @@ function initBingsoo2Game() {
     });
   }
 
-  // Toolbar Toggle Handlers
-  if (btnResetRulers) {
-    btnResetRulers.addEventListener('click', () => {
-      resetRulersPosition();
+  if (rulerChipGroup) {
+    rulerChipGroup.querySelectorAll('.ruler-chip').forEach(chip => {
+      let longPressTimer = null;
+      let longPressTriggered = false;
+
+      const clearLongPress = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      };
+
+      chip.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        longPressTriggered = false;
+        clearLongPress();
+        const id = parseInt(chip.dataset.rulerId, 10);
+        if (Number.isNaN(id)) return;
+        longPressTimer = setTimeout(() => {
+          longPressTriggered = true;
+          toggleRulerHidden(id);
+        }, 480);
+      });
+
+      chip.addEventListener('pointerup', clearLongPress);
+      chip.addEventListener('pointerleave', clearLongPress);
+      chip.addEventListener('pointercancel', clearLongPress);
+
+      chip.addEventListener('click', () => {
+        if (longPressTriggered) {
+          longPressTriggered = false;
+          return;
+        }
+        const id = parseInt(chip.dataset.rulerId, 10);
+        if (Number.isNaN(id)) return;
+        handleRulerChipClick(id);
+      });
+    });
+  }
+
+  if (btnLockAllRulers) {
+    btnLockAllRulers.addEventListener('click', () => {
+      handleLockAllRulersClick();
     });
   }
 
@@ -359,6 +404,8 @@ function initBingsoo2Game() {
     currentRound = 1;
     totalScore = 0;
     roundHistory = [];
+    gameStartedAt = Date.now();
+    sessionPlayTimeMs = null;
 
     updateHeaderUI();
     setupCanvasResolution();
@@ -405,8 +452,8 @@ function initBingsoo2Game() {
     scorePopup.classList.add('hidden');
 
     showInstruction(
-      '👉 직각자 3개를 활용해 삼각형 변의 수직이등분선을 찾고, 교점에 팥빙수(🍨)를 놓아보세요!',
-      '👉 직각자로 외심을 찾아 🍨을 놓아보세요!'
+      '👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!',
+      '👉 🍨 터치해 팥빙수를 놓아보세요!'
     );
 
     const width = gameBoard.clientWidth || 800;
@@ -428,14 +475,14 @@ function initBingsoo2Game() {
     }
 
     showInstruction(
-      `👉 [라운드 ${roundNum}] 직각자를 활용해 세 친구와 똑같은 거리에 팥빙수(🍨)를 놓아보세요!`,
-      `👉 [라운드 ${roundNum}] 외심에 🍨을 놓으세요!`
+      '👉 🍨 원하는 곳을 터치해 팥빙수를 놓아보세요!',
+      '👉 🍨 터치해 팥빙수를 놓아보세요!'
     );
 
+    resetRulersState();
     resetRulersPosition();
     renderStudents();
     renderTriangleGeometry();
-    renderRulers();
     updateHeaderUI();
   }
 
@@ -654,6 +701,101 @@ function initBingsoo2Game() {
     };
   }
 
+  function resetRulersState() {
+    activeRulerId = 0;
+    rulers.forEach((ruler, index) => {
+      ruler.locked = false;
+      ruler.hidden = index !== 0;
+    });
+    updateRulerToolbar();
+  }
+
+  function getRulerColorName(id) {
+    return RULER_COLOR_NAMES[id] || '직각자';
+  }
+
+  function updateRulerToolbar() {
+    if (rulerChipGroup) {
+      rulerChipGroup.querySelectorAll('.ruler-chip').forEach(chip => {
+        const id = parseInt(chip.dataset.rulerId, 10);
+        const ruler = rulers[id];
+        if (!ruler) return;
+        const colorName = getRulerColorName(id);
+        chip.classList.toggle('is-selected', !ruler.hidden && activeRulerId === id);
+        chip.classList.toggle('is-locked', ruler.locked && !ruler.hidden);
+        chip.classList.toggle('is-hidden', ruler.hidden);
+        chip.setAttribute('aria-pressed', !ruler.hidden && activeRulerId === id ? 'true' : 'false');
+        chip.title = ruler.hidden
+          ? `${colorName} 직각자 · 눌러서 꺼내기`
+          : ruler.locked
+            ? `${colorName} 직각자 고정됨 · 눌러서 해제 · 길게 누르면 숨김`
+            : activeRulerId === id
+              ? `${colorName} 직각자 선택됨 · 다시 누르면 고정 · 길게 누르면 숨김`
+              : `${colorName} 직각자 선택 · 길게 누르면 숨김`;
+      });
+    }
+
+    if (btnLockAllRulers) {
+      const visibleRulers = rulers.filter(ruler => !ruler.hidden);
+      const allLocked = visibleRulers.length > 0 && visibleRulers.every(ruler => ruler.locked);
+      btnLockAllRulers.classList.toggle('active', allLocked);
+      btnLockAllRulers.innerHTML = allLocked
+        ? '🔒 <span class="tool-btn-full">전체 고정됨</span><span class="tool-btn-short">고정됨</span>'
+        : '🔓 <span class="tool-btn-full">전체 고정</span><span class="tool-btn-short">전체</span>';
+      btnLockAllRulers.title = allLocked ? '표시 중인 직각자 전체 고정 해제' : '표시 중인 직각자 전체 고정';
+    }
+  }
+
+  function handleRulerChipClick(id) {
+    const ruler = rulers[id];
+    if (!ruler) return;
+
+    if (ruler.hidden) {
+      ruler.hidden = false;
+      activeRulerId = id;
+    } else if (ruler.locked) {
+      ruler.locked = false;
+      activeRulerId = id;
+    } else if (activeRulerId === id) {
+      ruler.locked = true;
+      activeRulerId = null;
+    } else {
+      activeRulerId = id;
+    }
+
+    updateRulerToolbar();
+    renderRulers();
+  }
+
+  function toggleRulerHidden(id) {
+    const ruler = rulers[id];
+    if (!ruler) return;
+
+    ruler.hidden = !ruler.hidden;
+    ruler.isDragging = false;
+    ruler.isRotating = false;
+
+    if (ruler.hidden) {
+      if (activeRulerId === id) activeRulerId = null;
+    } else {
+      activeRulerId = id;
+    }
+
+    updateRulerToolbar();
+    renderRulers();
+  }
+
+  function handleLockAllRulersClick() {
+    const visibleRulers = rulers.filter(ruler => !ruler.hidden);
+    const allLocked = visibleRulers.length > 0 && visibleRulers.every(ruler => ruler.locked);
+    rulers.forEach(ruler => {
+      if (!ruler.hidden) ruler.locked = !allLocked;
+    });
+    if (!allLocked) activeRulerId = null;
+    updateRulerToolbar();
+    renderRulers();
+  }
+
   function resetRulersPosition() {
     const width = gameBoard.clientWidth || 800;
     const height = gameBoard.clientHeight || 520;
@@ -681,10 +823,21 @@ function initBingsoo2Game() {
   function renderRulers() {
     rulersLayer.innerHTML = '';
 
-    rulers.forEach(ruler => {
+    const drawOrder = [...rulers].sort((a, b) => {
+      if (a.id === activeRulerId) return 1;
+      if (b.id === activeRulerId) return -1;
+      return a.id - b.id;
+    });
+
+    drawOrder.forEach(ruler => {
+      if (ruler.hidden) return;
+
       const container = document.createElement('div');
       container.id = `set-square-${ruler.id}`;
-      container.className = `set-square-container ${ruler.theme}`;
+      const classNames = ['set-square-container', ruler.theme];
+      if (ruler.locked) classNames.push('is-locked');
+      if (activeRulerId === ruler.id) classNames.push('is-selected');
+      container.className = classNames.join(' ');
       container.style.left = `${ruler.x}px`;
       container.style.top = `${ruler.y}px`;
       container.style.transform = `rotate(${ruler.angle}deg)`;
@@ -751,6 +904,7 @@ function initBingsoo2Game() {
     let startRulerPos = { x: ruler.x, y: ruler.y };
 
     function onRulerDragStart(e) {
+      if (ruler.locked) return;
       if (e.target.closest('.ruler-rotate-handle')) return;
       e.preventDefault();
       e.stopPropagation();
@@ -805,6 +959,7 @@ function initBingsoo2Game() {
     // Rotation Knob Dragging (Rotate)
     if (rotateHandle) {
       function onRotateStart(e) {
+        if (ruler.locked) return;
         e.preventDefault();
         e.stopPropagation();
 
@@ -1207,8 +1362,8 @@ function initBingsoo2Game() {
     isAnswerChecked = true;
 
     showInstruction(
-      '👉 팥빙수를 움직여 정답 외심(초록점)과 비교해보세요!',
-      '👉 🍨을 움직여 초록점과 비교하세요!'
+      '👉 팥빙수를 드래그하여 정답 위치를 확인하세요!',
+      '👉 팥빙수를 드래그해 정답 위치를 확인하세요!'
     );
 
     const errorDistance = Math.round(Math.hypot(placedPoint.x - targetPoint.x, placedPoint.y - targetPoint.y));
@@ -1240,9 +1395,9 @@ function initBingsoo2Game() {
     btnNextRound.classList.remove('hidden');
 
     if (currentRound === maxRounds) {
-      setDualLabel(btnNextRound, '🏆 최종 결과 보기', '🏆 결과');
+      btnNextRound.textContent = '🏆 최종 결과 보기';
     } else {
-      setDualLabel(btnNextRound, '▶ 다음 라운드 진행', '▶ 다음');
+      btnNextRound.textContent = '▶ 다음 라운드 진행';
     }
   });
 
@@ -1255,8 +1410,8 @@ function initBingsoo2Game() {
       drawVerificationLines();
       showScorePopup(initialSubmittedPoint.score, initialSubmittedPoint.errorPx);
       showInstruction(
-        '📍 팥빙수를 원래 제출 위치로 되돌렸습니다!',
-        '📍 제출 위치로 되돌렸습니다!'
+        '👉 팥빙수를 드래그하여 정답 위치를 확인하세요!',
+        '👉 팥빙수를 드래그해 정답 위치를 확인하세요!'
       );
     });
   }
@@ -1304,7 +1459,7 @@ function initBingsoo2Game() {
         <div class="crosshair-dot"></div>
       </div>
       <div class="target-icon-box">🎯</div>
-      <div class="target-label">정답 외심(O)</div>
+      <div class="target-label">정답 위치</div>
     `;
   }
 
@@ -1381,14 +1536,14 @@ function initBingsoo2Game() {
     if (popupTimeoutId) clearTimeout(popupTimeoutId);
 
     scoreNumber.textContent = `${score}점`;
-    scoreDistanceInfo.textContent = `정답 외심과 오차: ${errorDistance} px`;
+    scoreDistanceInfo.textContent = `정답 위치와 오차: ${errorDistance}`;
 
     let badgeText = "좋아요! 👍";
-    if (score === 100) badgeText = "완벽한 외심 명중! 🏆";
-    else if (score >= 90) badgeText = "초정밀 작도 명중! 🎯";
+    if (score === 100) badgeText = "0 오차 완벽 명중! 🏆";
+    else if (score >= 90) badgeText = "초정밀 명중! 🎯";
     else if (score >= 75) badgeText = "훌륭합니다! 👏";
     else if (score >= 50) badgeText = "좋아요! 👍";
-    else if (score >= 30) badgeText = "아쉬워요! 😃";
+    else if (score >= 25) badgeText = "아쉬워요! 😃";
     else badgeText = "다시 도전! 🍧";
 
     scoreRatingBadge.textContent = badgeText;
@@ -1396,7 +1551,7 @@ function initBingsoo2Game() {
 
     popupTimeoutId = setTimeout(() => {
       scorePopup.classList.add('hidden');
-    }, 1800);
+    }, 1500);
   }
 
   scorePopup.addEventListener('click', () => {
@@ -1425,6 +1580,10 @@ function initBingsoo2Game() {
   // Game Finish & Realtime Firebase Leaderboard
   // ----------------------------------------------------
   function finishGame() {
+    if (gameStartedAt) {
+      sessionPlayTimeMs = Math.max(0, Date.now() - gameStartedAt);
+    }
+
     finalTotalScore.innerHTML = `${totalScore} <small>/ 500</small>`;
     apiStatusMsg.textContent = '';
     apiStatusMsg.className = 'api-status-msg';
@@ -1459,10 +1618,11 @@ function initBingsoo2Game() {
     roundHistoryList.innerHTML = '';
     roundHistory.forEach(item => {
       const li = document.createElement('li');
+      li.className = 'history-item';
       li.innerHTML = `
-        <span><strong>라운드 ${item.round}</strong></span>
-        <span>오차: ${item.errorPx} px</span>
-        <span style="font-weight: 800; color: #0284c7;">+${item.score}점</span>
+        <span class="round-tag">ROUND ${item.round}</span>
+        <span>오차: ${item.errorPx}</span>
+        <span class="score-tag">+${item.score}점</span>
       `;
       roundHistoryList.appendChild(li);
     });
@@ -1473,6 +1633,131 @@ function initBingsoo2Game() {
   // ----------------------------------------------------
   // Leaderboard Functions
   // ----------------------------------------------------
+  function getTotalErrorPxFromRounds(rounds) {
+    if (!Array.isArray(rounds)) return null;
+    let sum = 0;
+    for (const round of rounds) {
+      const px = parseInt(round && round.errorPx, 10);
+      if (!Number.isFinite(px)) return null;
+      sum += px;
+    }
+    return sum;
+  }
+
+  function compareAscendingNullable(a, b) {
+    if (a != null && b != null && a !== b) return a - b;
+    if (a != null && b == null) return -1;
+    if (a == null && b != null) return 1;
+    return 0;
+  }
+
+  function isBetterLeaderboardEntry(candidate, previous) {
+    if (!previous) return true;
+    if (candidate.score !== previous.score) return candidate.score > previous.score;
+
+    const errCmp = compareAscendingNullable(candidate.totalErrorPx, previous.totalErrorPx);
+    if (errCmp !== 0) return errCmp < 0;
+
+    const timeCmp = compareAscendingNullable(candidate.playTimeMs, previous.playTimeMs);
+    if (timeCmp !== 0) return timeCmp < 0;
+
+    return (candidate.timestamp || 0) < (previous.timestamp || 0);
+  }
+
+  function sortLeaderboardEntries(entries) {
+    return entries.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+
+      const errCmp = compareAscendingNullable(a.totalErrorPx, b.totalErrorPx);
+      if (errCmp !== 0) return errCmp;
+
+      const timeCmp = compareAscendingNullable(a.playTimeMs, b.playTimeMs);
+      if (timeCmp !== 0) return timeCmp;
+
+      return (a.timestamp || 0) - (b.timestamp || 0);
+    });
+  }
+
+  function withScoreCompetitionRanks(entries) {
+    const ranks = [];
+    let lastScore = null;
+    let lastRank = 0;
+
+    entries.forEach((entry, index) => {
+      const rank = lastScore !== null && entry.score === lastScore ? lastRank : index + 1;
+      lastScore = entry.score;
+      lastRank = rank;
+      ranks.push(rank);
+    });
+
+    const tieCounts = {};
+    ranks.forEach((rank) => {
+      tieCounts[rank] = (tieCounts[rank] || 0) + 1;
+    });
+
+    return entries.map((entry, index) => ({
+      entry,
+      rank: ranks[index],
+      tied: tieCounts[ranks[index]] > 1
+    }));
+  }
+
+  function formatRankBadge(rank, tied) {
+    const label = tied ? `공동 ${rank}위` : `${rank}위`;
+    if (rank === 1) return `🥇 ${label}`;
+    if (rank === 2) return `🥈 ${label}`;
+    if (rank === 3) return `🥉 ${label}`;
+    return label;
+  }
+
+  function formatTotalErrorPx(totalErrorPx) {
+    return totalErrorPx == null ? '-' : `${totalErrorPx}px`;
+  }
+
+  function parseLeaderboardRow(row) {
+    const name = sanitizeInput(row.playerName || row.name || '도전자', 12);
+    const studentId = sanitizeInput(row.studentId || '', 10);
+    const score = Math.max(0, Math.min(500, parseInt(row.totalScore || row.score || 0, 10)));
+    const storedError = row.totalErrorPx != null ? parseInt(row.totalErrorPx, 10) : null;
+    const totalErrorPx = Number.isFinite(storedError)
+      ? storedError
+      : getTotalErrorPxFromRounds(row.rounds);
+    const storedPlayTime = row.playTimeMs != null ? parseInt(row.playTimeMs, 10) : null;
+    const playTimeMs = Number.isFinite(storedPlayTime) && storedPlayTime >= 0 ? storedPlayTime : null;
+
+    return {
+      name,
+      studentId,
+      score,
+      totalErrorPx: totalErrorPx == null || !Number.isFinite(totalErrorPx) ? null : totalErrorPx,
+      playTimeMs,
+      timestamp: row.timestamp || 0
+    };
+  }
+
+  function getHallOfFameDisplayEntries(sortedEntries, perfectScore = 500, defaultLimit = 20) {
+    const perfectCount = sortedEntries.filter((entry) => entry.score === perfectScore).length;
+    const displayCount = Math.max(defaultLimit, perfectCount);
+    return {
+      entries: sortedEntries.slice(0, displayCount),
+      perfectCount,
+      displayCount
+    };
+  }
+
+  function updateLeaderboardTitle(displayCount, perfectCount) {
+    if (!resultLeaderboardTitle) return;
+    const baseTitle = activeMode === 'dorms'
+      ? '🏆 dorms 명예의 전당'
+      : '🏆 우리 학교 명예의 전당';
+
+    if (perfectCount > 20) {
+      resultLeaderboardTitle.textContent = `${baseTitle} (500점 만점 ${perfectCount}명 전원)`;
+    } else {
+      resultLeaderboardTitle.textContent = `${baseTitle} (1위 ~ 20위)`;
+    }
+  }
+
   function listenRealtimeLeaderboard() {
     if (!firebaseDb) return;
 
@@ -1490,48 +1775,62 @@ function initBingsoo2Game() {
   function renderLeaderboardsFromData(data) {
     if (!data) return;
 
-    let entries = [];
-    Object.keys(data).forEach(key => {
-      const row = data[key];
-      if (row && (row.game === 'bingsoo2' || row.game === 'bingsoo-2' || (row.gameId && row.gameId.includes('bingsoo2')))) {
-        entries.push({
-          key,
-          name: sanitizeInput(row.playerName || row.name || '도전자', 12),
-          studentId: sanitizeInput(row.studentId || '', 10),
-          score: parseInt(row.totalScore || row.score || 0, 10),
-          timestamp: row.timestamp || 0
-        });
-      }
-    });
+    const bestMap = new Map();
 
-    entries.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.timestamp - b.timestamp;
-    });
+    const collectNodes = (obj, isDormsSubtree = false) => {
+      if (!obj || typeof obj !== 'object') return;
 
-    // 1st Place Champion
-    if (entries.length > 0) {
-      const champ = entries[0];
+      Object.keys(obj).forEach((key) => {
+        const row = obj[key];
+        if (!row || typeof row !== 'object') return;
+
+        if (row.name || row.playerName) {
+          const gameId = String(row.gameId || row.game || '').trim();
+          if (!gameId.includes('bingsoo2') && gameId !== 'bingsoo-2') return;
+
+          const entry = parseLeaderboardRow(row);
+          const userKey = activeMode === 'school'
+            ? `${entry.name}_${entry.studentId}`
+            : entry.name;
+          const prev = bestMap.get(userKey);
+          if (isBetterLeaderboardEntry(entry, prev)) {
+            bestMap.set(userKey, entry);
+          }
+        } else {
+          collectNodes(row, key === 'dorms' || isDormsSubtree);
+        }
+      });
+    };
+
+    collectNodes(data);
+
+    const sortedEntries = sortLeaderboardEntries(Array.from(bestMap.values()));
+    const { entries: hallOfFameEntries, perfectCount, displayCount } = getHallOfFameDisplayEntries(sortedEntries);
+    const tableColSpan = activeMode === 'school' ? 5 : 4;
+
+    updateLeaderboardTitle(displayCount, perfectCount);
+
+    if (hallOfFameEntries.length > 0) {
+      const champ = hallOfFameEntries[0];
       if (openingChampName) openingChampName.textContent = champ.name;
       if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
       if (openingChampId) {
         openingChampId.textContent = activeMode === 'school' ? `학번: ${champ.studentId || '미입력'}` : '';
       }
+    } else {
+      if (openingChampName) openingChampName.textContent = '도전자';
+      if (openingChampId) openingChampId.textContent = '';
+      if (openingChampScore) openingChampScore.innerHTML = `0<small>점</small>`;
     }
 
-    // Opening & Result Table
-    const top20 = entries.slice(0, 20);
+    const ranked = withScoreCompetitionRanks(hallOfFameEntries);
     const buildRows = () => {
-      if (top20.length === 0) {
-        return `<tr><td colspan="4" style="text-align:center; padding:16px; color:#94a3b8;">아직 등록된 랭킹 기록이 없습니다. 1등에 도전하세요!</td></tr>`;
+      if (ranked.length === 0) {
+        return `<tr><td colspan="${tableColSpan}" style="text-align:center; padding:15px; color:#64748b;">아직 등록된 기록이 없습니다. 첫 점수를 등록해 보세요!</td></tr>`;
       }
-      return top20.map((entry, idx) => {
-        const rank = idx + 1;
-        let rankBadge = `${rank}위`;
-        if (rank === 1) rankBadge = '🥇 1위';
-        else if (rank === 2) rankBadge = '🥈 2위';
-        else if (rank === 3) rankBadge = '🥉 3위';
 
+      return ranked.map(({ entry, rank, tied }) => {
+        const rankBadge = formatRankBadge(rank, tied);
         const idCell = activeMode === 'school' ? `<td>${escapeHtml(entry.studentId || '-')}</td>` : '';
         return `
           <tr>
@@ -1539,6 +1838,7 @@ function initBingsoo2Game() {
             <td>${escapeHtml(entry.name)}</td>
             ${idCell}
             <td style="font-weight: 800; color: #0284c7;">${entry.score}점</td>
+            <td>${formatTotalErrorPx(entry.totalErrorPx)}</td>
           </tr>
         `;
       }).join('');
@@ -1551,7 +1851,7 @@ function initBingsoo2Game() {
   // Register Score
   btnSendData.addEventListener('click', async () => {
     btnSendData.disabled = true;
-    apiStatusMsg.textContent = '명예의 전당에 점수를 등록하는 중...';
+    apiStatusMsg.textContent = '⏳ 점수 등록 중...';
     apiStatusMsg.className = 'api-status-msg';
 
     if (!firebaseDb) {
@@ -1562,6 +1862,10 @@ function initBingsoo2Game() {
     }
 
     try {
+      const totalErrorPx = roundHistory.reduce((sum, round) => sum + round.errorPx, 0);
+      const playTimeMs = sessionPlayTimeMs != null
+        ? sessionPlayTimeMs
+        : (gameStartedAt ? Math.max(0, Date.now() - gameStartedAt) : null);
       const newScoreRef = firebaseDb.ref(dbRefPath).push();
       await newScoreRef.set({
         gameId: 'bingsoo2',
@@ -1571,11 +1875,14 @@ function initBingsoo2Game() {
         studentId: activeMode === 'school' ? studentId : '',
         score: totalScore,
         totalScore: totalScore,
+        totalErrorPx,
+        playTimeMs,
         rounds: roundHistory,
+        channel: activeMode,
         timestamp: firebase.database.ServerValue.TIMESTAMP
       });
 
-      apiStatusMsg.textContent = '🎉 명예의 전당 랭킹에 성공적으로 등록되었습니다!';
+      apiStatusMsg.textContent = `✅ ${playerName}${activeMode === 'school' && studentId ? `(학번: ${studentId})` : ''}님의 ${totalScore}점 기록이 등록되었습니다.`;
       apiStatusMsg.className = 'api-status-msg success';
     } catch (e) {
       console.error("Score submission error:", e);
