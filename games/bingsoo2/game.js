@@ -24,6 +24,18 @@ if (window.firebase && firebaseConfig && firebaseConfig.apiKey) {
 // ----------------------------------------------------
 // Security & Input Validation Helpers
 // ----------------------------------------------------
+function isValidName(name) {
+  return typeof name === 'string' && name.trim().length >= 1 && name.trim().length <= 12;
+}
+
+function isBingsoo2GameId(row) {
+  if (typeof HalomathScores !== 'undefined' && HalomathScores.isBingsoo2GameId) {
+    return HalomathScores.isBingsoo2GameId(row);
+  }
+  const id = String((row && (row.gameId || row.game)) || '').trim();
+  return id === 'bingsoo2' || id === 'bingsoo-2';
+}
+
 function sanitizeInput(str, maxLen = 12) {
   if (typeof str !== 'string') return '';
   return str
@@ -1666,6 +1678,38 @@ function initBingsoo2Game() {
       apiStatusMsg.textContent = '⏳ 랭킹 등록 중...';
     }
 
+    playerName = sanitizeInput(HalomathProfile.loadName(activeMode) || playerName || '', 12);
+    if (activeMode === 'school') {
+      studentId = sanitizeInput(HalomathProfile.loadStudentId(activeMode) || studentId || '', 10);
+    }
+
+    if (!isValidName(playerName) || (activeMode === 'school' && !HalomathProfile.isValidStudentId(studentId))) {
+      if (apiStatusMsg) {
+        apiStatusMsg.className = 'api-status-msg error';
+        apiStatusMsg.textContent = activeMode === 'school'
+          ? '❌ 참가자 정보가 올바르지 않습니다. (이름 1~12자, 학번 1~10자)'
+          : '❌ 닉네임이 올바르지 않습니다. (1~12자)';
+      }
+      return null;
+    }
+
+    if (typeof totalScore !== 'number' || isNaN(totalScore) || totalScore < 0 || totalScore > 500) {
+      if (apiStatusMsg) {
+        apiStatusMsg.className = 'api-status-msg error';
+        apiStatusMsg.textContent = '❌ 유효하지 않은 점수 범위입니다.';
+      }
+      return null;
+    }
+
+    const calculatedSum = roundHistory.reduce((acc, cur) => acc + cur.score, 0);
+    if (roundHistory.length !== maxRounds || calculatedSum !== totalScore) {
+      if (apiStatusMsg) {
+        apiStatusMsg.className = 'api-status-msg error';
+        apiStatusMsg.textContent = '❌ 라운드 성적 데이터 검증에 실패했습니다.';
+      }
+      return null;
+    }
+
     const totalErrorPx = roundHistory.reduce((sum, round) => sum + round.errorPx, 0);
     const playTimeMs = sessionPlayTimeMs != null
       ? sessionPlayTimeMs
@@ -1674,10 +1718,7 @@ function initBingsoo2Game() {
     const payload = {
       gameId: 'bingsoo2',
       game: 'bingsoo2',
-      name: playerName,
-      playerName: playerName,
-      score: totalScore,
-      totalScore: totalScore,
+      score: Number(totalScore),
       totalErrorPx,
       playTimeMs,
       rounds: roundHistory,
@@ -1686,23 +1727,36 @@ function initBingsoo2Game() {
         : Date.now()
     };
 
-    const result = await HalomathScores.submitScore(firebaseDb, {
-      activeMode,
-      name: playerName,
-      studentId,
-      gameIds: ['bingsoo2', 'bingsoo-2'],
-      payload,
-      compareMode: 'bingsoo2',
-      updatedMessage: `🎉 ${totalScore}점으로 기록이 갱신되었습니다!`,
-      createdMessage: `✅ ${playerName}${activeMode === 'school' && studentId ? `(학번: ${studentId})` : ''}님의 ${totalScore}점이 등록되었습니다.`,
-      unchangedMessage: `ℹ️ 기존 등록 점수가 ${totalScore}점보다 높거나 같아 갱신하지 않았습니다.`
-    });
+    try {
+      const result = await HalomathScores.submitScore(firebaseDb, {
+        activeMode,
+        name: playerName,
+        studentId,
+        gameIds: ['bingsoo2', 'bingsoo-2'],
+        payload,
+        compareMode: 'bingsoo2',
+        acceptEntry: (val) => isBingsoo2GameId(val),
+        updatedMessage: `🎉 ${totalScore}점으로 기록이 갱신되었습니다!`,
+        createdMessage: activeMode === 'school'
+          ? `✅ ${playerName}(학번: ${studentId})님의 ${totalScore}점이 등록되었습니다!`
+          : `✅ ${playerName}님의 ${totalScore}점이 등록되었습니다!`,
+        unchangedMessage: `ℹ️ 기존 등록 점수가 ${totalScore}점보다 높거나 같아 갱신하지 않았습니다.`
+      });
 
-    if (apiStatusMsg) {
-      apiStatusMsg.className = 'api-status-msg' + (result.success ? ' success' : ' error');
-      apiStatusMsg.textContent = result.message;
+      if (apiStatusMsg) {
+        apiStatusMsg.className = 'api-status-msg' + (result.success ? ' success' : ' error');
+        apiStatusMsg.textContent = result.message;
+      }
+      listenRealtimeLeaderboard();
+      return result;
+    } catch (err) {
+      console.warn('registerScoreToLeaderboard failed:', err);
+      if (apiStatusMsg) {
+        apiStatusMsg.className = 'api-status-msg error';
+        apiStatusMsg.textContent = '❌ 랭킹 등록 중 오류가 발생했습니다.';
+      }
+      return null;
     }
-    return result;
   }
 
   function finishGame() {
@@ -1912,8 +1966,7 @@ function initBingsoo2Game() {
         if (!row || typeof row !== 'object') return;
 
         if (row.name || row.playerName) {
-          const gameId = String(row.gameId || row.game || '').trim();
-          if (!gameId.includes('bingsoo2') && gameId !== 'bingsoo-2') return;
+          if (!isBingsoo2GameId(row)) return;
 
           const valStudentId = String(row.studentId || '').trim();
           const valChannel = String(row.channel || '').trim();
