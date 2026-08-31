@@ -102,10 +102,6 @@ function initBingsoo2Game() {
   let isDraggingBingsoo = false;
   let popupTimeoutId = null;
 
-  // Tool Settings
-  let showGuideRays = true;
-  let showMidpoints = true;
-
   // 3 Set Squares (직각자 3개 - 깔끔하게 정렬된 기본 배치)
   const rulers = [
     { id: 0, theme: 'ruler-theme-blue', name: '자 A', x: 40, y: 380, angle: 0, width: 140, height: 110, isDragging: false, isRotating: false },
@@ -135,8 +131,6 @@ function initBingsoo2Game() {
   const ctx = lineCanvas.getContext('2d');
 
   const btnResetRulers = document.getElementById('btn-reset-rulers');
-  const btnToggleGuideRays = document.getElementById('btn-toggle-guide-rays');
-  const btnToggleMidpoints = document.getElementById('btn-toggle-midpoints');
 
   const playerModal = document.getElementById('player-modal');
   const playerForm = document.getElementById('player-form');
@@ -293,11 +287,6 @@ function initBingsoo2Game() {
     el.innerHTML = `<span class="btn-label-full">${fullText}</span><span class="btn-label-short">${shortText}</span>`;
   }
 
-  function setToolBtnLabel(btn, emoji, fullText, shortText) {
-    if (!btn) return;
-    btn.innerHTML = `${emoji} <span class="tool-btn-full">${fullText}</span><span class="tool-btn-short">${shortText}</span>`;
-  }
-
   let instructionFadeTimer = null;
   function showInstruction(fullText, compactText) {
     if (!instructionBanner) return;
@@ -309,34 +298,6 @@ function initBingsoo2Game() {
         instructionBanner.classList.add('is-faded');
       }, 4800);
     }
-  }
-
-  if (btnToggleGuideRays) {
-    btnToggleGuideRays.addEventListener('click', () => {
-      showGuideRays = !showGuideRays;
-      btnToggleGuideRays.classList.toggle('active', showGuideRays);
-      setToolBtnLabel(
-        btnToggleGuideRays,
-        '✨',
-        showGuideRays ? '수직 가이드선 ON' : '수직 가이드선 OFF',
-        showGuideRays ? '가이드' : '가이드OFF'
-      );
-      renderRulers();
-    });
-  }
-
-  if (btnToggleMidpoints) {
-    btnToggleMidpoints.addEventListener('click', () => {
-      showMidpoints = !showMidpoints;
-      btnToggleMidpoints.classList.toggle('active', showMidpoints);
-      setToolBtnLabel(
-        btnToggleMidpoints,
-        '📍',
-        showMidpoints ? '변의 중점 표시 ON' : '변의 중점 표시 OFF',
-        showMidpoints ? '중점' : '중점OFF'
-      );
-      renderTriangleGeometry();
-    });
   }
 
   // Realtime Leaderboard Listeners
@@ -626,10 +587,7 @@ function initBingsoo2Game() {
       }
       el.style.left = `${st.x}px`;
       el.style.top = `${st.y}px`;
-      el.innerHTML = `
-        <div class="student-emoji-box" id="student-emoji-${idx}">🤔</div>
-        <div class="student-name-tag">${st.name}</div>
-      `;
+      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}">🤔</div>`;
     });
   }
 
@@ -665,22 +623,19 @@ function initBingsoo2Game() {
       <circle cx="${C.x}" cy="${C.y}" r="4.5" fill="#0284c7" stroke="#ffffff" stroke-width="1.5" />
     `;
 
-    // Midpoints Markers
-    if (showMidpoints) {
-      svgHtml += `
-        <!-- Midpoint AB -->
-        <circle cx="${midAB.x}" cy="${midAB.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
-        <text x="${midAB.x}" y="${midAB.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
-        
-        <!-- Midpoint BC -->
-        <circle cx="${midBC.x}" cy="${midBC.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
-        <text x="${midBC.x}" y="${midBC.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
-        
-        <!-- Midpoint CA -->
-        <circle cx="${midCA.x}" cy="${midCA.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
-        <text x="${midCA.x}" y="${midCA.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
-      `;
-    }
+    svgHtml += `
+      <!-- Midpoint AB -->
+      <circle cx="${midAB.x}" cy="${midAB.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+      <text x="${midAB.x}" y="${midAB.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
+      
+      <!-- Midpoint BC -->
+      <circle cx="${midBC.x}" cy="${midBC.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+      <text x="${midBC.x}" y="${midBC.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
+      
+      <!-- Midpoint CA -->
+      <circle cx="${midCA.x}" cy="${midCA.y}" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+      <text x="${midCA.x}" y="${midCA.y - 9}" font-size="11" font-weight="700" fill="#d97706" text-anchor="middle">중점</text>
+    `;
 
     geometrySvg.innerHTML = svgHtml;
   }
@@ -705,7 +660,7 @@ function initBingsoo2Game() {
     const size = getRulerSize();
     const compact = isCompactViewport();
     const bottomY = Math.max(16, height - size.height - (compact ? 12 : 20));
-    const rightReserve = compact ? 52 : 16;
+    const rightReserve = compact ? 112 : 16;
 
     const count = 3;
     const availableWidth = Math.max(120, width - 28 - rightReserve);
@@ -749,14 +704,11 @@ function initBingsoo2Game() {
       }
 
       // Perpendicular Guide Ray
-      let guideRaySvg = '';
-      if (showGuideRays) {
-        guideRaySvg = `
-          <!-- Extended Perpendicular Rays from 90 deg corner -->
-          <line x1="0" y1="0" x2="${W * 4}" y2="0" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
-          <line x1="0" y1="0" x2="0" y2="${H * 4}" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
-        `;
-      }
+      const guideRaySvg = `
+        <!-- Extended Perpendicular Rays from 90 deg corner -->
+        <line x1="0" y1="0" x2="${W * 4}" y2="0" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
+        <line x1="0" y1="0" x2="0" y2="${H * 4}" stroke="rgba(2, 132, 199, 0.45)" stroke-width="1.5" stroke-dasharray="4,4" />
+      `;
 
       container.innerHTML = `
         <svg class="set-square-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -1017,7 +969,7 @@ function initBingsoo2Game() {
     let dpadStartPos = { x: 0, y: 0 };
 
     const onDpadStart = (e) => {
-      if (e.target.closest('.dpad-btn') || e.target.closest('.dpad-step-btn') || e.target.closest('.dpad-toggle-btn')) return;
+      if (e.target.closest('.dpad-btn') || e.target.closest('.dpad-step-btn')) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -1082,26 +1034,6 @@ function initBingsoo2Game() {
 
     dpadController.addEventListener('mousedown', onDpadStart);
     dpadController.addEventListener('touchstart', onDpadStart, { passive: false });
-
-    const btnToggleDpad = document.getElementById('btn-toggle-dpad');
-    const applyDpadCollapsed = (collapsed) => {
-      dpadController.classList.toggle('is-collapsed', collapsed);
-      if (btnToggleDpad) {
-        btnToggleDpad.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-        btnToggleDpad.setAttribute('aria-label', collapsed ? '세밀조정 펼치기' : '세밀조정 접기');
-        btnToggleDpad.textContent = collapsed ? '▸' : '▾';
-      }
-    };
-
-    applyDpadCollapsed(isCompactViewport());
-
-    if (btnToggleDpad) {
-      btnToggleDpad.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        applyDpadCollapsed(!dpadController.classList.contains('is-collapsed'));
-      });
-    }
   }
 
   if (btnToggleStep) {
@@ -1233,7 +1165,7 @@ function initBingsoo2Game() {
       let expr = '🤔';
       let moodClass = 'mood-neutral';
 
-      if (targetDist <= 8 || spread <= 8) {
+      if (targetDist <= 10 || spread <= 10) {
         expr = '🤩';
         moodClass = 'mood-happy';
       } else {

@@ -303,7 +303,7 @@ body {
 /* Student Pins */
 .student-pin {
   position: absolute;
-  transform: translate(-50%, -22px); /* 22px is exactly half of the 44px emoji box */
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -313,49 +313,39 @@ body {
 }
 
 .student-emoji-box {
-  width: 44px;
-  height: 44px;
   background: #ffffff;
-  border: 2.5px solid #0284c7;
+  border: 3.5px solid #0284c7;
   border-radius: 50%;
+  width: 54px;
+  height: 54px;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 1.5rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-  position: relative;
-}
-
-.student-pin.mood-happy .student-emoji-box {
-  border-color: #10b981;
-  background: #ecfdf5;
-  animation: bounceEmoji 0.6s infinite alternate;
+  font-size: 1.9rem;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  transition: all 0.2s ease;
 }
 
 .student-pin.mood-angry .student-emoji-box {
-  border-color: #ef4444;
-  background: #fef2f2;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.7);
+  animation: shake-head 0.4s infinite ease-in-out;
 }
 
-.student-pin.mood-disappointed .student-emoji-box {
-  border-color: #f59e0b;
-  background: #fffbeb;
+.student-pin.mood-happy .student-emoji-box {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.7);
+  transform: scale(1.15);
 }
 
-.student-name-tag {
-  font-size: 0.75rem;
-  font-weight: 800;
-  background: rgba(15, 23, 42, 0.85);
-  color: #ffffff;
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-top: 2px;
-  white-space: nowrap;
+.student-pin.mood-neutral .student-emoji-box {
+  border-color: #0284c7 !important;
 }
 
-@keyframes bounceEmoji {
-  0% { transform: translateY(0) scale(1); }
-  100% { transform: translateY(-6px) scale(1.08); }
+@keyframes shake-head {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
 }
 
 /* User Bingsoo Pin */
@@ -738,48 +728,6 @@ body {
   width: 100%;
   gap: 6px;
   cursor: grab;
-}
-
-.dpad-toggle-btn {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #0369a1;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.dpad-toggle-btn:hover {
-  background: #e0f2fe;
-  border-color: #0284c7;
-}
-
-.dpad-controller.is-collapsed {
-  padding: 6px 8px;
-  min-width: 0;
-}
-
-.dpad-controller.is-collapsed .dpad-cross,
-.dpad-controller.is-collapsed .dpad-step-btn,
-.dpad-controller.is-collapsed .dpad-drag-handle {
-  display: none;
-}
-
-.dpad-controller.is-collapsed .dpad-header {
-  justify-content: center;
-  gap: 4px;
-}
-
-.dpad-controller.is-collapsed .dpad-toggle-btn {
-  transform: rotate(-90deg);
 }
 
 .dpad-controller.is-dragging .dpad-header {
@@ -1503,9 +1451,9 @@ body {
   }
 
   .student-emoji-box {
-    width: 38px;
-    height: 38px;
-    font-size: 1.25rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
   }
 
   .bingsoo-icon-wrapper {

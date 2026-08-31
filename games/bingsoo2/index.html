@@ -79,12 +79,6 @@
         <button id="btn-reset-rulers" class="tool-btn" title="직각자 위치를 기본 배치로 되돌립니다">
           🔄 <span class="tool-btn-full">직각자 제자리로</span><span class="tool-btn-short">제자리</span>
         </button>
-        <button id="btn-toggle-guide-rays" class="tool-btn active" title="직각자 연장 가이드선을 켜거나 끕니다">
-          ✨ <span class="tool-btn-full">수직 가이드선 ON</span><span class="tool-btn-short">가이드</span>
-        </button>
-        <button id="btn-toggle-midpoints" class="tool-btn active" title="삼각형 변의 중점 표시를 켜거나 끕니다">
-          📍 <span class="tool-btn-full">변의 중점 표시 ON</span><span class="tool-btn-short">중점</span>
-        </button>
       </div>
       <div class="toolbar-right">
         <span class="guide-tip">💡 팁: 직각자를 드래그해 이동하고, <strong>초록 회전점(⟳)</strong>을 돌려 각도를 맞추세요!</span>
@@ -116,13 +110,12 @@
             👉 직각자로 외심을 찾아 🍨을 놓아보세요!
           </div>
 
-          <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable, collapsible) -->
+          <!-- Floating Touch D-Pad / Fine Adjustment Controller (Draggable) -->
           <div id="dpad-controller" class="dpad-controller" title="드래그하여 원하는 위치로 컨트롤러를 이동할 수 있습니다 (방향키 세밀조정)">
             <div class="dpad-header" id="dpad-drag-header">
               <span class="dpad-drag-handle">⠿</span>
               <span class="dpad-title">세밀조정</span>
               <button type="button" id="btn-toggle-step" class="dpad-step-btn" title="이동 단위 변경 (1px / 5px)">1px</button>
-              <button type="button" id="btn-toggle-dpad" class="dpad-toggle-btn" title="세밀조정 접기/펼치기" aria-expanded="true" aria-label="세밀조정 접기">▾</button>
             </div>
             <div class="dpad-cross">
               <button type="button" class="dpad-btn dpad-up" data-dir="up" title="위로 (↑)">▲</button>
