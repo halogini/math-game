@@ -25,13 +25,6 @@ function sanitizeInput(str, maxLen = 12) {
     .slice(0, maxLen);
 }
 
-function randomDormsNickname() {
-  const prefixes = ['도름', '별빛', '반짝', '똑똑', '신난', '고냥', '빙수', '프라즘'];
-  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const num = String(Math.floor(10 + Math.random() * 90));
-  return sanitizeInput(prefix + num, 12);
-}
-
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, function(m) {
@@ -95,42 +88,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   const urlParams = new URLSearchParams(window.location.search);
   const currentPath = window.location.pathname.toLowerCase();
-  
-  let activeMode = 'school'; // Default channel mode
-  
-  const modeParam = urlParams.get('mode');
-  if (modeParam === 'dorms' || modeParam === 'dorems' || currentPath.includes('/dorms') || currentPath.includes('/dorems')) {
-    activeMode = 'dorms';
-  } else if (modeParam === 'school' || currentPath.includes('/school')) {
-    activeMode = 'school';
+
+  let activeMode = typeof HalomathMode !== 'undefined'
+    ? HalomathMode.detectActiveMode()
+    : 'dorms';
+
+  // Fallback if shared script failed to load
+  if (typeof HalomathMode === 'undefined') {
+    const modeParam = urlParams.get('mode');
+    if (modeParam === 'school' || currentPath.includes('/school')) {
+      activeMode = 'school';
+    } else if (modeParam === 'dorms' || modeParam === 'dorems' || currentPath.includes('/dorms') || currentPath.includes('/dorems')) {
+      activeMode = 'dorms';
+    }
   }
 
-  // Persistent Player Profile Keys
-  const nameStorageKey = `halomath_name_${activeMode}`;
-  const idStorageKey = `halomath_id_${activeMode}`;
-
-  let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
-  let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
-
-  if (activeMode === 'dorms' && !playerName) {
-    playerName = randomDormsNickname();
-    localStorage.setItem(nameStorageKey, playerName);
-  }
-
-  // DOM Elements
   const portalTitle = document.getElementById('portal-title');
   const portalSubtitle = document.getElementById('portal-subtitle');
-  const displayProfileName = document.getElementById('display-profile-name');
-  const displayProfileId = document.getElementById('display-profile-id');
-  const btnEditProfile = document.getElementById('btn-edit-profile');
-
-  const profileModal = document.getElementById('profile-modal');
-  const profileForm = document.getElementById('profile-form');
-  const modalTitle = document.getElementById('modal-title');
-  const labelPlayerName = document.getElementById('label-player-name');
-  const inputPlayerName = document.getElementById('input-player-name');
-  const studentIdGroup = document.getElementById('student-id-group');
-  const inputStudentId = document.getElementById('input-student-id');
 
   const btnPlayBingsoo = document.getElementById('btn-play-bingsoo');
   const btnPlayBingsoo2 = document.getElementById('btn-play-bingsoo2');
@@ -140,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTitle = document.getElementById('leaderboard-title');
   const leaderboardModeNote = document.getElementById('leaderboard-mode-note');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
+  const leaderboardTableHeaderName = document.getElementById('th-header-name');
   const leaderboardTableHeaderMetric = document.getElementById('th-header-metric');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const leaderboardTabs = document.getElementById('leaderboard-tabs');
@@ -191,19 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeMode === 'dorms') {
       portalTitle.textContent = '🌐 할로매쓰 - dorms 수학 아케이드';
       portalSubtitle.textContent = 'dorms 회원들과 함께 즐기는 신나는 수학 미니게임 마당!';
-      
-      modalTitle.textContent = '🌐 도전자 닉네임 설정';
-      labelPlayerName.textContent = '도전자 닉네임:';
-      inputPlayerName.placeholder = '닉네임';
-      if (inputPlayerName && !inputPlayerName.value && playerName) {
-        inputPlayerName.value = playerName;
-      }
-
-      // Completely Hide & Remove Student ID group for Dorems mode
-      if (studentIdGroup) {
-        studentIdGroup.style.display = 'none';
-        inputStudentId.removeAttribute('required');
-      }
 
       leaderboardTitle.textContent = '🏆 dorms 명예의 전당 (Top 20)';
       if (leaderboardModeNote) {
@@ -212,19 +174,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = 'none';
       }
+      if (leaderboardTableHeaderName) {
+        leaderboardTableHeaderName.textContent = '닉네임';
+      }
     } else {
-      // School Mode
       portalTitle.textContent = '🏫 할로매쓰 - 수학 미니게임 아케이드';
       portalSubtitle.textContent = '우리 학교 친구들과 펼치는 유쾌하고 똑똑한 수학 미니게임 대결!';
-
-      modalTitle.textContent = '🏫 도전자 프로필 등록';
-      labelPlayerName.textContent = '도전자 이름:';
-      inputPlayerName.placeholder = '예: 홍길동';
-
-      if (studentIdGroup) {
-        studentIdGroup.style.display = 'flex';
-        inputStudentId.setAttribute('required', 'true');
-      }
 
       leaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (Top 20)';
       if (leaderboardModeNote) {
@@ -233,6 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = '';
       }
+      if (leaderboardTableHeaderName) {
+        leaderboardTableHeaderName.textContent = '이름';
+      }
     }
 
     if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo/index.html');
@@ -240,66 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
     if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
     if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon/index.html');
-
-    updateProfileDisplay();
   }
-
-  function updateProfileDisplay() {
-    if (playerName) {
-      displayProfileName.textContent = playerName;
-      if (activeMode === 'school') {
-        displayProfileId.textContent = studentId ? `학번: ${studentId}` : '학번: 미입력';
-        displayProfileId.style.display = '';
-      } else {
-        displayProfileId.style.display = 'none';
-      }
-    } else {
-      displayProfileName.textContent = '도전자 미등록';
-      displayProfileId.textContent = '클릭하여 프로필 설정';
-    }
-  }
-
-  // Check Profile Registration
-  if (!playerName || (activeMode === 'school' && !studentId)) {
-    profileModal.classList.remove('hidden');
-  }
-
-  if (btnEditProfile) {
-    btnEditProfile.addEventListener('click', () => {
-      inputPlayerName.value = playerName || (activeMode === 'dorms' ? randomDormsNickname() : '');
-      if (activeMode === 'school') {
-        inputStudentId.value = studentId;
-      }
-      profileModal.classList.remove('hidden');
-    });
-  }
-
-  profileForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    let cleanName = sanitizeInput(inputPlayerName.value, 12);
-
-    if (!cleanName) {
-      alert('닉네임을 입력해야 시작할 수 있습니다.');
-      if (inputPlayerName) inputPlayerName.focus();
-      return;
-    }
-
-    if (activeMode === 'school') {
-      const cleanId = sanitizeInput(inputStudentId.value, 10);
-      if (!cleanId || !/^[a-zA-Z0-9가-힣\-]+$/.test(cleanId)) {
-        alert('학번은 1자 이상 10자 이하의 영문, 숫자, 한글로 입력해 주세요.');
-        return;
-      }
-      studentId = cleanId;
-      localStorage.setItem(idStorageKey, studentId);
-    }
-
-    playerName = cleanName;
-    localStorage.setItem(nameStorageKey, playerName);
-
-    updateProfileDisplay();
-    profileModal.classList.add('hidden');
-  });
 
   // ----------------------------------------------------
   // Channel + game isolated leaderboard
@@ -551,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let idTd = '';
       if (activeMode === 'school') {
-        idTd = `<td>${escapeHtml(item.studentId || '미입력')}</td>`;
+        idTd = `<td>${escapeHtml(item.studentId || '—')}</td>`;
       }
 
       tr.innerHTML = `

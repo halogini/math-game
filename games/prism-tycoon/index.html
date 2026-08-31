@@ -875,9 +875,9 @@
           <p class="guide-best hidden" id="guide-best"></p>
         </div>
         <form id="profile-form" class="profile-form" autocomplete="on">
-          <p class="profile-lead" id="profile-lead">랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.</p>
-          <label id="label-player-name">닉네임
-            <input id="input-player-name" type="text" maxlength="12" required autocomplete="nickname" placeholder="1~12자">
+          <p class="profile-lead" id="profile-lead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
+          <label id="label-player-name">이름
+            <input id="input-player-name" type="text" maxlength="12" required autocomplete="nickname" placeholder="예: 홍길동">
           </label>
           <label id="label-student-id">학번
             <input id="input-student-id" type="text" maxlength="10" autocomplete="off" placeholder="1~10자">
@@ -959,6 +959,9 @@
     </div>
   </div>
 
+  <script src="../../shared/halomath-mode.js"></script>
+  <script src="../../shared/halomath-profile.js"></script>
+  <script src="../../shared/halomath-scores.js"></script>
   <script>
   (() => {
     'use strict';
@@ -999,23 +1002,12 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[m]));
     }
-    function detectActiveMode() {
-      const href = (window.location.href || '').toLowerCase();
-      const search = (window.location.search || '').toLowerCase();
-      if (search.includes('mode=dorms') || search.includes('mode=dorems')
-          || href.includes('/dorms') || href.includes('/dorems')) {
-        return 'dorms';
-      }
-      return 'school';
-    }
-    const activeMode = detectActiveMode();
-    const nameStorageKey = `halomath_name_${activeMode}`;
-    const idStorageKey = `halomath_id_${activeMode}`;
-    let playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || '', 12);
-    let studentId = activeMode === 'school' ? sanitizeInput(localStorage.getItem(idStorageKey) || '', 10) : '';
+    const activeMode = HalomathMode.detectActiveMode();
+    let playerName = sanitizeInput(HalomathProfile.loadName(activeMode), 12);
+    let studentId = activeMode === 'school' ? sanitizeInput(HalomathProfile.loadStudentId(activeMode), 10) : '';
     if (activeMode === 'dorms' && !playerName) {
       playerName = randomDormsNickname();
-      try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
+      try { HalomathProfile.saveName(activeMode, playerName); } catch (_) {}
     }
 
     function isDevPreview() {
@@ -1027,7 +1019,7 @@
     function hasValidProfile() {
       if (isDevPreview()) return true;
       if (!playerName) return false;
-      if (activeMode === 'school' && !/^[a-zA-Z0-9가-힣\-]{1,10}$/.test(studentId)) return false;
+      if (activeMode === 'school' && !HalomathProfile.isValidStudentId(studentId)) return false;
       return true;
     }
     function playerLabel() {
@@ -1049,12 +1041,14 @@
       const idIn = document.getElementById('input-student-id');
       let cleanName = sanitizeInput(nameIn ? nameIn.value : playerName, 12);
       if (!cleanName) {
-        setErr('닉네임을 입력해야 시작할 수 있습니다.');
+        setErr(activeMode === 'school'
+          ? '이름을 입력해야 시작할 수 있습니다.'
+          : '닉네임을 입력해야 시작할 수 있습니다.');
         if (nameIn) nameIn.focus();
         return false;
       }
       playerName = cleanName;
-      try { localStorage.setItem(nameStorageKey, playerName); } catch (_) {}
+      try { HalomathProfile.saveName(activeMode, playerName); } catch (_) {}
       if (activeMode === 'school') {
         const cleanId = sanitizeInput(idIn ? idIn.value : studentId, 10);
         if (!cleanId || !/^[a-zA-Z0-9가-힣\-]+$/.test(cleanId)) {
@@ -1063,7 +1057,7 @@
           return false;
         }
         studentId = cleanId;
-        try { localStorage.setItem(idStorageKey, studentId); } catch (_) {}
+        try { HalomathProfile.saveStudentId(activeMode, studentId); } catch (_) {}
       } else {
         studentId = '';
       }
@@ -1215,7 +1209,7 @@
           place.textContent = '—';
           detail.textContent = preview
             ? '미리보기 · 저장된 최고 기록이 없습니다.'
-            : (playerName ? '최고 기록을 불러오는 중…' : '닉네임을 입력하면 순위가 표시됩니다.');
+            : (playerName ? '최고 기록을 불러오는 중…' : (activeMode === 'school' ? '이름을 입력하면 순위가 표시됩니다.' : '닉네임을 입력하면 순위가 표시됩니다.'));
           return;
         }
         const tied = mine.tied ? '공동 ' : '';
@@ -1236,7 +1230,7 @@
       }
       tbody.innerHTML = withCompetitionRanks(list).map(({ item, rank, tied }) => {
         const me = highlightKey && playerRecordKey(item.name, item.studentId) === highlightKey;
-        const idTd = activeMode === 'school' ? `<td>${escapeHtml(item.studentId || '미입력')}</td>` : '';
+        const idTd = activeMode === 'school' ? `<td>${escapeHtml(item.studentId || '—')}</td>` : '';
         const label = tied ? `공동 ${rank}위` : `${rank}위`;
         return `<tr${me ? ' class="me"' : ''}><td>${label}</td><td>${escapeHtml(item.name)}</td>${idTd}<td>${item.score.toLocaleString()} 💰</td></tr>`;
       }).join('');
@@ -1282,7 +1276,7 @@
       if (idEl) {
         if (activeMode === 'school') {
           idEl.style.display = '';
-          idEl.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
+          idEl.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: —';
         } else {
           idEl.textContent = '';
           idEl.style.display = 'none';
@@ -1321,10 +1315,21 @@
       const nameIn = document.getElementById('input-player-name');
       const idIn = document.getElementById('input-student-id');
       const lead = document.getElementById('profile-lead');
+      const nameLabel = document.getElementById('label-player-name');
+      const nameColThs = document.querySelectorAll('.lb-table thead th:nth-child(2)');
       if (nameIn) {
-        nameIn.placeholder = '1~12자';
+        nameIn.placeholder = showId ? '예: 홍길동' : '닉네임';
         nameIn.setAttribute('required', '');
         if (playerName) nameIn.value = playerName;
+      }
+      if (nameLabel) {
+        const input = nameLabel.querySelector('input');
+        nameLabel.textContent = '';
+        nameLabel.append(showId ? '이름' : '닉네임');
+        if (input) {
+          nameLabel.appendChild(document.createTextNode('\n            '));
+          nameLabel.appendChild(input);
+        }
       }
       if (idIn && studentId) idIn.value = studentId;
       if (lead) {
@@ -1332,10 +1337,11 @@
           lead.style.display = '';
           lead.textContent = '이름과 학번을 입력해야 시작할 수 있습니다.';
         } else {
-          lead.textContent = '';
-          lead.style.display = 'none';
+          lead.style.display = '';
+          lead.textContent = '랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.';
         }
       }
+      nameColThs.forEach((el) => { el.textContent = showId ? '이름' : '닉네임'; });
       const champId = document.getElementById('opening-champ-id');
       if (champId && !showId) champId.style.display = 'none';
       const title = activeMode === 'dorms' ? '🏆 dorms 명예의 전당 (Top 20)' : '🏆 명예의 전당 (Top 20)';
@@ -1348,7 +1354,6 @@
 
     async function submitRank() {
       const msg = document.getElementById('rank-status');
-      const btn = document.getElementById('btn-send-rank');
       if (isResultPreview() || (state && state.resultPreview)) {
         if (msg) {
           msg.textContent = '테스트 화면에서는 랭킹에 등록되지 않습니다.';
@@ -1357,9 +1362,9 @@
         return;
       }
       const gold = Math.max(0, Math.floor(Number(state && state.gold) || 0));
-      playerName = sanitizeInput(localStorage.getItem(nameStorageKey) || playerName || '', 12);
+      playerName = sanitizeInput(HalomathProfile.loadName(activeMode) || playerName || '', 12);
       if (activeMode === 'school') {
-        studentId = sanitizeInput(localStorage.getItem(idStorageKey) || studentId || '', 10);
+        studentId = sanitizeInput(HalomathProfile.loadStudentId(activeMode) || studentId || '', 10);
       }
       const setMsg = (text, kind) => {
         if (!msg) return;
@@ -1367,111 +1372,36 @@
         msg.className = 'rank-status' + (kind ? ' ' + kind : '');
       };
       if (!playerName) {
-        setMsg('닉네임을 입력해야 랭킹에 등록할 수 있습니다.', 'err');
+        setMsg(activeMode === 'school'
+          ? '이름을 입력해야 랭킹에 등록할 수 있습니다.'
+          : '닉네임을 입력해야 랭킹에 등록할 수 있습니다.', 'err');
         return;
       }
-      if (activeMode === 'school' && !studentId) {
+      if (activeMode === 'school' && !HalomathProfile.isValidStudentId(studentId)) {
         setMsg('학번을 입력해야 랭킹에 등록할 수 있습니다.', 'err');
         return;
       }
-      if (btn) btn.disabled = true;
-      setMsg('등록 중…');
+      setMsg('등록 중…', '');
 
-      const payload = {
+      const result = await HalomathScores.submitScore(firebaseDb, {
+        activeMode,
         name: playerName,
-        studentId: activeMode === 'dorms' ? 'DORMS' : studentId,
-        score: gold,
-        channel: activeMode,
-        gameId: GAME_ID,
-        timestamp: Date.now()
-      };
-      const myKey = playerRecordKey(payload.name, payload.studentId);
+        studentId,
+        gameIds: ['prism-tycoon', 'tycoon'],
+        payload: {
+          score: gold,
+          gameId: GAME_ID,
+          timestamp: Date.now()
+        },
+        compareMode: 'higher',
+        acceptEntry: (item) => isTycoonEntry(item),
+        updatedMessage: `수익이 ${gold.toLocaleString()} 💰로 갱신되었습니다!`,
+        createdMessage: `${gold.toLocaleString()} 💰 기록이 등록되었습니다!`,
+        unchangedMessage: `이미 더 높거나 같은 수익(${gold.toLocaleString()} 💰)이 등록되어 있어요.`
+      });
 
-      const saveViaREST = async (existingKey) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const url = existingKey
-          ? `https://math-game-halogini-default-rtdb.firebaseio.com/scores/${encodeURIComponent(existingKey)}.json`
-          : SCORES_URL;
-        try {
-          const restRes = await fetch(url, {
-            method: existingKey ? 'PATCH' : 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          return restRes.ok;
-        } catch (err) {
-          clearTimeout(timeoutId);
-          console.error('REST score save error:', err);
-          return false;
-        }
-      };
-
-      const saveRecord = async (existingKey) => {
-        if (firebaseDb) {
-          const sdkSave = (async () => {
-            if (existingKey) await firebaseDb.ref(`scores/${existingKey}`).update(payload);
-            else await firebaseDb.ref('scores').push(payload);
-            return true;
-          })();
-          const timedOut = await Promise.race([
-            sdkSave.then(() => false).catch((err) => {
-              console.warn('SDK push failed:', err);
-              return 'fail';
-            }),
-            new Promise((resolve) => setTimeout(() => resolve('timeout'), 2500))
-          ]);
-          if (timedOut === false) return true;
-          return saveViaREST(existingKey);
-        }
-        return saveViaREST(existingKey);
-      };
-
-      try {
-        const data = await fetchScoresMap();
-        let existingBest = null;
-        if (data) {
-          const visit = (obj, isDormsSubtree) => {
-            if (!obj || typeof obj !== 'object') return;
-            Object.keys(obj).forEach((key) => {
-              const item = obj[key];
-              if (!item || typeof item !== 'object') return;
-              if (item.name) {
-                if (!isTycoonEntry(item) || !matchesMode(item, key, isDormsSubtree)) return;
-                const name = sanitizeInput(item.name, 12);
-                const sid = sanitizeInput(item.studentId || '', 10);
-                if (playerRecordKey(name, sid) !== myKey) return;
-                const score = Math.max(0, Number(item.score) || 0);
-                if (!existingBest || score > existingBest.score) existingBest = { key, score };
-              } else {
-                visit(item, key === 'dorms' || isDormsSubtree);
-              }
-            });
-          };
-          visit(data, false);
-        }
-        if (existingBest && gold <= existingBest.score) {
-          setMsg(`이미 더 높거나 같은 수익(${existingBest.score.toLocaleString()} 💰)이 등록되어 있어요.`, 'ok');
-          loadLeaderboard();
-          return;
-        }
-        const ok = await saveRecord(existingBest ? existingBest.key : null);
-        if (ok) {
-          setMsg(existingBest
-            ? `수익이 ${gold.toLocaleString()} 💰로 갱신되었습니다!`
-            : `${gold.toLocaleString()} 💰 기록이 등록되었습니다!`, 'ok');
-          loadLeaderboard();
-        } else {
-          setMsg('등록 실패. 잠시 후 다시 시도하세요.', 'err');
-        }
-      } catch (err) {
-        console.error('score submit failed:', err);
-        setMsg('등록 실패. 잠시 후 다시 시도하세요.', 'err');
-      } finally {
-        if (btn) btn.disabled = false;
-      }
+      setMsg(result.message, result.success ? 'ok' : 'err');
+      loadLeaderboard();
     }
 
     class SoundEngine {
@@ -7975,7 +7905,7 @@
       if (field) field.addEventListener('input', () => renderGuideBest());
     });
     const btnSendRank = document.getElementById('btn-send-rank');
-    if (btnSendRank) btnSendRank.addEventListener('click', submitRank);
+    if (btnSendRank) btnSendRank.style.display = 'none';
 
     const btnSound = document.getElementById('btn-sound-toggle');
     function syncMuteBtn() {

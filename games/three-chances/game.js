@@ -185,21 +185,7 @@ const ANGLE_LABELS = ["A", "B", "C"];
 const DRAG_THRESH = 10;
 const POI_ENTER_DIST = 70;
 
-function resolveActiveMode() {
-  try {
-    const search = window.location.search || "";
-    const hash = window.location.hash || "";
-    const href = window.location.href || "";
-    if (search.includes("mode=dorms") || search.includes("mode=dorems")
-      || hash.includes("mode=dorms") || hash.includes("mode=dorems")
-      || href.includes("dorms") || href.includes("dorems")) {
-      return "dorms";
-    }
-  } catch (e) { /* ignore */ }
-  return "school";
-}
-
-const activeMode = resolveActiveMode();
+const activeMode = HalomathMode.detectActiveMode();
 if (document.body) document.body.classList.toggle("mode-dorms", activeMode === "dorms");
 /** URL ?test=a1s2 | sas | angle1 → 각1·변2만 바로 플레이 */
 const TEST_A1S2 = (() => {
@@ -727,12 +713,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateHud() {
     if (hudTimer) hudTimer.textContent = formatTime(timeLeftMs);
-    document.getElementById("display-profile-name").textContent = playerName;
+    document.getElementById("display-profile-name").textContent = playerName || "—";
     const idEl = document.getElementById("display-profile-id");
     if (activeMode === "dorms") {
       idEl.textContent = "dorms";
     } else {
-      idEl.textContent = studentId ? `학번 ${studentId}` : "학번 미입력";
+      idEl.textContent = studentId ? `학번: ${studentId}` : "학번: —";
     }
     // 프로필 수정은 판이 시작되기 전에만
     const inRun = running || pendingStartAfterIntro
@@ -3022,7 +3008,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById("result-locked-name").textContent = playerName;
-    document.getElementById("result-locked-id").textContent = studentId || "미입력";
+    document.getElementById("result-locked-id").textContent = studentId || "—";
     const grid = document.getElementById("round-scores-grid");
     grid.innerHTML = "";
     for (let i = 0; i < TOTAL_TANKS; i++) {
@@ -3034,19 +3020,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const btnSendEl = document.getElementById("btn-send-data");
     const msg = document.getElementById("api-status-msg");
-    if (btnSendEl) {
-      btnSendEl.disabled = clearTimeMs == null;
-      btnSendEl.textContent = clearTimeMs == null ? "클리어 후 등록 가능" : "기록 등록하기";
-    }
-    if (msg && clearTimeMs == null) {
-      msg.textContent = "다섯 수조를 모두 고쳐야 클리어 시간을 등록할 수 있어요.";
-    } else if (msg) {
-      msg.textContent = "";
-    }
+    if (btnSendEl) btnSendEl.style.display = "none";
+    if (msg) msg.textContent = clearTimeMs != null ? "⏳ 랭킹 등록 중..." : "";
 
     gameoverModal.classList.remove("hidden");
     document.body.classList.add("modal-open");
     loadLeaderboard();
+    if (clearTimeMs != null) registerScoreToLeaderboard();
   }
 
   /** 열려 있는 모달·컷신을 모두 닫고 대기 중인 컷신 상태를 해제 */
@@ -5178,7 +5158,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const rowsHtml = withTimeRanks(top).map(({ item: r, rank, tied }) => {
         const idCell = activeMode === "dorms"
           ? ""
-          : `<td>${escapeHtml(r.studentId || "-")}</td>`;
+          : `<td>${escapeHtml(r.studentId || "—")}</td>`;
         const rankText = tied ? `공동 ${rank}` : String(rank);
         return `<tr><td>${rankText}</td><td>${escapeHtml(r.name || "")}</td>${idCell}<td>${formatClearTime(r.clearTimeMs)}</td></tr>`;
       }).join("");
@@ -5220,143 +5200,49 @@ document.addEventListener("DOMContentLoaded", () => {
         openingChampId.style.display = "none";
       } else {
         openingChampId.style.display = "";
-        openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : "학번: 미입력";
+        openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : "학번: —";
       }
     }
     openingChampScore.innerHTML = `${formatClearTime(champ.clearTimeMs)}<small></small>`;
   }
 
-  async function sendScore() {
+  async function registerScoreToLeaderboard() {
     const msg = document.getElementById("api-status-msg");
-    const btn = document.getElementById("btn-send-data");
-    if (clearTimeMs == null) {
-      msg.textContent = "다섯 수조를 모두 고쳐야 등록할 수 있어요.";
-      return;
-    }
+    if (clearTimeMs == null) return;
+
     const cleanName = sanitizeInput(playerName || "", 12);
     if (!cleanName) {
-      msg.textContent = "이름을 먼저 등록해 주세요.";
+      if (msg) msg.textContent = `${nameFieldLabel()}을 먼저 등록해 주세요.`;
       return;
     }
-    if (activeMode === "school") {
-      const cleanId = sanitizeInput(studentId || "", 10);
-      if (!cleanId) {
-        msg.textContent = "학번을 먼저 등록해 주세요.";
-        return;
-      }
+    if (activeMode === "school" && !HalomathProfile.isValidStudentId(sanitizeInput(studentId || "", 10))) {
+      if (msg) msg.textContent = "학번을 먼저 등록해 주세요.";
+      return;
     }
-    msg.textContent = "등록 중…";
-    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = "⏳ 랭킹 등록 중...";
 
-    const payload = {
+    const myLabel = formatClearTime(clearTimeMs);
+    const result = await HalomathScores.submitScore(firebaseDb, {
+      activeMode,
       name: cleanName,
-      studentId: activeMode === "dorms" ? "DORMS" : sanitizeInput(studentId || "", 10),
-      clearTimeMs: Number(clearTimeMs),
-      // Higher is better for shared scores ordering; derived from faster clear times.
-      score: Math.max(0, Math.min(500, Math.round(500 - Number(clearTimeMs) / 1000))),
-      channel: activeMode === "dorms" ? "dorms" : "school",
-      gameId: GAME_ID,
-      timestamp: Date.now()
-    };
-    const myKey = playerRecordKey(payload.name, payload.studentId);
-    const myLabel = formatClearTime(payload.clearTimeMs);
+      studentId,
+      gameIds: ["three-chances", "three_chances"],
+      payload: {
+        clearTimeMs: Number(clearTimeMs),
+        score: Math.max(0, Math.min(500, Math.round(500 - Number(clearTimeMs) / 1000))),
+        gameId: GAME_ID,
+        timestamp: Date.now()
+      },
+      compareMode: "lowerClearTime",
+      acceptEntry: (v) => isThreeChancesEntry(v),
+      updatedMessage: `기록이 ${myLabel}로 갱신되었습니다!`,
+      createdMessage: `클리어 시간 ${myLabel}이(가) 등록되었습니다!`,
+      unchangedMessage: `이미 더 빠른 기록이 등록되어 있어요.`
+    });
 
-    const saveViaREST = async (existingKey) => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const url = existingKey
-        ? `https://math-game-halogini-default-rtdb.firebaseio.com/scores/${encodeURIComponent(existingKey)}.json`
-        : SCORES_URL;
-      try {
-        const restRes = await fetch(url, {
-          method: existingKey ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (restRes.ok) return true;
-        const errText = await restRes.text().catch(() => "");
-        console.error("three-chances REST score save failed:", restRes.status, errText);
-        return false;
-      } catch (err) {
-        clearTimeout(timeoutId);
-        console.error("three-chances REST score save error:", err);
-        return false;
-      }
-    };
-
-    const saveRecord = async (existingKey) => {
-      if (firebaseDb) {
-        const sdkSave = (async () => {
-          if (existingKey) await firebaseDb.ref(`${LB_PATH}/${existingKey}`).update(payload);
-          else await firebaseDb.ref(LB_PATH).push(payload);
-          return true;
-        })();
-        const timedOut = await Promise.race([
-          sdkSave.then(() => false).catch((err) => {
-            console.warn("three-chances SDK push failed:", err);
-            return "fail";
-          }),
-          new Promise((resolve) => setTimeout(() => resolve("timeout"), 2500))
-        ]);
-        if (timedOut === false) return true;
-        return saveViaREST(existingKey);
-      }
-      return saveViaREST(existingKey);
-    };
-
-    try {
-      const data = await fetchScoresMap();
-      let existingBest = null;
-      let otherSameTime = false;
-      if (data) {
-        visitScoreRecords(data, (key, v, isDormsSubtree) => {
-          if (!isThreeChancesEntry(v) || !matchesMode(v, key, isDormsSubtree) || v.clearTimeMs == null) return;
-          const name = sanitizeInput(v.name || "", 12);
-          const sid = sanitizeInput(v.studentId || "", 10);
-          const clearMs = Number(v.clearTimeMs);
-          if (!Number.isFinite(clearMs) || clearMs <= 0) return;
-          if (playerRecordKey(name, sid) === myKey) {
-            if (!existingBest || clearMs < existingBest.clearTimeMs) {
-              existingBest = { key, clearTimeMs: clearMs };
-            }
-          } else if (formatClearTime(clearMs) === myLabel) {
-            otherSameTime = true;
-          }
-        });
-      }
-
-      if (existingBest && payload.clearTimeMs >= existingBest.clearTimeMs) {
-        const sameDisplay = formatClearTime(existingBest.clearTimeMs) === myLabel;
-        msg.textContent = sameDisplay
-          ? `이미 같은 클리어 시간(${myLabel})이 등록되어 있어요.`
-          : `이미 더 빠른 기록(${formatClearTime(existingBest.clearTimeMs)})이 등록되어 있어요.`;
-        loadLeaderboard();
-        return;
-      }
-
-      const ok = await saveRecord(existingBest ? existingBest.key : null);
-      if (ok) {
-        if (existingBest) {
-          msg.textContent = otherSameTime
-            ? `기록이 ${myLabel}로 갱신되었습니다! 같은 시간은 공동 순위예요.`
-            : `기록이 ${myLabel}로 갱신되었습니다!`;
-        } else if (otherSameTime) {
-          msg.textContent = `클리어 시간이 등록되었습니다! 같은 시간은 공동 순위예요.`;
-        } else {
-          msg.textContent = "클리어 시간이 등록되었습니다!";
-        }
-        loadLeaderboard();
-      } else {
-        msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
-      }
-    } catch (e) {
-      console.error("three-chances score submit failed:", e);
-      msg.textContent = "등록 실패. 잠시 후 다시 시도하세요.";
-    } finally {
-      if (btn) btn.disabled = false;
-    }
+    if (msg) msg.textContent = result.message;
+    loadLeaderboard();
+    return result;
   }
 
   function playIntroThenStart() {
@@ -5590,9 +5476,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  if (btnSend) btnSend.style.display = "none";
   btnNext.addEventListener("click", () => { sound.click(); advanceAfterResult(); });
   btnRestart.addEventListener("click", () => { sound.click(); restartGame(); });
-  btnSend.addEventListener("click", () => { sound.click(); sendScore(); });
   btnSound.addEventListener("click", () => {
     sound.muted = !sound.muted;
     btnSound.textContent = sound.muted ? "🔇" : "🔊";
@@ -5608,7 +5494,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const errEl = document.getElementById("profile-err");
     const cleanName = sanitizeInput(nameField ? nameField.value : "");
     if (!cleanName) {
-      if (errEl) errEl.textContent = "닉네임을 입력해야 시작할 수 있습니다.";
+      if (errEl) errEl.textContent = `${nameFieldLabel()}을 입력해야 시작할 수 있습니다.`;
       if (nameField) nameField.focus();
       return;
     }
@@ -5617,10 +5503,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (activeMode === "dorms") {
       studentId = "";
     } else {
-      studentId = sanitizeInput(document.getElementById("input-student-id").value);
-      localStorage.setItem("hm_student_id", studentId);
+      const cleanId = sanitizeInput(document.getElementById("input-student-id").value, 10);
+      if (!HalomathProfile.isValidStudentId(cleanId)) {
+        if (errEl) errEl.textContent = "학번을 1~10자 영문·숫자·한글로 입력해 주세요.";
+        return;
+      }
+      studentId = cleanId;
+      HalomathProfile.saveStudentId(activeMode, studentId);
     }
-    localStorage.setItem("hm_player_name", playerName);
+    HalomathProfile.saveName(activeMode, playerName);
     profileModal.classList.add("hidden");
     document.body.classList.remove("modal-open");
     updateHud();
@@ -5651,46 +5542,69 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function applyDormsModeUi() {
+  function nameFieldLabel() {
+    return activeMode === "dorms" ? "닉네임" : "이름";
+  }
+
+  function applyProfileModeUi() {
     document.body.classList.toggle("mode-dorms", activeMode === "dorms");
     const lbTitle = document.getElementById("result-leaderboard-title");
+    const profileLead = document.getElementById("profile-lead");
+    const nameColThs = document.querySelectorAll(".leaderboard-table thead th:nth-child(2)");
+
     if (lbTitle) {
       lbTitle.textContent = activeMode === "dorms"
         ? "dorms 명예의 전당 (Top 20)"
         : "우리 학교 명예의 전당 (Top 20)";
     }
     if (thOpeningId) thOpeningId.style.display = activeMode === "dorms" ? "none" : "";
-    if (activeMode !== "dorms") return;
-    const labelId = document.getElementById("label-student-id");
-    const inputId = document.getElementById("input-student-id");
-    const idWrap = document.getElementById("result-locked-id-wrap");
-    const thId = document.getElementById("th-leaderboard-id");
-    const labelName = document.getElementById("label-player-name");
-    const displayId = document.getElementById("display-profile-id");
-    if (labelId) labelId.style.display = "none";
-    if (inputId) {
-      inputId.removeAttribute("required");
-      inputId.disabled = true;
-      inputId.value = "";
-    }
-    if (idWrap) idWrap.style.display = "none";
-    if (thId) thId.style.display = "none";
-    if (labelName) {
-      const nameInput = labelName.querySelector("input");
-      labelName.textContent = "";
-      labelName.append("닉네임");
-      if (nameInput) {
-        nameInput.placeholder = "닉네임";
-        nameInput.setAttribute("required", "");
+
+    if (activeMode === "dorms") {
+      const labelId = document.getElementById("label-student-id");
+      const inputId = document.getElementById("input-student-id");
+      const idWrap = document.getElementById("result-locked-id-wrap");
+      const thId = document.getElementById("th-leaderboard-id");
+      const labelName = document.getElementById("label-player-name");
+      const displayId = document.getElementById("display-profile-id");
+      if (labelId) labelId.style.display = "none";
+      if (inputId) {
+        inputId.removeAttribute("required");
+        inputId.disabled = true;
+        inputId.value = "";
+      }
+      if (idWrap) idWrap.style.display = "none";
+      if (thId) thId.style.display = "none";
+      if (labelName) {
+        const nameInput = labelName.querySelector("input");
+        labelName.textContent = "";
+        labelName.append("닉네임");
+        if (nameInput) {
+          nameInput.placeholder = "닉네임";
+          nameInput.setAttribute("required", "");
+          labelName.appendChild(document.createTextNode(" "));
+          labelName.appendChild(nameInput);
+        }
+      }
+      if (displayId) displayId.style.display = "none";
+      if (profileLead) profileLead.textContent = "랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.";
+      nameColThs.forEach((el) => { el.textContent = "닉네임"; });
+      studentId = "";
+    } else {
+      const labelName = document.getElementById("label-player-name");
+      const nameInput = document.getElementById("input-player-name");
+      if (labelName && nameInput) {
+        labelName.textContent = "";
+        labelName.append("이름");
         labelName.appendChild(document.createTextNode(" "));
         labelName.appendChild(nameInput);
+        nameInput.placeholder = "예: 홍길동";
       }
+      if (profileLead) profileLead.textContent = "이름과 학번을 입력해야 시작할 수 있습니다.";
+      nameColThs.forEach((el) => { el.textContent = "이름"; });
     }
-    if (displayId) displayId.style.display = "none";
-    studentId = "";
   }
 
-  applyDormsModeUi();
+  applyProfileModeUi();
   loadLeaderboard();
 
   if (btnToggleOpeningLeaderboard && openingLeaderboardBox) {
@@ -5703,12 +5617,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const savedName = localStorage.getItem("hm_player_name")
-    || (activeMode === "dorms" ? localStorage.getItem("halomath_name_dorms") : "");
-  const savedId = localStorage.getItem("hm_student_id");
+  const savedName = HalomathProfile.loadName(activeMode);
+  const savedId = HalomathProfile.loadStudentId(activeMode);
+  if (savedName) playerName = sanitizeInput(savedName, 12);
+  if (savedId && activeMode !== "dorms") studentId = sanitizeInput(savedId, 10);
   const nameInputEl = document.getElementById("input-player-name");
   if (nameInputEl) {
-    if (activeMode === "dorms") nameInputEl.placeholder = "닉네임";
+    nameInputEl.placeholder = activeMode === "dorms" ? "닉네임" : "예: 홍길동";
     if (savedName) {
       nameInputEl.value = savedName;
     } else if (activeMode === "dorms") {

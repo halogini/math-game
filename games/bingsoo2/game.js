@@ -48,26 +48,8 @@ function escapeHtml(str) {
 
 function initBingsoo2Game() {
   // Channel Mode Detection (?mode=dorms vs school)
-  function detectActiveMode() {
-    try {
-      const href = (window.location.href || '').toLowerCase();
-      const search = (window.location.search || '').toLowerCase();
-      const hash = (window.location.hash || '').toLowerCase();
+  let activeMode = HalomathMode.detectActiveMode();
 
-      if (search.includes('mode=dorms') || search.includes('mode=dorems') ||
-          hash.includes('mode=dorms') || hash.includes('mode=dorems') ||
-          href.includes('dorms') || href.includes('dorems')) {
-        return 'dorms';
-      }
-    } catch (e) {}
-    return 'school';
-  }
-
-  let activeMode = detectActiveMode();
-
-  const dbRefPath = activeMode === 'dorms' ? 'scores/dorms' : 'scores';
-  const nameStorageKey = `bingsoo2_name_${activeMode}`;
-  const idStorageKey = `bingsoo2_id_${activeMode}`;
   const highScoreStorageKey = `bingsoo2_highscore_${activeMode}`;
 
   // LocalStorage Safe Helpers
@@ -115,17 +97,14 @@ function initBingsoo2Game() {
   ];
 
   // Locked Player Info
-  let playerName = sanitizeInput(
-    safeGetStorage(nameStorageKey) || (activeMode === 'dorms' ? safeGetStorage('halomath_name_dorms') : '') || '',
-    12
-  );
+  let playerName = sanitizeInput(HalomathProfile.loadName(activeMode), 12);
   if (activeMode === 'dorms' && !playerName) {
     playerName = randomDormsNickname();
-    safeSetStorage(nameStorageKey, playerName);
+    HalomathProfile.saveName(activeMode, playerName);
   } else if (!playerName) {
     playerName = '도전자';
   }
-  let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey) || '', 10) : '';
+  let studentId = activeMode === 'school' ? sanitizeInput(HalomathProfile.loadStudentId(activeMode), 10) : '';
 
   // DOM Elements
   const gameBoard = document.getElementById('game-board');
@@ -188,20 +167,33 @@ function initBingsoo2Game() {
   const resultLeaderboardTitle = document.getElementById('result-leaderboard-title');
 
   // Mode Isolation Toggles
+  const profileLead = document.getElementById('profile-lead');
+  const nameColThs = document.querySelectorAll('#tr-opening-th th:nth-child(2), #tr-result-th th:nth-child(2)');
+
+  function nameFieldLabel() {
+    return activeMode === 'dorms' ? '닉네임' : '이름';
+  }
+
   if (activeMode === 'dorms') {
     if (studentIdGroup) studentIdGroup.style.display = 'none';
     if (displayStudentId) displayStudentId.style.display = 'none';
     if (thOpeningId) thOpeningId.style.display = 'none';
     if (thResultId) thResultId.style.display = 'none';
     if (resultLockedIdSpan) resultLockedIdSpan.style.display = 'none';
-    if (labelPlayerName) labelPlayerName.textContent = '도전자 닉네임:';
+    if (labelPlayerName) labelPlayerName.textContent = '닉네임:';
     if (inputPlayerName) {
       inputPlayerName.placeholder = '닉네임';
       if (!inputPlayerName.value && playerName) inputPlayerName.value = playerName;
     }
     if (inputStudentId) inputStudentId.removeAttribute('required');
     if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 dorms 명예의 전당 (1위 ~ 20위)';
+    if (profileLead) profileLead.textContent = '랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.';
+    nameColThs.forEach((el) => { el.textContent = '닉네임'; });
   } else {
+    if (labelPlayerName) labelPlayerName.textContent = '이름:';
+    if (inputPlayerName) inputPlayerName.placeholder = '예: 홍길동';
+    if (profileLead) profileLead.textContent = '이름과 학번을 입력해야 시작할 수 있습니다.';
+    nameColThs.forEach((el) => { el.textContent = '이름'; });
     if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (1위 ~ 20위)';
   }
 
@@ -364,7 +356,7 @@ function initBingsoo2Game() {
     const rawName = inputPlayerName ? inputPlayerName.value : '';
     const cleanName = sanitizeInput(rawName, 12);
     if (!cleanName) {
-      setErr('닉네임을 입력해야 시작할 수 있습니다.');
+      setErr(`${nameFieldLabel()}을 입력해야 시작할 수 있습니다.`);
       if (inputPlayerName) inputPlayerName.focus();
       return;
     }
@@ -373,13 +365,18 @@ function initBingsoo2Game() {
     let cleanId = '';
     if (activeMode === 'school') {
       const rawId = inputStudentId ? inputStudentId.value : '';
-      cleanId = sanitizeInput(rawId, 10) || '미입력';
+      cleanId = sanitizeInput(rawId, 10);
+      if (!HalomathProfile.isValidStudentId(cleanId)) {
+        setErr('학번을 1~10자 영문·숫자·한글로 입력해 주세요.');
+        if (inputStudentId) inputStudentId.focus();
+        return;
+      }
       studentId = cleanId;
-      safeSetStorage(idStorageKey, studentId);
+      HalomathProfile.saveStudentId(activeMode, studentId);
     }
 
     playerName = cleanName;
-    safeSetStorage(nameStorageKey, playerName);
+    HalomathProfile.saveName(activeMode, playerName);
 
     updatePlayerInfoDisplay();
     playerModal.classList.add('hidden');
@@ -389,13 +386,13 @@ function initBingsoo2Game() {
   function updatePlayerInfoDisplay() {
     displayPlayerName.textContent = playerName || '플레이어';
     if (activeMode === 'school') {
-      displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: 미입력';
+      displayStudentId.textContent = studentId ? `학번: ${studentId}` : '학번: —';
       displayStudentId.style.display = '';
     } else {
       displayStudentId.style.display = 'none';
     }
     if (resultLockedName) resultLockedName.textContent = playerName;
-    if (resultLockedId) resultLockedId.textContent = studentId;
+    if (resultLockedId) resultLockedId.textContent = studentId || '—';
   }
 
   function initGame() {
@@ -1579,6 +1576,53 @@ function initBingsoo2Game() {
   // ----------------------------------------------------
   // Game Finish & Realtime Firebase Leaderboard
   // ----------------------------------------------------
+  if (btnSendData) btnSendData.style.display = 'none';
+
+  async function registerScoreToLeaderboard() {
+    if (apiStatusMsg) {
+      apiStatusMsg.className = 'api-status-msg';
+      apiStatusMsg.textContent = '⏳ 랭킹 등록 중...';
+    }
+
+    const totalErrorPx = roundHistory.reduce((sum, round) => sum + round.errorPx, 0);
+    const playTimeMs = sessionPlayTimeMs != null
+      ? sessionPlayTimeMs
+      : (gameStartedAt ? Math.max(0, Date.now() - gameStartedAt) : null);
+
+    const payload = {
+      gameId: 'bingsoo2',
+      game: 'bingsoo2',
+      name: playerName,
+      playerName: playerName,
+      score: totalScore,
+      totalScore: totalScore,
+      totalErrorPx,
+      playTimeMs,
+      rounds: roundHistory,
+      timestamp: (window.firebase && firebase.database && typeof firebase.database.ServerValue !== 'undefined')
+        ? firebase.database.ServerValue.TIMESTAMP
+        : Date.now()
+    };
+
+    const result = await HalomathScores.submitScore(firebaseDb, {
+      activeMode,
+      name: playerName,
+      studentId,
+      gameIds: ['bingsoo2', 'bingsoo-2'],
+      payload,
+      compareMode: 'bingsoo2',
+      updatedMessage: `🎉 ${totalScore}점으로 기록이 갱신되었습니다!`,
+      createdMessage: `✅ ${playerName}${activeMode === 'school' && studentId ? `(학번: ${studentId})` : ''}님의 ${totalScore}점이 등록되었습니다.`,
+      unchangedMessage: `ℹ️ 기존 등록 점수가 ${totalScore}점보다 높거나 같아 갱신하지 않았습니다.`
+    });
+
+    if (apiStatusMsg) {
+      apiStatusMsg.className = 'api-status-msg' + (result.success ? ' success' : ' error');
+      apiStatusMsg.textContent = result.message;
+    }
+    return result;
+  }
+
   function finishGame() {
     if (gameStartedAt) {
       sessionPlayTimeMs = Math.max(0, Date.now() - gameStartedAt);
@@ -1603,7 +1647,7 @@ function initBingsoo2Game() {
     }
 
     if (resultLockedName) resultLockedName.textContent = playerName;
-    if (resultLockedId) resultLockedId.textContent = studentId;
+    if (resultLockedId) resultLockedId.textContent = studentId || '—';
 
     const avgScore = totalScore / 5;
 
@@ -1628,6 +1672,7 @@ function initBingsoo2Game() {
     });
 
     resultModal.classList.remove('hidden');
+    registerScoreToLeaderboard();
   }
 
   // ----------------------------------------------------
@@ -1762,7 +1807,7 @@ function initBingsoo2Game() {
     if (!firebaseDb) return;
 
     try {
-      const ref = firebaseDb.ref(dbRefPath);
+      const ref = firebaseDb.ref('scores');
       ref.on('value', (snapshot) => {
         const val = snapshot.val();
         renderLeaderboardsFromData(val);
@@ -1787,6 +1832,13 @@ function initBingsoo2Game() {
         if (row.name || row.playerName) {
           const gameId = String(row.gameId || row.game || '').trim();
           if (!gameId.includes('bingsoo2') && gameId !== 'bingsoo-2') return;
+
+          const valStudentId = String(row.studentId || '').trim();
+          const valChannel = String(row.channel || '').trim();
+          const isDormsEntry = isDormsSubtree || valStudentId === 'DORMS' || valStudentId === 'DOREMS'
+            || valChannel === 'dorms' || valChannel === 'dorems' || key === 'dorms';
+          const matchesMode = activeMode === 'dorms' ? isDormsEntry : !isDormsEntry;
+          if (!matchesMode) return;
 
           const entry = parseLeaderboardRow(row);
           const userKey = activeMode === 'school'
@@ -1815,7 +1867,7 @@ function initBingsoo2Game() {
       if (openingChampName) openingChampName.textContent = champ.name;
       if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
       if (openingChampId) {
-        openingChampId.textContent = activeMode === 'school' ? `학번: ${champ.studentId || '미입력'}` : '';
+        openingChampId.textContent = activeMode === 'school' ? `학번: ${champ.studentId || '—'}` : '';
       }
     } else {
       if (openingChampName) openingChampName.textContent = '도전자';
@@ -1831,7 +1883,7 @@ function initBingsoo2Game() {
 
       return ranked.map(({ entry, rank, tied }) => {
         const rankBadge = formatRankBadge(rank, tied);
-        const idCell = activeMode === 'school' ? `<td>${escapeHtml(entry.studentId || '-')}</td>` : '';
+        const idCell = activeMode === 'school' ? `<td>${escapeHtml(entry.studentId || '—')}</td>` : '';
         return `
           <tr>
             <td><strong>${rankBadge}</strong></td>
@@ -1848,49 +1900,7 @@ function initBingsoo2Game() {
     if (leaderboardTbody) leaderboardTbody.innerHTML = buildRows();
   }
 
-  // Register Score
-  btnSendData.addEventListener('click', async () => {
-    btnSendData.disabled = true;
-    apiStatusMsg.textContent = '⏳ 점수 등록 중...';
-    apiStatusMsg.className = 'api-status-msg';
-
-    if (!firebaseDb) {
-      apiStatusMsg.textContent = '❌ Firebase 데이터베이스 연결을 찾을 수 없습니다.';
-      apiStatusMsg.className = 'api-status-msg error';
-      btnSendData.disabled = false;
-      return;
-    }
-
-    try {
-      const totalErrorPx = roundHistory.reduce((sum, round) => sum + round.errorPx, 0);
-      const playTimeMs = sessionPlayTimeMs != null
-        ? sessionPlayTimeMs
-        : (gameStartedAt ? Math.max(0, Date.now() - gameStartedAt) : null);
-      const newScoreRef = firebaseDb.ref(dbRefPath).push();
-      await newScoreRef.set({
-        gameId: 'bingsoo2',
-        game: 'bingsoo2',
-        name: playerName,
-        playerName: playerName,
-        studentId: activeMode === 'school' ? studentId : '',
-        score: totalScore,
-        totalScore: totalScore,
-        totalErrorPx,
-        playTimeMs,
-        rounds: roundHistory,
-        channel: activeMode,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      });
-
-      apiStatusMsg.textContent = `✅ ${playerName}${activeMode === 'school' && studentId ? `(학번: ${studentId})` : ''}님의 ${totalScore}점 기록이 등록되었습니다.`;
-      apiStatusMsg.className = 'api-status-msg success';
-    } catch (e) {
-      console.error("Score submission error:", e);
-      apiStatusMsg.textContent = '❌ 점수 등록 중 오류가 발생했습니다: ' + (e.message || '네트워크 오류');
-      apiStatusMsg.className = 'api-status-msg error';
-      btnSendData.disabled = false;
-    }
-  });
+  // Score auto-registers in finishGame via registerScoreToLeaderboard.
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -117,25 +117,8 @@ const sounds = new SoundEngine();
 
 function initCongruenceGame() {
   // Robust Channel Mode Detection (supporting KakaoTalk URL variations)
-  function detectActiveMode() {
-    try {
-      const href = (window.location.href || '').toLowerCase();
-      const search = (window.location.search || '').toLowerCase();
-      const hash = (window.location.hash || '').toLowerCase();
+  let activeMode = HalomathMode.detectActiveMode();
 
-      if (search.includes('mode=dorms') || search.includes('mode=dorems') ||
-          hash.includes('mode=dorms') || hash.includes('mode=dorems') ||
-          href.includes('dorms') || href.includes('dorems')) {
-        return 'dorms';
-      }
-    } catch (e) {}
-    return 'school';
-  }
-
-  let activeMode = detectActiveMode();
-
-  const nameStorageKey = `congruence_name_${activeMode}`;
-  const idStorageKey = `congruence_id_${activeMode}`;
   const highScoreStorageKey = `congruence_highscore_${activeMode}`;
 
   // Safe LocalStorage helpers for In-App WebViews (e.g. KakaoTalk)
@@ -155,15 +138,12 @@ function initCongruenceGame() {
     }
   }
 
-  let playerName = sanitizeInput(
-    safeGetStorage(nameStorageKey) || (activeMode === 'dorms' ? safeGetStorage('halomath_name_dorms') : '') || '',
-    12
-  );
+  let playerName = sanitizeInput(HalomathProfile.loadName(activeMode), 12);
   if (activeMode === 'dorms' && (!playerName || playerName === '도전자')) {
     playerName = randomDormsNickname();
-    safeSetStorage(nameStorageKey, playerName);
+    HalomathProfile.saveName(activeMode, playerName);
   }
-  let studentId = activeMode === 'school' ? sanitizeInput(safeGetStorage(idStorageKey), 10) : '';
+  let studentId = activeMode === 'school' ? sanitizeInput(HalomathProfile.loadStudentId(activeMode), 10) : '';
   let highScore = parseInt(safeGetStorage(highScoreStorageKey, '0'), 10);
 
   // Hide all Lobby navigation buttons unconditionally in ALL modes
@@ -359,23 +339,38 @@ function initCongruenceGame() {
     });
   }
 
-  function applyDormsModeUi() {
-    if (activeMode !== 'dorms') return;
-    document.body.classList.add('mode-dorms');
+  function applyProfileModeUi() {
+    const profileLead = document.getElementById('profile-lead');
     const labelPlayerName = document.getElementById('label-player-name');
-    if (labelPlayerName) labelPlayerName.textContent = '닉네임';
-    if (studentIdGroup) studentIdGroup.style.display = 'none';
-    document.querySelectorAll('.th-student-id').forEach((el) => { el.style.display = 'none'; });
-    const champId = document.getElementById('opening-champ-id');
-    if (champId) champId.style.display = 'none';
-    const resultIdSpan = document.getElementById('result-locked-id-span');
-    if (resultIdSpan) resultIdSpan.style.display = 'none';
-    if (displayProfileId) displayProfileId.style.display = 'none';
-    if (inputStudentId) {
-      inputStudentId.removeAttribute('required');
-      inputStudentId.disabled = true;
-      inputStudentId.value = '';
+    const nameColThs = document.querySelectorAll('.leaderboard-table thead th:nth-child(2)');
+
+    if (activeMode === 'dorms') {
+      document.body.classList.add('mode-dorms');
+      if (labelPlayerName) labelPlayerName.textContent = '닉네임:';
+      if (studentIdGroup) studentIdGroup.style.display = 'none';
+      document.querySelectorAll('.th-student-id').forEach((el) => { el.style.display = 'none'; });
+      const champId = document.getElementById('opening-champ-id');
+      if (champId) champId.style.display = 'none';
+      const resultIdSpan = document.getElementById('result-locked-id-span');
+      if (resultIdSpan) resultIdSpan.style.display = 'none';
+      if (displayProfileId) displayProfileId.style.display = 'none';
+      if (inputStudentId) {
+        inputStudentId.removeAttribute('required');
+        inputStudentId.disabled = true;
+        inputStudentId.value = '';
+      }
+      if (profileLead) profileLead.textContent = '랭킹에 올릴 닉네임을 입력해야 시작할 수 있습니다.';
+      nameColThs.forEach((el) => { el.textContent = '닉네임'; });
+    } else {
+      if (labelPlayerName) labelPlayerName.textContent = '이름:';
+      if (inputPlayerName) inputPlayerName.placeholder = '예: 홍길동';
+      if (profileLead) profileLead.textContent = '이름과 학번을 입력해야 시작할 수 있습니다.';
+      nameColThs.forEach((el) => { el.textContent = '이름'; });
     }
+  }
+
+  function nameFieldLabel() {
+    return activeMode === 'dorms' ? '닉네임' : '이름';
   }
 
   function fillNicknameInput() {
@@ -384,18 +379,19 @@ function initCongruenceGame() {
     if (activeMode === 'dorms') {
       if (!playerName || playerName === '도전자') {
         playerName = randomDormsNickname();
-        safeSetStorage(nameStorageKey, playerName);
+        HalomathProfile.saveName(activeMode, playerName);
       }
-      nameEl.placeholder = '닉네임 입력';
+      nameEl.placeholder = '닉네임';
       nameEl.value = playerName;
       nameEl.setAttribute('required', '');
     } else {
-      nameEl.value = playerName || '도전자';
+      nameEl.placeholder = '예: 홍길동';
+      nameEl.value = playerName || '';
     }
     if (inputStudentId && activeMode === 'school') inputStudentId.value = studentId;
   }
 
-  applyDormsModeUi();
+  applyProfileModeUi();
   fillNicknameInput();
 
   let isTimerPaused = true;
@@ -413,7 +409,7 @@ function initCongruenceGame() {
 
     let cleanName = sanitizeInput(nameInput ? nameInput.value : '', 12);
     if (!cleanName) {
-      setErr('닉네임을 입력해야 시작할 수 있습니다.');
+      setErr(`${nameFieldLabel()}을 입력해야 시작할 수 있습니다.`);
       if (nameInput) nameInput.focus();
       return;
     }
@@ -421,12 +417,17 @@ function initCongruenceGame() {
 
     if (activeMode === 'school' && idInput) {
       let cleanId = sanitizeInput(idInput.value, 10);
-      studentId = cleanId || '미입력';
-      safeSetStorage(idStorageKey, studentId);
+      if (!HalomathProfile.isValidStudentId(cleanId)) {
+        setErr('학번을 1~10자 영문·숫자·한글로 입력해 주세요.');
+        if (idInput) idInput.focus();
+        return;
+      }
+      studentId = cleanId;
+      HalomathProfile.saveStudentId(activeMode, studentId);
     }
 
     playerName = cleanName;
-    safeSetStorage(nameStorageKey, playerName);
+    HalomathProfile.saveName(activeMode, playerName);
 
     updateProfileDisplay();
 
@@ -2221,17 +2222,56 @@ function initCongruenceGame() {
     }
 
     if (resultLockedName) resultLockedName.textContent = playerName || '도전자';
-    if (resultLockedId) resultLockedId.textContent = studentId || '미입력';
+    if (resultLockedId) resultLockedId.textContent = studentId || '—';
     if (resultLockedIdSpan) resultLockedIdSpan.style.display = (activeMode === 'school') ? 'inline' : 'none';
 
-    if (btnSendData) {
-      btnSendData.disabled = false;
-      btnSendData.textContent = '🚀 점수 등록하기';
-    }
+    if (btnSendData) btnSendData.style.display = 'none';
     if (apiStatusMsg) apiStatusMsg.textContent = '';
 
     setUiPhase('modal');
     if (gameoverModal) gameoverModal.classList.remove('hidden');
+    fetchLeaderboard();
+    registerScoreToLeaderboard(totalScore);
+  }
+
+  async function registerScoreToLeaderboard(score) {
+    if (!playerName) return;
+    if (apiStatusMsg) {
+      apiStatusMsg.textContent = '⏳ 랭킹 등록 중...';
+      apiStatusMsg.className = 'api-status-msg';
+    }
+
+    const payload = {
+      score: score,
+      gameId: 'congruence',
+      timestamp: (window.firebase && firebase.database && typeof firebase.database.ServerValue !== 'undefined')
+        ? firebase.database.ServerValue.TIMESTAMP
+        : Date.now()
+    };
+
+    const result = await HalomathScores.submitScore(firebaseDb, {
+      activeMode,
+      name: playerName,
+      studentId,
+      gameIds: ['congruence', 'triangle', 'congruence_game'],
+      payload,
+      compareMode: 'higher',
+      acceptEntry: (val) => isCongruenceScore(val),
+      updatedMessage: `🎉 최고 점수가 ${score}점으로 갱신되었습니다!`,
+      createdMessage: `🎉 ${score}점이 랭킹에 등록되었습니다!`,
+      unchangedMessage: `ℹ️ 기존 최고 점수가 ${score}점보다 높거나 같아 갱신하지 않았습니다.`
+    });
+
+    if (result.success && result.updated !== false && score > highScore) {
+      highScore = score;
+      safeSetStorage(highScoreStorageKey, highScore);
+      if (hudHighScore) hudHighScore.textContent = `${highScore}점`;
+    }
+
+    if (apiStatusMsg) {
+      apiStatusMsg.textContent = result.message;
+      apiStatusMsg.className = 'api-status-msg' + (result.success ? ' success' : ' error');
+    }
     fetchLeaderboard();
   }
 
@@ -2269,16 +2309,6 @@ function initCongruenceGame() {
     btnToggleOpeningLeaderboard.addEventListener('click', () => {
       fetchLeaderboard();
       openingLeaderboardBox.classList.toggle('hidden');
-    });
-  }
-
-  if (btnSendData) {
-    btnSendData.addEventListener('click', async () => {
-      btnSendData.disabled = true;
-      btnSendData.textContent = '⏳ 등록 중...';
-      const res = await saveScoreToFirebase(totalScore);
-      if (apiStatusMsg) apiStatusMsg.textContent = res ? res.message : '🎉 점수가 등록되었습니다!';
-      btnSendData.textContent = '✅ 등록 완료';
     });
   }
 
@@ -2412,7 +2442,7 @@ function initCongruenceGame() {
       if (openingChampName) openingChampName.textContent = champ.name || '도전자';
       if (openingChampId) {
         if (activeMode === 'school') {
-          openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: 미입력';
+          openingChampId.textContent = champ.studentId ? `학번: ${champ.studentId}` : '학번: —';
           openingChampId.style.display = 'inline';
         } else {
           openingChampId.style.display = 'none';
@@ -2421,7 +2451,7 @@ function initCongruenceGame() {
       if (openingChampScore) openingChampScore.innerHTML = `${champ.score}<small>점</small>`;
     } else {
       if (openingChampName) openingChampName.textContent = '도전자';
-      if (openingChampId) openingChampId.textContent = activeMode === 'school' ? '학번: 미입력' : '';
+      if (openingChampId) openingChampId.textContent = activeMode === 'school' ? '학번: —' : '';
       if (openingChampScore) openingChampScore.innerHTML = `0<small>점</small>`;
     }
 
@@ -2463,7 +2493,7 @@ function initCongruenceGame() {
 
       let idTd = '';
       if (activeMode === 'school') {
-        idTd = `<td>${escapeHtml(item.studentId || '미입력')}</td>`;
+        idTd = `<td>${escapeHtml(item.studentId || '—')}</td>`;
       }
 
       tr.innerHTML = `
@@ -2476,117 +2506,6 @@ function initCongruenceGame() {
     });
   }
 
-  async function saveScoreToFirebase(score) {
-    if (!playerName) return { success: false, message: '❌ 참가자 이름이 입력되지 않았습니다.' };
-
-    const payload = {
-      name: playerName,
-      studentId: activeMode === 'school' ? studentId : 'DORMS',
-      channel: activeMode === 'school' ? 'school' : 'dorms',
-      score: score,
-      gameId: 'congruence',
-      timestamp: (window.firebase && firebase.database && typeof firebase.database.ServerValue !== 'undefined') ? firebase.database.ServerValue.TIMESTAMP : Date.now()
-    };
-
-    const saveViaREST = async () => {
-      if (highScore > 0 && payload.score <= highScore) {
-        return { success: true, message: `ℹ️ 기존 최고 점수(${highScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.` };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      try {
-        const restRes = await fetch('https://math-game-halogini-default-rtdb.firebaseio.com/scores.json', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (restRes.ok) {
-          highScore = payload.score;
-          safeSetStorage(highScoreStorageKey, highScore);
-          if (hudHighScore) hudHighScore.textContent = highScore;
-          fetchLeaderboard();
-          return { success: true, message: `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!` };
-        }
-      } catch (err) {
-        clearTimeout(timeoutId);
-        console.error("REST score save error:", err);
-      }
-      return { success: false, message: '❌ 점수 등록 중 네트워크 오류가 발생했습니다.' };
-    };
-
-    const timeoutPromise = new Promise((resolve) => {
-      setTimeout(() => resolve({ timeout: true }), 2500);
-    });
-
-    const sdkSavePromise = (async () => {
-      if (!firebaseDb) return null;
-      try {
-        const snapshot = await firebaseDb.ref('scores').once('value');
-        const matchingKeys = [];
-        let maxExistingScore = -1;
-
-        snapshot.forEach(child => {
-          const val = child.val();
-          if (val && String(val.name).trim() === String(payload.name).trim()) {
-            if (!isCongruenceScore(val)) return;
-
-            const valStudentId = String(val.studentId || '').trim();
-            const valChannel = String(val.channel || '').trim();
-            const isDormsVal = (valStudentId === 'DORMS' || valStudentId === 'DOREMS' || valChannel === 'dorms' || valChannel === 'dorems');
-            const isMatch = (activeMode === 'dorms' && isDormsVal)
-                         || (activeMode === 'school' && !isDormsVal && valStudentId === String(payload.studentId).trim());
-            if (isMatch) {
-              matchingKeys.push({ key: child.key, score: parseInt(val.score, 10) || 0 });
-              if ((parseInt(val.score, 10) || 0) > maxExistingScore) {
-                maxExistingScore = parseInt(val.score, 10) || 0;
-              }
-            }
-          }
-        });
-
-        let statusMsg = '';
-        if (matchingKeys.length > 0) {
-          const primaryKey = matchingKeys[0].key;
-          if (payload.score > maxExistingScore) {
-            await firebaseDb.ref(`scores/${primaryKey}`).update(payload);
-            highScore = Math.max(highScore, payload.score);
-            safeSetStorage(highScoreStorageKey, highScore);
-            if (hudHighScore) hudHighScore.textContent = highScore;
-            statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
-          } else {
-            statusMsg = `ℹ️ 기존 최고 점수(${maxExistingScore}점)가 현재 점수(${payload.score}점)보다 높거나 같아 갱신되지 않았습니다.`;
-          }
-          for (let i = 1; i < matchingKeys.length; i++) {
-            await firebaseDb.ref(`scores/${matchingKeys[i].key}`).remove();
-          }
-        } else {
-          await firebaseDb.ref('scores').push(payload);
-          highScore = Math.max(highScore, payload.score);
-          safeSetStorage(highScoreStorageKey, highScore);
-          if (hudHighScore) hudHighScore.textContent = highScore;
-          statusMsg = `🎉 최고 점수가 ${payload.score}점으로 성공적으로 갱신되었습니다!`;
-        }
-
-        fetchLeaderboard();
-        return { success: true, message: statusMsg };
-      } catch (err) {
-        return null;
-      }
-    })();
-
-    const result = await Promise.race([sdkSavePromise, timeoutPromise]);
-    if (result && !result.timeout) {
-      return result;
-    }
-
-    return await saveViaREST();
-  }
-
   // ----------------------------------------------------
   // User Profile Registration & Sync
   // ----------------------------------------------------
@@ -2594,20 +2513,22 @@ function initCongruenceGame() {
     if (playerName) {
       displayProfileName.textContent = playerName;
       if (activeMode === 'school') {
-        displayProfileId.textContent = studentId ? `학번: ${studentId}` : '학번: 미입력';
+        displayProfileId.textContent = studentId ? `학번: ${studentId}` : '학번: —';
       } else {
         displayProfileId.style.display = 'none';
       }
     } else {
-      displayProfileName.textContent = '도전자 미등록';
-      displayProfileId.textContent = '클릭하여 프로필 설정';
+      displayProfileName.textContent = '—';
+      if (activeMode === 'school') {
+        displayProfileId.textContent = '학번: —';
+      }
     }
   }
 
   // Pre-fill profile inputs on load
   function openProfileModal() {
     fillNicknameInput();
-    if (activeMode === 'school' && inputStudentId) inputStudentId.value = studentId || '미입력';
+    if (activeMode === 'school' && inputStudentId) inputStudentId.value = studentId || '';
     if (profileModal) {
       profileModal.classList.remove('hidden');
       profileModal.style.display = 'flex';

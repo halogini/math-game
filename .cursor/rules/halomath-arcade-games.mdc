@@ -1,0 +1,62 @@
+---
+description: HaloMath 아케이드 게임 — 프로필·랭킹·모드 공통 규칙 (신규 게임 포함)
+globs: games/**/*.{js,html},shared/**/*.js,portal.js,index.html
+alwaysApply: false
+---
+
+# HaloMath 아케이드 게임 규칙
+
+## 프로필 (게임 내부 입력, 포털에는 없음)
+
+- 공통 모듈: `shared/halomath-profile.js`
+- localStorage 키: `halomath_name_school` | `halomath_name_dorms` | `halomath_id_school`
+- 스쿨: **이름 + 학번** 모두 `HalomathProfile.isValidStudentId()` 통과해야 시작
+- 도orms: **닉네임만** (학번 UI 숨김)
+- `'미입력'`으로 시작·저장 금지
+
+## UI 표기 (모드별)
+
+| | school | dorms |
+|---|---|---|
+| 입력 라벨 | **이름:** | **닉네임:** |
+| placeholder | `예: 홍길동` | `닉네임` |
+| profile-lead | 이름과 학번을 입력해야… | 닉네임을 입력해야… |
+| 리더보드 열 | 이름 | 닉네임 |
+| 빈 학번 표시 | `—` (미입력 금지) | (열 숨김) |
+| 검증 오류 | `이름을 입력…` / `학번을…` | `닉네임을 입력…` |
+
+- HTML 더미값(`도전자`, `2101`) 넣지 말 것 — localStorage pre-fill만
+
+```html
+<script src="../../shared/halomath-mode.js"></script>
+<script src="../../shared/halomath-profile.js"></script>
+<script src="../../shared/halomath-scores.js"></script>
+<script src="game.js"></script>
+```
+
+## 랭킹 저장
+
+- 공통 모듈: `shared/halomath-scores.js` → **`HalomathScores.submitScore()`만 사용**
+- 경로: **`scores/`** (도orms 전용 `scores/dorms` 쓰기 금지)
+- payload에 자동 추가: `channel: 'school'|'dorms'`, `studentId: 학번|'DORMS'`
+- 같은 사람 기록은 **update** (더 좋을 때만), 중복 row는 remove
+- `compareMode`: `higher` | `lowerClearTime` | `bingsoo2`
+- 수동 「기록 등록」 버튼 없음 — **게임 종료 시 자동 등록** + 결과 메시지
+
+## 리더보드 읽기
+
+- `firebaseDb.ref('scores')` + **`scores/dorms` subtree 재귀** (레거시 표시)
+- 도orms 판별: `studentId==='DORMS'` 또는 `channel==='dorms'` 또는 `dorms` subtree
+- 포털 `portal.js`의 `collectGameScores` 패턴 참고
+
+## gameId
+
+- 고유 `gameId` 문자열 필수 (예: `my-new-game`)
+- 포털 `index.html` 탭 + `portal.js`의 `acceptGame` / `CONGRUENCE_GAME_IDS` 등에 등록
+
+## 모드
+
+- 공통 모듈: `shared/halomath-mode.js` → `HalomathMode.detectActiveMode()`
+- URL `?mode=school|dorms` (`dorems` 별칭). **생략 시 기본 `dorms`**
+- 학교 수업: **`?mode=school` 필수**
+- 랭킹·프로필·UI 모두 `activeMode`로 분기

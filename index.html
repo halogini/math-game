@@ -41,16 +41,6 @@
           <p class="subtitle" id="portal-subtitle">즐겁고 신나는 수학 미니게임들을 한곳에서 도전해보세요!</p>
         </div>
       </div>
-
-      <!-- User Profile Card -->
-      <div class="user-profile-bar">
-        <span class="profile-avatar">👤</span>
-        <div class="profile-info">
-          <span class="profile-name" id="display-profile-name">도전자 미등록</span>
-          <span class="profile-id" id="display-profile-id">클릭하여 프로필 설정</span>
-        </div>
-        <button id="btn-edit-profile" class="btn-edit-profile">✏️ 변경</button>
-      </div>
     </header>
 
     <!-- Main Game Catalog & Leaderboard -->
@@ -148,7 +138,7 @@
               <thead>
                 <tr>
                   <th>순위</th>
-                  <th>도전자</th>
+                  <th id="th-header-name">이름</th>
                   <th id="th-header-id">학번</th>
                   <th id="th-header-metric">최고 점수</th>
                 </tr>
@@ -169,28 +159,7 @@
     </footer>
   </div>
 
-  <!-- Player Profile Modal (Placed outside portal-container to prevent backdrop-filter containing block position issues) -->
-  <div id="profile-modal" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 id="modal-title">🎮 도전자 프로필 등록</h2>
-      </div>
-      <form id="profile-form">
-        <div class="form-group">
-          <label for="input-player-name" id="label-player-name">도전자 이름:</label>
-          <input type="text" id="input-player-name" class="form-input" placeholder="예: 홍길동" maxlength="12" required />
-        </div>
-        <div class="form-group" id="student-id-group">
-          <label for="input-student-id">학번:</label>
-          <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" pattern="[a-zA-Z0-9가-힣\-]+" title="영문, 숫자, 한글만 입력 가능합니다." required />
-        </div>
-        <button type="submit" class="btn-primary" style="width:100%; margin-top:10px;">
-          ⚡ 프로필 저장하고 게임하기
-        </button>
-      </form>
-    </div>
-  </div>
-
+  <script src="shared/halomath-mode.js"></script>
   <script src="portal.js"></script>
 </body>
 </html>

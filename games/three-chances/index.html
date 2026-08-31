@@ -32,8 +32,8 @@
       <div class="user-profile-card">
         <span class="profile-avatar">👤</span>
         <div class="profile-text">
-          <span class="profile-name" id="display-profile-name">도전자</span>
-          <span class="profile-id" id="display-profile-id">학번 미입력</span>
+          <span class="profile-name" id="display-profile-name">—</span>
+          <span class="profile-id" id="display-profile-id">학번: —</span>
         </div>
         <button id="btn-edit-profile" class="btn-small-edit" type="button">✏️</button>
       </div>
@@ -167,7 +167,7 @@
       <div class="send-action-box">
         <div class="result-locked-player-box">
           등록 참가자: <strong id="result-locked-name">도전자</strong>
-          <span id="result-locked-id-wrap"> (학번: <strong id="result-locked-id">미입력</strong>)</span>
+          <span id="result-locked-id-wrap"> (학번: <strong id="result-locked-id">—</strong>)</span>
         </div>
         <button id="btn-send-data" class="btn-modal-action btn-primary" type="button">기록 등록하기</button>
         <div id="api-status-msg" class="api-status-msg"></div>
@@ -229,11 +229,12 @@
       </div>
 
       <form id="profile-form" class="profile-form">
+        <p class="profile-lead" id="profile-lead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
         <label id="label-player-name">이름
-          <input id="input-player-name" type="text" maxlength="12" placeholder="닉네임" required autocomplete="nickname">
+          <input id="input-player-name" type="text" maxlength="12" placeholder="예: 홍길동" required autocomplete="nickname">
         </label>
         <label id="label-student-id">학번
-          <input id="input-student-id" type="text" maxlength="12" placeholder="학번 입력" autocomplete="off">
+          <input id="input-student-id" type="text" maxlength="10" placeholder="예: 10301" autocomplete="off">
         </label>
         <p id="profile-err" class="profile-err"></p>
         <button type="submit" class="btn-modal-action btn-primary" id="btn-start-game">챔피언에 도전하기 (게임 시작)</button>
@@ -274,6 +275,9 @@
   </div>
   </div>
 
+  <script src="../../shared/halomath-mode.js?v=fs2"></script>
+  <script src="../../shared/halomath-profile.js?v=fs2"></script>
+  <script src="../../shared/halomath-scores.js?v=fs2"></script>
   <script src="../../shared/mobile-fullscreen.js?v=fs2"></script>
   <script src="game.js?v=fs2"></script>
 </body>

@@ -49,8 +49,8 @@
         <div class="player-info-card">
           <span class="player-icon">👤</span>
           <div class="player-details">
-            <span class="player-name" id="display-player-name">도전자</span>
-            <span class="player-id" id="display-student-id">학번: 2101</span>
+            <span class="player-name" id="display-player-name">—</span>
+            <span class="player-id" id="display-student-id">학번: —</span>
           </div>
         </div>
 
@@ -128,8 +128,8 @@
             <div class="champ-gold-shimmer"></div>
             <div class="champ-trophy">🥇</div>
             <div class="champ-info">
-              <span class="champ-name" id="opening-champ-name">김빙수</span>
-              <span class="champ-id" id="opening-champ-id">학번: 2105</span>
+              <span class="champ-name" id="opening-champ-name">—</span>
+              <span class="champ-id" id="opening-champ-id">학번: —</span>
             </div>
             <div class="champ-score" id="opening-champ-score">492<small>점</small></div>
           </div>
@@ -167,13 +167,14 @@
 
         <div class="modal-body">
           <form id="player-form">
+            <p class="profile-lead" id="profile-lead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
             <div class="form-group">
-              <label for="input-player-name" id="label-player-name">도전자 이름:</label>
-              <input type="text" id="input-player-name" class="form-input" value="도전자" placeholder="예: 홍길동" maxlength="12" required />
+              <label for="input-player-name" id="label-player-name">이름:</label>
+              <input type="text" id="input-player-name" class="form-input" value="" placeholder="예: 홍길동" maxlength="12" required />
             </div>
             <div class="form-group" id="student-id-group">
               <label for="input-student-id">학번:</label>
-              <input type="text" id="input-student-id" class="form-input" placeholder="예: 2101" maxlength="10" />
+              <input type="text" id="input-student-id" class="form-input" placeholder="예: 10301" maxlength="10" />
             </div>
             <button type="submit" class="btn btn-primary btn-lg style-sparkle-btn" style="width: 100%; margin-top: 10px;">
               ⚡ 챔피언에 도전하기 (게임 시작)
@@ -230,7 +231,7 @@
           <div class="send-action-box">
             <div class="result-locked-player-box">
               <span class="locked-icon">🔒</span>
-              <span class="locked-text">등록 참가자: <strong id="result-locked-name">홍길동</strong> <span id="result-locked-id-span">(학번: <strong id="result-locked-id">2101</strong>)</span></span>
+              <span class="locked-text">등록 참가자: <strong id="result-locked-name">—</strong> <span id="result-locked-id-span">(학번: <strong id="result-locked-id">—</strong>)</span></span>
             </div>
             <button id="btn-send-data" class="btn btn-secondary btn-lg" style="width: 100%;">
               🚀 점수 등록하기
@@ -277,6 +278,9 @@
     </div>
   </div>
 
+  <script src="../../shared/halomath-mode.js"></script>
+  <script src="../../shared/halomath-profile.js"></script>
+  <script src="../../shared/halomath-scores.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
