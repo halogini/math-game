@@ -3240,11 +3240,17 @@
 
     function queueDiagHint(s) {
       if (!s.guide || s.guide.diagShown) return;
+      s.guide.diagShown = true;
+      // 첫 특별요청 전에는 단계(order 노란 안내)를 바꾸지 않고 바로 띄운다.
       if (!s.guide.paraDone) {
-        s.guide.pendingDiag = true;
+        s.tip = {
+          text: '사각형의 성질이 많을수록 판매금액이 올라가요',
+          t: 0,
+          max: 5.5,
+          hold: true
+        };
         return;
       }
-      s.guide.diagShown = true;
       if (s.guide.step === 'orderTime') s.guide.pendingOrderTime = true;
       s.guide.step = 'diagHint';
       s.guide.orderT = 0;
@@ -3944,7 +3950,7 @@
               if (s.guide) s.guide.paraDone = true;
               s.order = null;
               if (firstOrder) {
-                if (s.guide.pendingDiag || (hasQuadProps(gem.kind) && !s.guide.diagShown)) {
+                if (hasQuadProps(gem.kind) && !s.guide.diagShown) {
                   s.guide.pendingOrderTime = true;
                   queueDiagHint(s);
                 } else {
