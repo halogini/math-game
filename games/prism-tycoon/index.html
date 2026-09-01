@@ -880,7 +880,7 @@
             <input id="input-player-name" type="text" maxlength="12" required autocomplete="nickname" placeholder="예: 홍길동">
           </label>
           <label id="label-student-id">학번
-            <input id="input-student-id" type="text" maxlength="10" autocomplete="off" placeholder="1~10자">
+            <input id="input-student-id" type="text" maxlength="10" autocomplete="off" placeholder="4글자로 입력 (예: 2230)">
           </label>
           <p class="profile-err" id="profile-err"></p>
         </form>
@@ -1331,7 +1331,10 @@
           nameLabel.appendChild(input);
         }
       }
-      if (idIn && studentId) idIn.value = studentId;
+      if (idIn) {
+        idIn.placeholder = '4글자로 입력 (예: 2230)';
+        if (studentId) idIn.value = studentId;
+      }
       if (lead) {
         if (showId) {
           lead.style.display = '';

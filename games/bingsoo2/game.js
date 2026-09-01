@@ -205,6 +205,7 @@ function initBingsoo2Game() {
   } else {
     if (labelPlayerName) labelPlayerName.textContent = '이름:';
     if (inputPlayerName) inputPlayerName.placeholder = '예: 홍길동';
+    if (inputStudentId) inputStudentId.placeholder = '4글자로 입력 (예: 2230)';
     if (profileLead) profileLead.textContent = '이름과 학번을 입력해야 시작할 수 있습니다.';
     nameColThs.forEach((el) => { el.textContent = '이름'; });
     if (resultLeaderboardTitle) resultLeaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (1위 ~ 20위)';

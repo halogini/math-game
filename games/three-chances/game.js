@@ -5592,6 +5592,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       const labelName = document.getElementById("label-player-name");
       const nameInput = document.getElementById("input-player-name");
+      const inputId = document.getElementById("input-student-id");
+      if (inputId) inputId.placeholder = "4글자로 입력 (예: 2230)";
       if (labelName && nameInput) {
         labelName.textContent = "";
         labelName.append("이름");
