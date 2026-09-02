@@ -494,4 +494,366 @@
   .live-compare-grid {
     grid-template-columns: 1fr;
   }
+
+  .live-host-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .live-host-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .live-host-toolbar .btn-play-game,
+  .live-host-toolbar .admin-btn {
+    width: 100%;
+  }
+
+  .live-host-ranks-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ── Host dashboard (수업 세션 진행) ── */
+
+.live-host-page {
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.live-host-wrap {
+  max-width: 980px;
+  gap: 20px;
+  padding: 28px;
+}
+
+.live-host-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.live-host-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.live-host-logo {
+  font-size: 2.4rem;
+  padding: 8px 12px;
+}
+
+.live-host-eyebrow {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.live-host-title {
+  font-family: 'Jua', sans-serif;
+  font-size: 2rem;
+  color: #0284c7;
+  letter-spacing: 0.02em;
+}
+
+.live-host-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #047857;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.live-host-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: live-host-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-host-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.live-host-toast {
+  min-height: 0;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.live-host-toast:empty {
+  display: none;
+}
+
+.live-host-dashboard {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.live-host-panel {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.live-host-invite {
+  border-color: #bae6fd;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+}
+
+.live-host-qr {
+  text-align: center;
+  background: #f8fafc;
+}
+
+.live-host-panel-head h2 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.15rem;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.live-host-panel-head p {
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.live-host-code-block {
+  padding: 16px 18px;
+  background: #fff;
+  border: 2px dashed #bae6fd;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.live-host-code {
+  margin: 6px 0 0;
+  font-size: 3rem;
+  line-height: 1.1;
+}
+
+.live-host-link-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-host-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.live-host-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.live-host-link-row input {
+  flex: 1;
+  min-width: 0;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: #334155;
+  background: #fff;
+}
+
+.live-host-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.live-host-hints li {
+  padding-left: 1rem;
+  position: relative;
+}
+
+.live-host-hints li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.live-host-qr-figure {
+  margin: 0 auto;
+  padding: 12px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  display: inline-block;
+}
+
+.live-host-qr-figure img {
+  display: block;
+  width: 200px;
+  height: 200px;
+}
+
+.live-host-qr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-host-qr-actions .admin-btn {
+  width: 100%;
+}
+
+.live-host-qr-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+.live-host-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #f1f5f9;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.live-host-btn-play {
+  width: auto;
+  flex: 1 1 10rem;
+  padding: 12px 20px;
+  margin: 0;
+}
+
+.live-host-btn-save {
+  flex: 0 0 auto;
+}
+
+.live-host-btn-end {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.live-host-ranks {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px 22px;
+}
+
+.live-host-ranks-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.live-host-ranks-head h2 {
+  font-family: 'Jua', sans-serif;
+  font-size: 1.2rem;
+  color: #0369a1;
+}
+
+.live-host-ranks-note {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.live-host-player-count {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.live-host-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.live-host-table {
+  margin: 0;
+}
+
+.live-host-table th {
+  background: #f8fafc;
+}
+
+.live-host-empty-row td {
+  text-align: center;
+  color: #94a3b8;
+  padding: 28px 16px !important;
+  font-size: 0.9rem;
+}
+
+.live-host-rank-top td {
+  background: #f0f9ff;
+}
+
+.live-host-rank-1 td:first-child {
+  font-weight: 800;
+}
+
+.live-host-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.live-host-footer a {
+  color: #64748b;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.live-host-footer a:hover {
+  color: #0284c7;
 }

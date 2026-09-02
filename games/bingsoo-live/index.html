@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍧 팥빙수 수업 세션 | 할로매쓰</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;">
   <meta name="description" content="수업 시간에만 쓰는 팥빙수 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
   <link rel="stylesheet" href="../../style.css">
   <link rel="stylesheet" href="lobby.css">
@@ -12,6 +12,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="../../config.sample.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
   <div class="portal-container live-lobby">
@@ -42,14 +44,14 @@
           <span class="live-step-num" aria-hidden="true">2</span>
           <div>
             <strong>QR 보여주기</strong>
-            <p>학생이 QR을 찍거나 링크로 들어와 같은 수업 방에서 점수를 올립니다.</p>
+            <p>학생은 카메라로 QR만 찍으면 됩니다. 진행 창은 선생님 컴퓨터에 그대로 둡니다.</p>
           </div>
         </li>
         <li class="live-step">
           <span class="live-step-num" aria-hidden="true">3</span>
           <div>
             <strong>수업 후 종료</strong>
-            <p>진행 창에서 세션 종료를 누르면 이번 수업 기록이 지워집니다. 필요하면 순위를 파일로 저장하세요.</p>
+            <p>진행 창을 닫거나 세션 종료를 누르면 이번 수업 기록이 지워집니다. 필요하면 순위를 파일로 저장하세요.</p>
           </div>
         </li>
       </ol>
@@ -67,10 +69,10 @@
       <section class="live-card live-card-session" aria-labelledby="session-card-title">
         <span class="live-card-badge">선생님 · 수업용</span>
         <h2 class="live-card-title" id="session-card-title">수업 세션 시작</h2>
-        <p class="live-card-desc">이번 수업만의 순위표가 만들어집니다. 창을 닫아도 <strong>세션 종료</strong>를 누르기 전까지 방은 유지됩니다.</p>
+        <p class="live-card-desc">이번 수업만의 순위표가 만들어집니다. 진행 창을 닫거나 <strong>세션 종료</strong>를 누르면 방이 끝납니다.</p>
         <ul class="live-card-points">
-          <li>별도 등록 없이 바로 참여</li>
-          <li>QR 또는 링크로 입장</li>
+          <li>학생은 QR만 찍고 바로 참여</li>
+          <li>진행 창을 닫으면 세션 종료</li>
           <li>수업 끝나면 기록 삭제 가능</li>
         </ul>
         <button type="button" class="btn-play-game" id="btn-host">세션 시작</button>

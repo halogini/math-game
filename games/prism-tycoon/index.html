@@ -1364,7 +1364,8 @@
         }
         return;
       }
-      const gold = Math.max(0, Math.floor(Number(state && state.gold) || 0));
+      const runGold = Math.max(0, Math.floor(Number(state && state.gold) || 0));
+      const gold = Math.max(runGold, getLocalBest());
       playerName = sanitizeInput(HalomathProfile.loadName(activeMode) || playerName || '', 12);
       if (activeMode === 'school') {
         studentId = sanitizeInput(HalomathProfile.loadStudentId(activeMode) || studentId || '', 10);

@@ -1,11 +1,16 @@
 /**
  * Classroom live sessions (REST-first). Scores go to liveRooms/{code}, never scores/.
+ * Host window (and lobby) uses anonymous auth. Students joining via QR do not.
  */
 (function (global) {
   const ALPH = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   const TTL_MS = 24 * 60 * 60 * 1000;
   const LAST_ROOM_KEY = 'halomath_live_last_room';
   const REST_TIMEOUT_MS = 8000;
+  const CODE_ATTEMPTS = 12;
+
+  let cachedHostToken = '';
+  let cachedHostUid = '';
 
   function normalizeCode(raw) {
     const s = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -45,6 +50,22 @@
     return Date.now() - t > TTL_MS;
   }
 
+  function isHostClosed(meta) {
+    if (!meta || typeof meta !== 'object') return true;
+    if (!Object.prototype.hasOwnProperty.call(meta, 'hostSeenAt')) return false;
+    return Number(meta.hostSeenAt) === 0;
+  }
+
+  function metaBody(createdAt, hostSeenAt, hostUid) {
+    const payload = {
+      gameId: 'bingsoo',
+      createdAt: Number(createdAt) || Date.now()
+    };
+    if (hostSeenAt != null) payload.hostSeenAt = Number(hostSeenAt) || 0;
+    if (hostUid) payload.hostUid = String(hostUid);
+    return payload;
+  }
+
   function saveLastRoom(code) {
     try {
       if (code) localStorage.setItem(LAST_ROOM_KEY, code);
@@ -75,13 +96,97 @@
     }
   }
 
+  function firebaseConfig() {
+    return (global.ENV && global.ENV.FIREBASE_CONFIG)
+      || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_CONFIG)
+      || {};
+  }
+
+  function initFirebaseApp() {
+    if (typeof firebase === 'undefined' || !firebase.initializeApp) return null;
+    if (firebase.apps && firebase.apps.length) return firebase.app();
+    const cfg = firebaseConfig();
+    if (!cfg.apiKey) return null;
+    return firebase.initializeApp(cfg);
+  }
+
+  async function ensureHostAuth() {
+    initFirebaseApp();
+    if (typeof firebase === 'undefined' || !firebase.auth) {
+      const err = new Error('HOST_AUTH_UNAVAILABLE');
+      err.code = 'HOST_AUTH_UNAVAILABLE';
+      throw err;
+    }
+    const auth = firebase.auth();
+    try {
+      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    } catch (e) { /* ignore */ }
+    if (!auth.currentUser) {
+      try {
+        await auth.signInAnonymously();
+      } catch (e) {
+        const err = new Error('HOST_AUTH_DISABLED');
+        err.code = 'HOST_AUTH_DISABLED';
+        err.cause = e;
+        throw err;
+      }
+    }
+    const user = auth.currentUser;
+    cachedHostUid = user.uid;
+    cachedHostToken = await user.getIdToken();
+    return user;
+  }
+
+  async function refreshHostAuth() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.auth || !firebase.auth().currentUser) {
+        return ensureHostAuth();
+      }
+      cachedHostUid = firebase.auth().currentUser.uid;
+      cachedHostToken = await firebase.auth().currentUser.getIdToken();
+      return firebase.auth().currentUser;
+    } catch (e) {
+      return ensureHostAuth();
+    }
+  }
+
+  function withAuth(path, token) {
+    const cleanPath = String(path || '').replace(/^\//, '');
+    const url = `${restBase()}/${cleanPath}`;
+    if (!token) return url;
+    return `${url}${url.indexOf('?') >= 0 ? '&' : '?'}auth=${encodeURIComponent(token)}`;
+  }
+
+  function writeMetaKeepalive(code, createdAt, hostSeenAt, hostUid, token) {
+    const normalized = normalizeCode(code);
+    if (!normalized) return;
+    const url = withAuth(`${roomPath(normalized)}/meta.json`, token || cachedHostToken);
+    try {
+      fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(metaBody(createdAt, hostSeenAt, hostUid || cachedHostUid)),
+        keepalive: true
+      });
+    } catch (e) { /* page is unloading */ }
+  }
+
+  function deleteRoomKeepalive(code, token) {
+    const normalized = normalizeCode(code);
+    if (!normalized) return;
+    const url = withAuth(`${roomPath(normalized)}.json`, token || cachedHostToken);
+    try {
+      fetch(url, { method: 'DELETE', keepalive: true });
+    } catch (e) { /* page is unloading */ }
+  }
+
   async function fetchRest(path, options, timeoutMs) {
     const ms = timeoutMs || REST_TIMEOUT_MS;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ms);
-    const cleanPath = String(path || '').replace(/^\//, '');
+    const token = options && options.authToken;
     try {
-      const res = await fetch(`${restBase()}/${cleanPath}`, {
+      const res = await fetch(withAuth(path, token), {
         method: options && options.method ? options.method : 'GET',
         headers: { 'Content-Type': 'application/json' },
         body: options && options.body ? options.body : undefined,
@@ -91,7 +196,7 @@
       const text = await res.text();
       if (!res.ok) {
         const err = new Error(text || res.statusText);
-        err.code = res.status === 401 ? 'PERMISSION_DENIED' : String(res.status);
+        err.code = res.status === 401 || res.status === 403 ? 'PERMISSION_DENIED' : String(res.status);
         throw err;
       }
       if (!text || text === 'null') return null;
@@ -111,24 +216,85 @@
     return data && typeof data === 'object' ? data : {};
   }
 
-  async function createRoom(code) {
+  async function createRoom() {
+    const user = await ensureHostAuth();
+    const token = await user.getIdToken();
+    cachedHostToken = token;
+    cachedHostUid = user.uid;
+    for (let i = 0; i < CODE_ATTEMPTS; i += 1) {
+      const code = randomCode();
+      let existing = null;
+      try {
+        existing = await getMeta(code);
+      } catch (e) {
+        existing = null;
+      }
+      if (existing) continue;
+      const now = Date.now();
+      try {
+        await fetchRest(`${roomPath(code)}/meta.json`, {
+          method: 'PUT',
+          body: JSON.stringify(metaBody(now, now, user.uid)),
+          authToken: token
+        });
+        return code;
+      } catch (err) {
+        if (err && err.code === 'PERMISSION_DENIED') continue;
+        throw err;
+      }
+    }
+    const err = new Error('NO_FREE_CODE');
+    err.code = 'NO_FREE_CODE';
+    throw err;
+  }
+
+  async function markHostOpen(code, createdAt, hostUid) {
+    const user = await ensureHostAuth();
+    const token = await user.getIdToken();
+    cachedHostToken = token;
+    cachedHostUid = user.uid;
+    const meta = await getMeta(code);
+    if (!meta) {
+      const err = new Error('SESSION_ENDED');
+      err.code = 'SESSION_ENDED';
+      throw err;
+    }
+    const uid = String(hostUid || meta.hostUid || user.uid);
+    const created = Number(createdAt || meta.createdAt) || Date.now();
     await fetchRest(`${roomPath(code)}/meta.json`, {
       method: 'PUT',
-      body: JSON.stringify({ gameId: 'bingsoo', createdAt: Date.now() })
+      body: JSON.stringify(metaBody(created, Date.now(), uid)),
+      authToken: token
     });
+  }
+
+  function leaveHostWindow(code, createdAt, hostUid) {
+    const normalized = normalizeCode(code);
+    if (!normalized) return;
+    saveLastRoom('');
+    const uid = hostUid || cachedHostUid;
+    writeMetaKeepalive(normalized, createdAt, 0, uid, cachedHostToken);
+    deleteRoomKeepalive(normalized, cachedHostToken);
+    try {
+      if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'halomath-live-ended', code: normalized }, '*');
+      }
+    } catch (e) { /* ignore */ }
   }
 
   async function roomIsActive(code) {
     try {
       const meta = await getMeta(code);
-      return !!(meta && !isExpired(meta.createdAt));
+      return !!(meta && !isExpired(meta.createdAt) && !isHostClosed(meta));
     } catch (e) {
       return false;
     }
   }
 
   async function deleteRoom(code) {
-    await fetchRest(`${roomPath(code)}.json`, { method: 'DELETE' });
+    const user = await ensureHostAuth();
+    const token = await user.getIdToken();
+    await fetchRest(`${roomPath(code)}.json`, { method: 'DELETE', authToken: token });
     saveLastRoom('');
   }
 
@@ -191,7 +357,7 @@
 
   async function submitScore(code, name, score) {
     const meta = await getMeta(code);
-    if (!meta || isExpired(meta.createdAt)) {
+    if (!meta || isExpired(meta.createdAt) || isHostClosed(meta)) {
       const err = new Error('SESSION_ENDED');
       err.code = 'SESSION_ENDED';
       throw err;
@@ -259,6 +425,18 @@
     win.location.replace(target);
   }
 
+  function hostAuthErrorMessage(err) {
+    const code = err && err.code;
+    if (code === 'HOST_AUTH_DISABLED' || (err && err.cause && err.cause.code === 'auth/operation-not-allowed')) {
+      return '세션을 열려면 Firebase 콘솔에서 익명 로그인(Anonymous)을 켜 주세요.';
+    }
+    if (code === 'NO_FREE_CODE') {
+      return '빈 세션 코드를 찾지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    }
+    const detail = err && (err.code || err.message) ? ` (${err.code || err.message})` : '';
+    return `세션을 열 수 없습니다.${detail} Firebase 콘솔에서 liveRooms 규칙을 Publish했는지 확인해 주세요.`;
+  }
+
   global.HalomathLive = {
     normalizeCode,
     detectRoomFromUrl,
@@ -267,6 +445,11 @@
     roomPath,
     TTL_MS,
     isExpired,
+    isHostClosed,
+    ensureHostAuth,
+    refreshHostAuth,
+    markHostOpen,
+    leaveHostWindow,
     LAST_ROOM_KEY,
     saveLastRoom,
     loadLastRoom,
@@ -283,6 +466,7 @@
     submitScore,
     playersToLeaderboardMap,
     lobbyUrl,
-    returnToLobby
+    returnToLobby,
+    hostAuthErrorMessage
   };
 })(typeof window !== 'undefined' ? window : global);

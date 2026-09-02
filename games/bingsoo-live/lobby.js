@@ -79,6 +79,7 @@ document.getElementById('btn-host').addEventListener('click', async () => {
   setStatus('세션 준비 중…');
 
   try {
+    await HalomathLive.ensureHostAuth();
     let existing = HalomathLive.loadLastRoom();
     if (existing && !(await HalomathLive.roomIsActive(existing))) {
       HalomathLive.saveLastRoom('');
@@ -104,9 +105,8 @@ document.getElementById('btn-host').addEventListener('click', async () => {
       hideReopen();
     }
 
-    const code = HalomathLive.randomCode();
-    setStatus(`세션 ${code} 만드는 중…`);
-    await HalomathLive.createRoom(code);
+    setStatus('빈 세션 코드를 찾는 중…');
+    const code = await HalomathLive.createRoom();
     HalomathLive.saveLastRoom(code);
     showReopen(code);
 
@@ -116,17 +116,22 @@ document.getElementById('btn-host').addEventListener('click', async () => {
       : `세션 ${code}으로 이동했습니다. (팝업이 막혀 같은 탭에서 열림)`);
   } catch (err) {
     console.warn(err);
-    const detail = err && (err.code || err.message) ? ` (${err.code || err.message})` : '';
-    setStatus(`세션을 열 수 없습니다.${detail} Firebase 콘솔에서 liveRooms 규칙을 Publish했는지 확인해 주세요.`);
+    setStatus(HalomathLive.hostAuthErrorMessage(err));
   } finally {
     setBusy(false);
   }
 });
 
-document.getElementById('btn-reopen').addEventListener('click', () => {
+document.getElementById('btn-reopen').addEventListener('click', async () => {
   const code = window.HalomathLive ? HalomathLive.loadLastRoom() : '';
   if (!code) {
     hideReopen();
+    return;
+  }
+  try {
+    await HalomathLive.ensureHostAuth();
+  } catch (err) {
+    setStatus(HalomathLive.hostAuthErrorMessage(err));
     return;
   }
   openHostWindow(code);
@@ -165,5 +170,12 @@ window.addEventListener('storage', (e) => {
     return;
   }
   const code = HalomathLive.loadLastRoom();
-  if (code) showReopen(code);
+  if (!code) return;
+  HalomathLive.roomIsActive(code).then((active) => {
+    if (active) showReopen(code);
+    else {
+      HalomathLive.saveLastRoom('');
+      hideReopen();
+    }
+  }).catch(() => showReopen(code));
 }());

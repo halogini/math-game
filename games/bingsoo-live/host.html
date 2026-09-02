@@ -4,75 +4,112 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍧 수업 세션 진행 | 할로매쓰</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://api.qrserver.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.qrserver.com;">
   <link rel="stylesheet" href="../../style.css">
   <link rel="stylesheet" href="lobby.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="../../config.sample.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
-<body>
-  <div class="portal-container live-lobby">
-    <header class="portal-header">
-      <div class="brand">
-        <span class="logo-badge">🍧</span>
+<body class="live-host-page">
+  <div class="portal-container live-host-wrap">
+    <header class="live-host-header">
+      <div class="live-host-brand">
+        <span class="logo-badge live-host-logo">🍧</span>
         <div>
-          <h1>수업 세션 진행</h1>
-          <p class="subtitle">이 창을 닫아도 세션은 유지됩니다. 세션 종료를 누르면 기록이 지워지고 시작 화면으로 돌아갑니다.</p>
+          <p class="live-host-eyebrow">수업 세션 진행</p>
+          <h1 class="live-host-title">세션 <span id="host-code-badge">————</span></h1>
         </div>
+      </div>
+      <div class="live-host-live-pill" aria-live="polite">
+        <span class="live-host-pulse" aria-hidden="true"></span>
+        진행 중
       </div>
     </header>
 
-    <main class="portal-main">
-      <p class="live-status" id="host-status"></p>
-      <section class="live-host-panel" id="host-panel">
-        <div class="leaderboard-container">
-          <div class="live-host-top">
-            <div>
-              <p class="live-code-label">이 세션 코드</p>
-              <p class="live-code" id="host-code">————</p>
-              <p class="live-link-wrap">
-                학생 링크
-                <input type="text" id="host-link" readonly>
-                <button type="button" class="admin-btn" id="btn-copy-link">복사</button>
-              </p>
-            </div>
-            <figure class="live-qr-box">
-              <img id="host-qr" alt="학생용 입장 QR" width="220" height="220">
-              <figcaption>학생이 카메라로 찍으면 바로 게임에 들어갑니다.</figcaption>
-              <button type="button" class="admin-btn" id="btn-qr-pip" hidden>QR 미니 창 (항상 위 · 크롬)</button>
-              <button type="button" class="admin-btn" id="btn-qr-popout">QR 작은 창으로 띄우기</button>
-              <p class="qr-popout-note" id="qr-popout-note">크롬·엣지에서는 「미니 창」이 다른 창 위에 떠 있습니다. 그 외 브라우저는 작은 창을 쓰세요.</p>
-            </figure>
-          </div>
-          <p class="live-actions-row">
-            <a class="btn-play-game" id="btn-host-play" href="#" target="_blank" rel="noopener">이 세션에서 나도 플레이</a>
-            <button type="button" class="admin-btn" id="btn-save-ranks">순위 파일로 저장</button>
-          </p>
-          <p class="live-actions-row">
-            <button type="button" class="admin-btn admin-btn-exit" id="btn-end-session">세션 종료 · 기록 삭제</button>
-          </p>
-          <h2>이 세션 순위</h2>
-          <p class="leaderboard-mode-note">창을 닫아도 종료 전까지 방은 유지됩니다. 바로 지우려면 종료를 누르세요.</p>
-          <div class="table-wrapper">
-            <table class="leaderboard-table">
-              <thead>
-                <tr>
-                  <th>순위</th>
-                  <th>닉네임</th>
-                  <th>점수</th>
-                </tr>
-              </thead>
-              <tbody id="live-tbody">
-                <tr><td colspan="3">아직 기록이 없습니다.</td></tr>
-              </tbody>
-            </table>
-          </div>
+    <p class="live-host-toast" id="host-status" role="status" aria-live="polite"></p>
+
+    <section class="live-host-dashboard" id="host-panel">
+      <div class="live-host-panel live-host-invite">
+        <div class="live-host-panel-head">
+          <h2>학생 초대</h2>
+          <p>QR을 칠판·프로젝터에 띄우거나, 링크를 채팅으로 보내세요.</p>
         </div>
-      </section>
-      <p class="live-back"><a href="index.html">← 세션 시작 화면</a> · 세션은 계속 유지됩니다</p>
-    </main>
+
+        <div class="live-host-code-block">
+          <span class="live-code-label">세션 코드</span>
+          <p class="live-code live-host-code" id="host-code">————</p>
+        </div>
+
+        <label class="live-host-link-field">
+          <span class="live-host-field-label">입장 링크</span>
+          <div class="live-host-link-row">
+            <input type="text" id="host-link" readonly>
+            <button type="button" class="admin-btn admin-btn-primary" id="btn-copy-link">복사</button>
+          </div>
+        </label>
+
+        <ul class="live-host-hints">
+          <li>학생은 닉네임만 입력하고 바로 참여합니다. QR을 찍으면 됩니다.</li>
+          <li>이 진행 창을 닫으면 세션이 종료됩니다. QR 창만 닫아도 방은 유지됩니다.</li>
+        </ul>
+      </div>
+
+      <div class="live-host-panel live-host-qr">
+        <div class="live-host-panel-head">
+          <h2>QR 코드</h2>
+          <p>학생이 카메라로 찍으면 바로 게임에 들어갑니다.</p>
+        </div>
+
+        <figure class="live-host-qr-figure">
+          <img id="host-qr" alt="학생용 입장 QR" width="200" height="200">
+        </figure>
+
+        <div class="live-host-qr-actions">
+          <button type="button" class="admin-btn" id="btn-qr-pip" hidden>미니 창 (크롬 · 항상 위)</button>
+          <button type="button" class="admin-btn" id="btn-qr-popout">작은 창으로 띄우기</button>
+        </div>
+        <p class="live-host-qr-note" id="qr-popout-note">프로젝터에 QR이 작게 보이면 「작은 창」을 화면 구석에 두세요.</p>
+      </div>
+    </section>
+
+    <section class="live-host-toolbar" aria-label="세션 관리">
+      <a class="btn-play-game live-host-btn-play" id="btn-host-play" href="#" target="_blank" rel="noopener">나도 플레이</a>
+      <button type="button" class="admin-btn live-host-btn-save" id="btn-save-ranks">순위 파일로 저장</button>
+      <button type="button" class="admin-btn admin-btn-exit live-host-btn-end" id="btn-end-session">세션 종료 · 기록 삭제</button>
+    </section>
+
+    <section class="live-host-ranks" aria-labelledby="live-rank-title">
+      <div class="live-host-ranks-head">
+        <div>
+          <h2 id="live-rank-title">실시간 순위</h2>
+          <p class="live-host-ranks-note">3초마다 자동으로 갱신됩니다.</p>
+        </div>
+        <span class="live-host-player-count" id="player-count">0명 참여</span>
+      </div>
+      <div class="live-host-table-wrap">
+        <table class="leaderboard-table live-host-table">
+          <thead>
+            <tr>
+              <th scope="col">순위</th>
+              <th scope="col">닉네임</th>
+              <th scope="col">점수</th>
+            </tr>
+          </thead>
+          <tbody id="live-tbody">
+            <tr class="live-host-empty-row"><td colspan="3">아직 기록이 없습니다. 학생이 입장하면 여기에 표시됩니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="live-host-footer">
+      <a href="index.html">← 세션 시작 화면</a>
+      <span>진행 창을 닫거나 세션 종료를 누르면 방이 끝납니다</span>
+    </footer>
   </div>
   <script src="../../shared/halomath-live.js"></script>
   <script src="host.js"></script>

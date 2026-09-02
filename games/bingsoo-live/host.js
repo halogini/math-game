@@ -11,6 +11,9 @@ function absolutePlayUrl(code) {
 }
 
 let currentRoomCode = '';
+let hostCreatedAt = 0;
+let hostUid = '';
+let autoEndArmed = true;
 let lastLiveList = [];
 let pollTimer = null;
 let qrPopoutWindow = null;
@@ -168,15 +171,22 @@ function escapeHtml(str) {
 
 function renderLiveRows(data) {
   const tbody = document.getElementById('live-tbody');
+  const countEl = document.getElementById('player-count');
   if (!tbody) return;
   lastLiveList = HalomathLive.collectLiveList(data);
+  if (countEl) {
+    countEl.textContent = lastLiveList.length
+      ? `${lastLiveList.length}명 참여`
+      : '0명 참여';
+  }
   if (!lastLiveList.length) {
-    tbody.innerHTML = '<tr><td colspan="3">아직 기록이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr class="live-host-empty-row"><td colspan="3">아직 기록이 없습니다. 학생이 입장하면 여기에 표시됩니다.</td></tr>';
     return;
   }
   tbody.innerHTML = lastLiveList.map((item, i) => {
     const rank = i === 0 ? '🥇 1위' : i === 1 ? '🥈 2위' : i === 2 ? '🥉 3위' : `${i + 1}위`;
-    return `<tr><td>${rank}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.score}점</strong></td></tr>`;
+    const rowClass = i < 3 ? ` class="live-host-rank-top live-host-rank-${i + 1}"` : '';
+    return `<tr${rowClass}><td>${rank}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.score}점</strong></td></tr>`;
   }).join('');
 }
 
@@ -184,6 +194,7 @@ function listenLiveBoard(code) {
   if (!window.HalomathLive) return;
   if (pollTimer) clearInterval(pollTimer);
   const refresh = () => {
+    HalomathLive.refreshHostAuth().catch(() => {});
     HalomathLive.getPlayers(code)
       .then(renderLiveRows)
       .catch((err) => console.warn('live board refresh failed:', err));
@@ -201,16 +212,42 @@ function bindHost(code) {
   currentRoomCode = code;
   document.title = `🍧 세션 ${code} | 할로매쓰`;
   const codeEl = document.getElementById('host-code');
+  const badgeEl = document.getElementById('host-code-badge');
   const linkEl = document.getElementById('host-link');
   const playBtn = document.getElementById('btn-host-play');
   const playHref = absolutePlayUrl(code);
   if (codeEl) codeEl.textContent = code;
+  if (badgeEl) badgeEl.textContent = code;
   if (linkEl) linkEl.value = playHref;
   if (playBtn) playBtn.href = playUrl(code);
   setStudentQr(playHref);
   HalomathLive.saveLastRoom(code);
   listenLiveBoard(code);
 }
+
+function disarmAutoEnd() {
+  autoEndArmed = false;
+}
+
+function leaveHostIfClosing(event) {
+  if (!autoEndArmed || !currentRoomCode || !window.HalomathLive) return;
+  if (event && event.persisted) return;
+  autoEndArmed = false;
+  closeAllQrWindows();
+  HalomathLive.leaveHostWindow(currentRoomCode, hostCreatedAt, hostUid);
+}
+
+window.addEventListener('pagehide', leaveHostIfClosing);
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted || !currentRoomCode || !window.HalomathLive) return;
+  autoEndArmed = true;
+  HalomathLive.markHostOpen(currentRoomCode, hostCreatedAt, hostUid).catch(() => {});
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'F5' || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'r')) {
+    autoEndArmed = false;
+  }
+});
 
 async function sweepExpiredRoom(code) {
   const status = document.getElementById('host-status');
@@ -262,6 +299,8 @@ document.getElementById('btn-end-session').addEventListener('click', async (even
     HalomathLive.saveLastRoom('');
   }
 
+  disarmAutoEnd();
+
   if (pollTimer) clearInterval(pollTimer);
   if (btn) btn.disabled = true;
   closeAllQrWindows();
@@ -281,6 +320,8 @@ document.getElementById('btn-save-ranks').addEventListener('click', () => {
 
 document.getElementById('btn-copy-link').addEventListener('click', async () => {
   const linkEl = document.getElementById('host-link');
+  const btn = document.getElementById('btn-copy-link');
+  const status = document.getElementById('host-status');
   if (!linkEl || !linkEl.value) return;
   try {
     await navigator.clipboard.writeText(linkEl.value);
@@ -288,6 +329,12 @@ document.getElementById('btn-copy-link').addEventListener('click', async () => {
     linkEl.select();
     document.execCommand('copy');
   }
+  if (btn) {
+    const prev = btn.textContent;
+    btn.textContent = '복사됨!';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  }
+  if (status) status.textContent = '입장 링크를 복사했습니다.';
 });
 
 document.getElementById('btn-qr-pip').addEventListener('click', async () => {
@@ -325,14 +372,33 @@ document.getElementById('btn-qr-popout').addEventListener('click', () => {
     if (status) status.textContent = '세션 코드가 없습니다. 시작 화면에서 세션을 열어 주세요.';
     return;
   }
+  try {
+    await HalomathLive.ensureHostAuth();
+  } catch (err) {
+    if (status) status.textContent = HalomathLive.hostAuthErrorMessage(err);
+    return;
+  }
   bindHost(code);
   const pipBtn = document.getElementById('btn-qr-pip');
   const pipNote = document.getElementById('qr-popout-note');
   if (pipBtn) pipBtn.hidden = !canUseQrPip();
   if (pipNote && !canUseQrPip()) {
-    pipNote.textContent = '작은 창을 화면 구석에 두고 쓰세요.';
+    pipNote.textContent = '프로젝터에 QR이 작게 보이면 「작은 창」을 화면 구석에 두세요.';
   }
-  const ended = await sweepExpiredRoom(code);
-  if (ended) return;
-  if (status) status.textContent = '세션이 진행 중입니다. 이 창을 닫아도 종료 전까지 유지됩니다.';
+  try {
+    const meta = await HalomathLive.getMeta(code);
+    if (!meta) {
+      if (status) status.textContent = '이 세션은 이미 종료되었습니다.';
+      HalomathLive.saveLastRoom('');
+      return;
+    }
+    hostCreatedAt = Number(meta.createdAt) || Date.now();
+    hostUid = String(meta.hostUid || '');
+    const expired = await sweepExpiredRoom(code);
+    if (expired) return;
+    await HalomathLive.markHostOpen(code, hostCreatedAt, hostUid);
+  } catch (err) {
+    console.warn('host session restore failed:', err);
+  }
+  if (status) status.textContent = '';
 }());
