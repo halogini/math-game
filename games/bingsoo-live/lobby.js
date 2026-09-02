@@ -29,17 +29,34 @@ function openHostWindow(code) {
 
 function showReopen(code) {
   const btn = document.getElementById('btn-reopen');
-  if (!btn || !code) return;
-  btn.hidden = false;
-  btn.classList.remove('hidden');
-  btn.textContent = `진행 중 세션 창 다시 열기 (${code})`;
+  const banner = document.getElementById('active-banner');
+  const codeEl = document.getElementById('active-code');
+  if (!code) return;
+  if (codeEl) codeEl.textContent = code;
+  if (banner) {
+    banner.hidden = false;
+    banner.classList.remove('hidden');
+  }
+  if (btn) {
+    btn.hidden = false;
+    btn.classList.remove('hidden');
+    btn.textContent = '진행 창 다시 열기';
+  }
 }
 
 function hideReopen() {
   const btn = document.getElementById('btn-reopen');
-  if (!btn) return;
-  btn.hidden = true;
-  btn.classList.add('hidden');
+  const banner = document.getElementById('active-banner');
+  const codeEl = document.getElementById('active-code');
+  if (banner) {
+    banner.hidden = true;
+    banner.classList.add('hidden');
+  }
+  if (codeEl) codeEl.textContent = '————';
+  if (btn) {
+    btn.hidden = true;
+    btn.classList.add('hidden');
+  }
 }
 
 function setStatus(text) {

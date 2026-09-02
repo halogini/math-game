@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍧 팥빙수 수업 세션 | 할로매쓰</title>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com;">
-  <meta name="description" content="수업 시간에만 쓰는 팥빙수 세션.">
+  <meta name="description" content="수업 시간에만 쓰는 팥빙수 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
   <link rel="stylesheet" href="../../style.css">
   <link rel="stylesheet" href="lobby.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,28 +15,103 @@
 </head>
 <body>
   <div class="portal-container live-lobby">
-    <header class="portal-header">
+    <header class="portal-header live-header">
       <div class="brand">
         <span class="logo-badge">🍧</span>
         <div>
           <h1>팥빙수 수업 세션</h1>
-          <p class="subtitle">세션을 시작하면 선생님용 창이 열립니다. 창을 닫아도 종료를 누르기 전까지 방은 유지됩니다.</p>
+          <p class="subtitle">수업 시간에 학생들과 함께 플레이하는 선생님용 시작 화면입니다. 학생 등록 없이 QR만 보여주면 됩니다.</p>
         </div>
       </div>
     </header>
 
-    <main class="portal-main">
-      <section class="live-actions">
-        <div class="game-card active">
-          <h2 class="game-title">선생님 · 세션 시작 (QR · 무배정)</h2>
-          <p class="game-desc">학급에 학생을 등록하지 않습니다. 새 창에서 QR을 비추면 아이들이 닉네임만 넣고 같이 칩니다.</p>
-          <button type="button" class="btn-play-game" id="btn-host">세션 시작</button>
-          <button type="button" class="admin-btn hidden" id="btn-reopen" hidden>진행 중 세션 창 다시 열기</button>
-          <p class="live-status" id="host-status"></p>
-        </div>
+    <section class="live-guide" aria-labelledby="live-guide-title">
+      <div class="live-guide-head">
+        <h2 id="live-guide-title">처음이신가요? 이렇게 진행해요</h2>
+        <p class="live-guide-lead">아래 <strong>세션 시작</strong> 한 번이면 QR 창과 진행 창이 열립니다.</p>
+      </div>
+      <ol class="live-steps">
+        <li class="live-step">
+          <span class="live-step-num" aria-hidden="true">1</span>
+          <div>
+            <strong>세션 시작</strong>
+            <p>선생님용 진행 창과 QR 창이 열립니다. 학생은 닉네임만 입력하고 바로 참여합니다.</p>
+          </div>
+        </li>
+        <li class="live-step">
+          <span class="live-step-num" aria-hidden="true">2</span>
+          <div>
+            <strong>QR 보여주기</strong>
+            <p>학생이 QR을 찍거나 링크로 들어와 같은 수업 방에서 점수를 올립니다.</p>
+          </div>
+        </li>
+        <li class="live-step">
+          <span class="live-step-num" aria-hidden="true">3</span>
+          <div>
+            <strong>수업 후 종료</strong>
+            <p>진행 창에서 세션 종료를 누르면 이번 수업 기록이 지워집니다. 필요하면 순위를 파일로 저장하세요.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <div class="live-active-banner hidden" id="active-banner" hidden>
+      <div class="live-active-text">
+        <span class="live-active-label">진행 중인 세션</span>
+        <span class="live-active-code" id="active-code">————</span>
+      </div>
+      <button type="button" class="admin-btn admin-btn-primary" id="btn-reopen" hidden>진행 창 다시 열기</button>
+    </div>
+
+    <main class="portal-main live-main-grid">
+      <section class="live-card live-card-session" aria-labelledby="session-card-title">
+        <span class="live-card-badge">선생님 · 수업용</span>
+        <h2 class="live-card-title" id="session-card-title">수업 세션 시작</h2>
+        <p class="live-card-desc">이번 수업만의 순위표가 만들어집니다. 창을 닫아도 <strong>세션 종료</strong>를 누르기 전까지 방은 유지됩니다.</p>
+        <ul class="live-card-points">
+          <li>별도 등록 없이 바로 참여</li>
+          <li>QR 또는 링크로 입장</li>
+          <li>수업 끝나면 기록 삭제 가능</li>
+        </ul>
+        <button type="button" class="btn-play-game" id="btn-host">세션 시작</button>
+        <p class="live-status" id="host-status" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="live-card live-card-play" aria-labelledby="play-card-title">
+        <span class="live-card-badge live-card-badge-muted">연습 · 미리보기</span>
+        <h2 class="live-card-title" id="play-card-title">팥빙수 게임 플레이하기</h2>
+        <p class="live-card-desc">수업 전에 게임 규칙을 익히거나, 혼자 연습할 때 사용하세요. 닉네임만 넣고 플레이합니다.</p>
+        <ul class="live-card-points live-card-points-muted">
+          <li>명예의 전당에 기록</li>
+          <li>수업 세션과 별개 (QR·코드 불필요)</li>
+        </ul>
+        <a href="../bingsoo/index.html?mode=dorms" class="btn-play-game btn-play-outline" id="btn-play-solo">
+          팥빙수 게임 플레이하기
+        </a>
+      </section>
     </main>
+
+    <aside class="live-compare" aria-labelledby="compare-title">
+      <h3 id="compare-title">수업 세션 vs 혼자 플레이</h3>
+      <div class="live-compare-grid">
+        <div class="live-compare-col">
+          <h4>수업 세션</h4>
+          <ul>
+            <li>이번 수업 학생만 순위</li>
+            <li>선생님이 QR로 초대</li>
+            <li>종료 시 기록 삭제</li>
+          </ul>
+        </div>
+        <div class="live-compare-col">
+          <h4>혼자 플레이</h4>
+          <ul>
+            <li>연습·미리보기용</li>
+            <li>닉네임만 사용</li>
+            <li>명예의 전당에 기록</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
   </div>
   <script src="../../shared/halomath-live.js"></script>
   <script src="lobby.js"></script>
