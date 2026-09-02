@@ -5,12 +5,15 @@
 const firebaseConfig = (window.ENV && window.ENV.FIREBASE_CONFIG) || null;
 
 let firebaseDb = null;
+let firebaseAuth = null;
+let portalAdminUnlocked = false;
 if (window.firebase && firebaseConfig && firebaseConfig.apiKey) {
   try {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
     firebaseDb = firebase.database();
+    if (firebase.auth) firebaseAuth = firebase.auth();
   } catch (err) {
     console.error("Firebase init failed:", err);
   }
@@ -75,6 +78,7 @@ function isBetterBingsoo2Record(candidate, previous) {
 }
 
 function getLeaderboardDisplayList(list, gameKey) {
+  if (portalAdminUnlocked) return list;
   if (gameKey === 'bingsoo2') {
     const perfectCount = list.filter((item) => item.score === 500).length;
     return list.slice(0, Math.max(20, perfectCount));
@@ -118,6 +122,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTableHeaderMetric = document.getElementById('th-header-metric');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const leaderboardTabs = document.getElementById('leaderboard-tabs');
+  const logoBadge = document.getElementById('logo-badge');
+  const adminGate = document.getElementById('admin-gate');
+  const adminEmailInput = document.getElementById('admin-email-input');
+  const adminPassInput = document.getElementById('admin-pass-input');
+  const adminGateError = document.getElementById('admin-gate-error');
+  const adminToolbar = document.getElementById('admin-toolbar');
+  const adminSearch = document.getElementById('admin-search');
+  const adminCount = document.getElementById('admin-count');
+  const btnAdminUnlock = document.getElementById('btn-admin-unlock');
+  const btnAdminCancel = document.getElementById('btn-admin-cancel');
+  const btnAdminExit = document.getElementById('btn-admin-exit');
+  const btnAdminExport = document.getElementById('btn-admin-export');
+  const btnAdminToggleMode = document.getElementById('btn-admin-toggle-mode');
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
@@ -126,6 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeLeaderboardGame = 'bingsoo';
   let scoresUnsub = null;
   let threeChancesUnsub = null;
+  let leaderboardFetchGen = 0;
+  let lastFullList = [];
+  let adminQuery = '';
 
   function formatClearTime(ms) {
     const n = Math.max(0, Math.floor(Number(ms) || 0));
@@ -167,9 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
       portalTitle.textContent = '🌐 할로매쓰 - dorms 수학 아케이드';
       portalSubtitle.textContent = 'dorms 회원들과 함께 즐기는 신나는 수학 미니게임 마당!';
 
-      leaderboardTitle.textContent = '🏆 dorms 명예의 전당 (Top 20)';
+      leaderboardTitle.textContent = portalAdminUnlocked
+        ? '🏆 dorms 명예의 전당 (전체)'
+        : '🏆 dorms 명예의 전당 (Top 20)';
       if (leaderboardModeNote) {
-        leaderboardModeNote.textContent = '도름 모드 · 학번 없이 닉네임만 기록됩니다';
+        leaderboardModeNote.textContent = portalAdminUnlocked
+          ? '관리자 · 도름 전체 기록 (학생 화면은 Top 20)'
+          : '도름 모드 · 학번 없이 닉네임만 기록됩니다';
       }
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = 'none';
@@ -181,9 +205,13 @@ document.addEventListener('DOMContentLoaded', () => {
       portalTitle.textContent = '🏫 할로매쓰 - 수학 미니게임 아케이드';
       portalSubtitle.textContent = '우리 학교 친구들과 펼치는 유쾌하고 똑똑한 수학 미니게임 대결!';
 
-      leaderboardTitle.textContent = '🏆 우리 학교 명예의 전당 (Top 20)';
+      leaderboardTitle.textContent = portalAdminUnlocked
+        ? '🏆 우리 학교 명예의 전당 (전체)'
+        : '🏆 우리 학교 명예의 전당 (Top 20)';
       if (leaderboardModeNote) {
-        leaderboardModeNote.textContent = '학교 모드 · 이름과 학번으로 기록됩니다';
+        leaderboardModeNote.textContent = portalAdminUnlocked
+          ? '관리자 · 학교 전체 기록 (학생 화면은 Top 20)'
+          : '학교 모드 · 이름과 학번으로 기록됩니다';
       }
       if (leaderboardTableHeaderId) {
         leaderboardTableHeaderId.style.display = '';
@@ -245,9 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  updateMetricHeader();
-  listenRealtimeLeaderboard();
-
   function stopLeaderboardListeners() {
     if (typeof scoresUnsub === 'function') {
       try { scoresUnsub(); } catch (e) { /* ignore */ }
@@ -261,25 +286,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function listenRealtimeLeaderboard() {
     stopLeaderboardListeners();
+    const fetchId = ++leaderboardFetchGen;
     renderLeaderboardSkeleton(leaderboardTbody);
     if (!firebaseDb) {
+      lastFullList = [];
       renderLeaderboardTable([]);
       return;
     }
 
-    // All arcade games write under scores/ with gameId + channel.
-    // Also watch scores/dorms for older dorms writes.
-    const process = (rootVal) => {
-      const list = collectGameScores(rootVal, activeLeaderboardGame);
-      renderLeaderboardTable(getLeaderboardDisplayList(list, activeLeaderboardGame));
-    };
-
-    const scoresRef = firebaseDb.ref('scores');
-    const onScores = scoresRef.on('value', (snap) => process(snap.val()), (err) => {
-      console.error('Leaderboard fetch error:', err);
-      renderLeaderboardTable([]);
-    });
-    scoresUnsub = () => scoresRef.off('value', onScores);
+    firebaseDb.ref('scores').once('value')
+      .then((snap) => {
+        if (fetchId !== leaderboardFetchGen) return;
+        const list = collectGameScores(snap.val(), activeLeaderboardGame);
+        lastFullList = list;
+        renderLeaderboardTable(getLeaderboardDisplayList(list, activeLeaderboardGame));
+      })
+      .catch((err) => {
+        if (fetchId !== leaderboardFetchGen) return;
+        console.error('Leaderboard fetch error:', err);
+        lastFullList = [];
+        renderLeaderboardTable([]);
+      });
   }
 
   function collectGameScores(dataObj, gameKey) {
@@ -428,21 +455,195 @@ document.addEventListener('DOMContentLoaded', () => {
     return n;
   }
 
+  function filterAdminList(list) {
+    const q = adminQuery.trim().toLowerCase();
+    if (!portalAdminUnlocked || !q) return list;
+    return list.filter((item) => {
+      const name = String(item.name || '').toLowerCase();
+      const sid = String(item.studentId || '').toLowerCase();
+      return name.includes(q) || sid.includes(q);
+    });
+  }
+
+  function setElHidden(el, hide) {
+    if (!el) return;
+    el.hidden = hide;
+    el.classList.toggle('hidden', hide);
+  }
+
+  function stripAdminQuery() {
+    try {
+      const next = new URL(window.location.href);
+      next.searchParams.delete('admin');
+      window.history.replaceState({}, '', next.pathname + next.search + next.hash);
+    } catch (e) { /* ignore */ }
+  }
+
+  function currentAdminUser() {
+    return firebaseAuth && firebaseAuth.currentUser ? firebaseAuth.currentUser : null;
+  }
+
+  function applyAdminChrome() {
+    document.body.classList.toggle('admin-mode', portalAdminUnlocked);
+    setElHidden(adminToolbar, !portalAdminUnlocked);
+    if (btnAdminToggleMode) {
+      btnAdminToggleMode.textContent = activeMode === 'school' ? '도름 기록 보기' : '학교 기록 보기';
+    }
+    applyChannelBranding();
+  }
+
+  function enterAdminMode() {
+    portalAdminUnlocked = true;
+    applyAdminChrome();
+    setElHidden(adminGate, true);
+    listenRealtimeLeaderboard();
+  }
+
+  function restoreModeFromUrl() {
+    if (typeof HalomathMode !== 'undefined') {
+      activeMode = HalomathMode.detectActiveMode();
+      return;
+    }
+    const modeParam = urlParams.get('mode');
+    if (modeParam === 'school' || currentPath.includes('/school')) activeMode = 'school';
+    else activeMode = 'dorms';
+  }
+
+  function exitAdminMode() {
+    portalAdminUnlocked = false;
+    adminQuery = '';
+    if (adminSearch) adminSearch.value = '';
+    stripAdminQuery();
+    restoreModeFromUrl();
+    applyAdminChrome();
+    listenRealtimeLeaderboard();
+    if (firebaseAuth) {
+      firebaseAuth.signOut().catch(() => { /* ignore */ });
+    }
+  }
+
+  function showAdminGateError(msg) {
+    if (!adminGateError) return;
+    if (!msg) {
+      adminGateError.hidden = true;
+      adminGateError.textContent = '';
+      return;
+    }
+    adminGateError.hidden = false;
+    adminGateError.textContent = msg;
+  }
+
+  function openAdminGate() {
+    if (portalAdminUnlocked) return;
+    if (currentAdminUser()) {
+      enterAdminMode();
+      return;
+    }
+    showAdminGateError('');
+    setElHidden(adminGate, false);
+    if (adminPassInput) adminPassInput.value = '';
+    if (adminEmailInput) adminEmailInput.focus();
+  }
+
+  function authErrorMessage(err) {
+    const code = String((err && err.code) || '');
+    if (code === 'auth/operation-not-allowed') {
+      return 'Firebase 콘솔에서 이메일/비밀번호 로그인을 켜고, 선생님 계정을 추가해 주세요.';
+    }
+    if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-email') {
+      return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    }
+    if (code === 'auth/too-many-requests') {
+      return '시도가 너무 많습니다. 잠시 후 다시 해 주세요.';
+    }
+    if (code === 'auth/network-request-failed') {
+      return '로그인 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.';
+    }
+    return '로그인에 실패했습니다.';
+  }
+
+  async function submitAdminLogin() {
+    if (!firebaseAuth) {
+      showAdminGateError('로그인 기능을 불러오지 못했습니다.');
+      return;
+    }
+    const email = adminEmailInput ? String(adminEmailInput.value || '').trim() : '';
+    const password = adminPassInput ? String(adminPassInput.value || '') : '';
+    if (!email || !password) {
+      showAdminGateError('이메일과 비밀번호를 모두 입력해 주세요.');
+      return;
+    }
+    showAdminGateError('');
+    if (btnAdminUnlock) {
+      btnAdminUnlock.disabled = true;
+      btnAdminUnlock.textContent = '확인 중...';
+    }
+    try {
+      await firebaseAuth.signInWithEmailAndPassword(email, password);
+      if (adminPassInput) adminPassInput.value = '';
+      enterAdminMode();
+    } catch (err) {
+      showAdminGateError(authErrorMessage(err));
+    } finally {
+      if (btnAdminUnlock) {
+        btnAdminUnlock.disabled = false;
+        btnAdminUnlock.textContent = '로그인';
+      }
+    }
+  }
+
+  function exportAdminCsv() {
+    const list = filterAdminList(lastFullList);
+    const showId = activeMode === 'school';
+    const rows = [[
+      '순위',
+      showId ? '이름' : '닉네임',
+      ...(showId ? ['학번'] : []),
+      activeLeaderboardGame === 'three-chances' ? '클리어 시간' : (activeLeaderboardGame === 'prism-tycoon' ? '총 수익' : '최고 점수')
+    ]];
+    const ranked = activeLeaderboardGame === 'three-chances'
+      ? withCompetitionRanks(list, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
+      : withCompetitionRanks(list, (item) => item.score);
+    ranked.forEach(({ item, rank }) => {
+      const line = [String(rank), item.name || ''];
+      if (showId) line.push(item.studentId || '');
+      line.push(item.metricLabel || (item.score != null ? String(item.score) : ''));
+      rows.push(line);
+    });
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `halomath-${activeMode}-${activeLeaderboardGame}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   function renderLeaderboardTable(list) {
     if (!leaderboardTbody) return;
     leaderboardTbody.removeAttribute('aria-busy');
     leaderboardTbody.innerHTML = '';
 
+    const visible = filterAdminList(list);
     const colSpan = activeMode === 'school' ? 4 : 3;
 
-    if (!list || list.length === 0) {
-      leaderboardTbody.innerHTML = `<tr><td colspan="${colSpan}" style="padding:16px; text-align:center; color:#64748b;">아직 등록된 기록이 없습니다. 첫 번째 챔피언이 되어 보세요!</td></tr>`;
+    if (adminCount) {
+      adminCount.textContent = portalAdminUnlocked
+        ? (adminQuery.trim() ? `표시 ${visible.length}명 / 전체 ${list.length}명` : `전체 ${visible.length}명`)
+        : '';
+    }
+
+    if (!visible || visible.length === 0) {
+      const emptyMsg = portalAdminUnlocked && lastFullList.length && adminQuery.trim()
+        ? '검색 결과가 없습니다.'
+        : '아직 등록된 기록이 없습니다. 첫 번째 챔피언이 되어 보세요!';
+      leaderboardTbody.innerHTML = `<tr><td colspan="${colSpan}" style="padding:16px; text-align:center; color:#64748b;">${emptyMsg}</td></tr>`;
       return;
     }
 
     const ranked = activeLeaderboardGame === 'three-chances'
-      ? withCompetitionRanks(list, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
-      : withCompetitionRanks(list, (item) => item.score);
+      ? withCompetitionRanks(visible, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
+      : withCompetitionRanks(visible, (item) => item.score);
 
     ranked.forEach(({ item, rank, tied }) => {
       const tr = document.createElement('tr');
@@ -461,5 +662,65 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       leaderboardTbody.appendChild(tr);
     });
+  }
+
+  if (btnAdminUnlock) btnAdminUnlock.addEventListener('click', submitAdminLogin);
+  if (btnAdminCancel) {
+    btnAdminCancel.addEventListener('click', () => {
+      setElHidden(adminGate, true);
+      stripAdminQuery();
+    });
+  }
+  if (btnAdminExit) btnAdminExit.addEventListener('click', exitAdminMode);
+  if (btnAdminExport) btnAdminExport.addEventListener('click', exportAdminCsv);
+  if (btnAdminToggleMode) {
+    btnAdminToggleMode.addEventListener('click', () => {
+      activeMode = activeMode === 'school' ? 'dorms' : 'school';
+      applyAdminChrome();
+      listenRealtimeLeaderboard();
+    });
+  }
+  if (adminSearch) {
+    adminSearch.addEventListener('input', () => {
+      adminQuery = adminSearch.value || '';
+      renderLeaderboardTable(getLeaderboardDisplayList(lastFullList, activeLeaderboardGame));
+    });
+  }
+  function onAdminLoginKey(e) {
+    if (e.key === 'Enter') submitAdminLogin();
+  }
+  if (adminEmailInput) adminEmailInput.addEventListener('keydown', onAdminLoginKey);
+  if (adminPassInput) adminPassInput.addEventListener('keydown', onAdminLoginKey);
+  if (logoBadge) {
+    let logoClicks = 0;
+    let logoTimer = null;
+    logoBadge.addEventListener('click', () => {
+      logoClicks += 1;
+      clearTimeout(logoTimer);
+      logoTimer = setTimeout(() => { logoClicks = 0; }, 1400);
+      if (logoClicks >= 7) {
+        logoClicks = 0;
+        openAdminGate();
+      }
+    });
+  }
+
+  function startPortal() {
+    const wantAdmin = (urlParams.get('admin') || '').toLowerCase();
+    if (wantAdmin === '1' || wantAdmin === 'true') {
+      if (currentAdminUser()) enterAdminMode();
+      else openAdminGate();
+    }
+    updateMetricHeader();
+    if (!portalAdminUnlocked) listenRealtimeLeaderboard();
+  }
+
+  if (firebaseAuth) {
+    const unsub = firebaseAuth.onAuthStateChanged(() => {
+      unsub();
+      startPortal();
+    });
+  } else {
+    startPortal();
   }
 });

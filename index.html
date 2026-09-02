@@ -6,7 +6,7 @@
   <title>🎮 할로매쓰 (HaloMath) - 수학 미니게임 아케이드</title>
 
   <!-- Security & SEO Meta Tags -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.googleapis.com https://*.firebaseapp.com;">
   <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -28,6 +28,7 @@
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="config.sample.js"></script>
 </head>
 <body>
@@ -35,7 +36,7 @@
     <!-- Header Controls & Branding -->
     <header class="portal-header">
       <div class="brand">
-        <span class="logo-badge">🎮</span>
+        <span class="logo-badge" id="logo-badge" title="">🎮</span>
         <div>
           <h1 id="portal-title">할로매쓰 - 수학 미니게임 아케이드</h1>
           <p class="subtitle" id="portal-subtitle">즐겁고 신나는 수학 미니게임들을 한곳에서 도전해보세요!</p>
@@ -133,6 +134,16 @@
             <button type="button" class="lb-tab" data-game="three-chances" role="tab" aria-selected="false">🐱 기회는 세 번</button>
             <button type="button" class="lb-tab" data-game="prism-tycoon" role="tab" aria-selected="false">🔮 보석 타이쿤</button>
           </div>
+          <div id="admin-toolbar" class="admin-toolbar hidden" hidden>
+            <label class="admin-search-label">
+              검색
+              <input type="search" id="admin-search" placeholder="이름 또는 학번" maxlength="24" autocomplete="off">
+            </label>
+            <button type="button" class="admin-btn" id="btn-admin-export">CSV 저장</button>
+            <button type="button" class="admin-btn" id="btn-admin-toggle-mode">도름 기록 보기</button>
+            <span class="admin-count" id="admin-count"></span>
+            <button type="button" class="admin-btn admin-btn-exit" id="btn-admin-exit">관리자 종료</button>
+          </div>
           <div class="table-wrapper">
             <table class="leaderboard-table">
               <thead>
@@ -157,6 +168,26 @@
       <a href="privacy.html" target="_blank" class="privacy-link">개인정보처리방침</a>
       <p style="margin-top:4px;">© HaloMath Arcade Platform. All rights reserved.</p>
     </footer>
+  </div>
+
+  <div id="admin-gate" class="admin-gate hidden" hidden>
+    <div class="admin-gate-card" role="dialog" aria-modal="true" aria-labelledby="admin-gate-title">
+      <h2 id="admin-gate-title">관리자 로그인</h2>
+      <p>선생님만 들어갈 수 있습니다.</p>
+      <label class="admin-search-label">
+        이메일
+        <input type="email" id="admin-email-input" autocomplete="username">
+      </label>
+      <label class="admin-search-label">
+        비밀번호
+        <input type="password" id="admin-pass-input" maxlength="64" autocomplete="current-password">
+      </label>
+      <p class="admin-gate-error" id="admin-gate-error" hidden></p>
+      <div class="admin-gate-actions">
+        <button type="button" class="admin-btn" id="btn-admin-cancel">취소</button>
+        <button type="button" class="admin-btn admin-btn-primary" id="btn-admin-unlock">로그인</button>
+      </div>
+    </div>
   </div>
 
   <script src="shared/halomath-mode.js"></script>

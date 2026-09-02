@@ -2018,14 +2018,6 @@ function initBingsoo2Game() {
           console.warn('Bingsoo2 leaderboard SDK failed; using REST.', err);
           fetchLeaderboardViaREST();
         });
-
-      try {
-        firebaseDb.ref('scores').on('value', (snapshot) => {
-          renderLeaderboardsFromData(snapshot.val());
-        });
-      } catch (err) {
-        console.warn('Leaderboard listen error:', err);
-      }
       return;
     }
 
