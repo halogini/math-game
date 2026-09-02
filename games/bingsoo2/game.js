@@ -2112,6 +2112,211 @@ function initBingsoo2Game() {
     if (leaderboardTbody) leaderboardTbody.innerHTML = buildRows();
   }
 
+  // ----------------------------------------------------
+  // Crown 5-Clicks QR PiP / Popout Mini Window
+  // ----------------------------------------------------
+  let qrPipWindow = null;
+  let qrPopoutWindow = null;
+
+  function canUseDocumentPip() {
+    return !!(window.documentPictureInPicture && typeof window.documentPictureInPicture.requestWindow === 'function');
+  }
+
+  function getShareableGameUrl() {
+    try {
+      return new URL(window.location.href).href;
+    } catch (e) {
+      return window.location.href;
+    }
+  }
+
+  function fillQrPipDocument(doc, targetUrl) {
+    doc.title = '🍧 빙수 2탄 입장 QR';
+    doc.head.innerHTML = '';
+    doc.body.innerHTML = '';
+
+    const qrImgSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&ecc=M&data=${encodeURIComponent(targetUrl)}`;
+
+    const style = doc.createElement('style');
+    style.textContent = `
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 14px;
+        text-align: center;
+        color: #0f172a;
+        user-select: none;
+      }
+      .qr-card {
+        background: #ffffff;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+        width: 100%;
+        max-width: 280px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .qr-badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0284c7;
+        background: #e0f2fe;
+        padding: 3px 10px;
+        border-radius: 20px;
+        margin-bottom: 6px;
+      }
+      .qr-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin-bottom: 10px;
+      }
+      .qr-img-wrapper {
+        background: #ffffff;
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+      }
+      .qr-img {
+        display: block;
+        width: 200px;
+        height: 200px;
+        border-radius: 6px;
+      }
+      .qr-desc {
+        font-size: 0.8rem;
+        color: #64748b;
+        line-height: 1.4;
+        font-weight: 500;
+      }
+      .qr-desc strong {
+        color: #0284c7;
+      }
+    `;
+    doc.head.appendChild(style);
+
+    const card = doc.createElement('div');
+    card.className = 'qr-card';
+
+    const badge = doc.createElement('span');
+    badge.className = 'qr-badge';
+    badge.textContent = '🍧 할로매쓰 빙수 2탄';
+
+    const title = doc.createElement('div');
+    title.className = 'qr-title';
+    title.textContent = '학생 접속 QR 코드';
+
+    const imgWrap = doc.createElement('div');
+    imgWrap.className = 'qr-img-wrapper';
+
+    const img = doc.createElement('img');
+    img.className = 'qr-img';
+    img.alt = '빙수 2탄 입장 QR 코드';
+    img.width = 200;
+    img.height = 200;
+    img.src = qrImgSrc;
+
+    imgWrap.appendChild(img);
+
+    const desc = doc.createElement('p');
+    desc.className = 'qr-desc';
+    desc.innerHTML = '스마트폰/태블릿 카메라로 비추면<br><strong>바로 게임에 접속</strong>할 수 있습니다.';
+
+    card.append(badge, title, imgWrap, desc);
+    doc.body.appendChild(card);
+  }
+
+  async function openQrPipOrPopup() {
+    const targetUrl = getShareableGameUrl();
+
+    if (canUseDocumentPip()) {
+      try {
+        if (qrPipWindow && !qrPipWindow.closed) {
+          fillQrPipDocument(qrPipWindow.document, targetUrl);
+          return;
+        }
+        const pipWindow = await window.documentPictureInPicture.requestWindow({
+          width: 290,
+          height: 380
+        });
+        qrPipWindow = pipWindow;
+        fillQrPipDocument(pipWindow.document, targetUrl);
+        pipWindow.addEventListener('pagehide', () => {
+          qrPipWindow = null;
+        });
+        return;
+      } catch (err) {
+        console.warn('QR Document PiP failed, using fallback popup window:', err);
+      }
+    }
+
+    const features = 'width=320,height=420,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+    if (qrPopoutWindow && !qrPopoutWindow.closed) {
+      try {
+        fillQrPipDocument(qrPopoutWindow.document, targetUrl);
+        qrPopoutWindow.focus();
+        return;
+      } catch (e) { /* fall through */ }
+    }
+
+    qrPopoutWindow = window.open('', 'halomath-bingsoo2-qr', features);
+    if (qrPopoutWindow) {
+      fillQrPipDocument(qrPopoutWindow.document, targetUrl);
+      try { qrPopoutWindow.focus(); } catch (e) { /* ignore */ }
+    } else {
+      alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.');
+    }
+  }
+
+  function setupCrownEasterEgg() {
+    let crownClicks = 0;
+    let crownTimer = null;
+
+    const onCrownTrigger = (e) => {
+      if (e) {
+        e.stopPropagation();
+      }
+      crownClicks += 1;
+
+      if (crownTimer) clearTimeout(crownTimer);
+      crownTimer = setTimeout(() => {
+        crownClicks = 0;
+      }, 2500);
+
+      if (crownClicks >= 5) {
+        crownClicks = 0;
+        clearTimeout(crownTimer);
+        openQrPipOrPopup();
+      }
+    };
+
+    const crownBtn = document.getElementById('btn-opening-crown');
+    if (crownBtn) {
+      crownBtn.addEventListener('click', onCrownTrigger);
+    }
+
+    const bannerH2 = document.querySelector('.opening-banner h2');
+    if (bannerH2 && bannerH2 !== crownBtn) {
+      bannerH2.addEventListener('click', onCrownTrigger);
+    }
+  }
+
+  setupCrownEasterEgg();
+
   // Score auto-registers in finishGame via registerScoreToLeaderboard.
 }
 
