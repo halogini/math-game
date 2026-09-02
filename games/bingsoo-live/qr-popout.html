@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세션 QR</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:;">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="lobby.css">
+</head>
+<body class="qr-popout-body">
+  <div class="qr-popout-card">
+    <p class="qr-popout-label">세션 코드</p>
+    <p class="qr-popout-code" id="qr-code">————</p>
+    <img id="qr-img" class="qr-popout-img" alt="학생용 입장 QR" width="260" height="260">
+    <p class="qr-popout-hint">학생이 카메라로 찍으면<br>바로 게임에 들어갑니다.</p>
+  </div>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const room = String(params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!room) {
+        document.body.innerHTML = '<p class="qr-popout-error">세션 코드가 없습니다.</p>';
+        return;
+      }
+      const playHref = new URL(`../bingsoo/index.html?live=1&room=${encodeURIComponent(room)}`, window.location.href).href;
+      document.getElementById('qr-code').textContent = room;
+      document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&ecc=M&data=${encodeURIComponent(playHref)}`;
+      document.title = `QR · ${room}`;
+    }());
+  </script>
+</body>
+</html>

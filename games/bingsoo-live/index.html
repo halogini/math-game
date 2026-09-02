@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍧 팥빙수 수업 세션 | 할로매쓰</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com;">
+  <meta name="description" content="수업 시간에만 쓰는 팥빙수 세션.">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="stylesheet" href="lobby.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="../../config.sample.js"></script>
+</head>
+<body>
+  <div class="portal-container live-lobby">
+    <header class="portal-header">
+      <div class="brand">
+        <span class="logo-badge">🍧</span>
+        <div>
+          <h1>팥빙수 수업 세션</h1>
+          <p class="subtitle">세션을 시작하면 선생님용 창이 열립니다. 창을 닫아도 종료를 누르기 전까지 방은 유지됩니다.</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="portal-main">
+      <section class="live-actions">
+        <div class="game-card active">
+          <h2 class="game-title">선생님 · 세션 시작 (QR · 무배정)</h2>
+          <p class="game-desc">학급에 학생을 등록하지 않습니다. 새 창에서 QR을 비추면 아이들이 닉네임만 넣고 같이 칩니다.</p>
+          <button type="button" class="btn-play-game" id="btn-host">세션 시작</button>
+          <button type="button" class="admin-btn hidden" id="btn-reopen" hidden>진행 중 세션 창 다시 열기</button>
+          <p class="live-status" id="host-status"></p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script src="../../shared/halomath-live.js"></script>
+  <script src="lobby.js"></script>
+</body>
+</html>

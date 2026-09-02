@@ -28,6 +28,21 @@
           ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
         }
       }
+    },
+    "liveRooms": {
+      "$code": {
+        ".write": "!newData.exists()",
+        "meta": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['gameId', 'createdAt']) && newData.child('gameId').isString() && newData.child('gameId').val().length > 0 && newData.child('gameId').val().length <= 24 && newData.child('createdAt').isNumber()"
+        },
+        "players": {
+          "$playerId": {
+            ".write": "!newData.exists() || (root.child('liveRooms').child($code).child('meta').exists() && now < root.child('liveRooms').child($code).child('meta').child('createdAt').val() + 86400000 && (!data.exists() || (newData.hasChild('score') && newData.child('score').val() >= data.child('score').val())))",
+            ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
+          }
+        }
+      }
     }
   }
 }
