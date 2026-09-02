@@ -426,6 +426,18 @@ body {
   cursor: crosshair;
 }
 
+@media (min-width: 768px) and (min-height: 720px) {
+  .game-board {
+    height: 560px;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 820px) {
+  .game-board {
+    height: 580px;
+  }
+}
+
 .board-grid-pattern {
   position: absolute;
   inset: 0;

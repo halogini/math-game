@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>팥빙수 2탄 - 커밋 버전 vs 현재 버전 비교 테스트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Outfit:wght@400;600;700;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --accent: #f59e0b;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --before-color: #ef4444;
+      --after-color: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Pretendard', 'Outfit', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title-box h1 {
+      font-family: 'Jua', sans-serif;
+      font-size: 1.4rem;
+      color: #38bdf8;
+    }
+
+    .badge-pill {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .badge-before { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-after { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+
+    .controls-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+    }
+
+    .control-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    select, button {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    select:hover, button:hover {
+      background: #334155;
+      border-color: #64748b;
+    }
+
+    .btn-action {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: white;
+      font-weight: 700;
+    }
+    .btn-action:hover {
+      background: #0369a1;
+    }
+
+    .layout-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Comparison Container */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .compare-grid.is-stacked {
+      grid-template-columns: 1fr;
+    }
+
+    .compare-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .compare-card-header {
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .compare-card-header.before {
+      background: rgba(239, 68, 68, 0.08);
+      color: #fca5a5;
+    }
+
+    .compare-card-header.after {
+      background: rgba(16, 185, 129, 0.08);
+      color: #6ee7b7;
+    }
+
+    .metrics-bar {
+      display: flex;
+      gap: 12px;
+      padding: 8px 16px;
+      background: rgba(15, 23, 42, 0.6);
+      font-size: 0.78rem;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+    }
+
+    .metric-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .metric-item span.val {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .viewport-wrapper {
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #090d16;
+      flex: 1;
+      overflow: auto;
+    }
+
+    .viewport-frame {
+      transition: all 0.3s ease;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Simulation Board */
+    .sim-board {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #ffffff 0%, #f8fafc 100%);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    .sim-grid-pattern {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(203, 213, 225, 0.4) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(203, 213, 225, 0.4) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+    }
+
+    svg.sim-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .sim-student-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .sim-student-box {
+      background: #ffffff;
+      border: 3px solid #0284c7;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.5rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    .sim-circumcenter-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.9);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .sim-bingsoo-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+      z-index: 10;
+      pointer-events: none;
+      animation: popPin 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes popPin {
+      0% { transform: translate(-50%, -50%) scale(0.4); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* Simulation D-Pad Widget */
+    .sim-dpad {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 2px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      z-index: 20;
+      user-select: none;
+      cursor: move;
+      width: 110px;
+    }
+
+    .sim-dpad-header {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #64748b;
+      text-align: center;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 4px;
+    }
+
+    .sim-dpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 3px;
+      width: 100%;
+    }
+
+    .sim-dpad-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      height: 26px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.7rem;
+      color: #334155;
+      cursor: pointer;
+    }
+    .sim-dpad-btn:hover { background: #e2e8f0; }
+
+    .dpad-click-status {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      text-align: center;
+      background: rgba(0,0,0,0.3);
+      border-top: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+    .dpad-status-tag {
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .dpad-status-ok { background: #065f46; color: #6ee7b7; }
+    .dpad-status-err { background: #991b1b; color: #fca5a5; }
+
+    .test-instruction {
+      background: rgba(2, 132, 199, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      color: #bae6fd;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-box">
+      <h1>🍨 팥빙수 2탄 알고리즘 & 터치 비교 테스트</h1>
+      <span class="badge-pill badge-before">커밋 버전 (Before)</span>
+      <span style="color:#64748b; font-weight:bold;">vs</span>
+      <span class="badge-pill badge-after">현재 수정 버전 (After)</span>
+    </div>
+
+    <div class="controls-panel">
+      <div class="control-group">
+        <label for="device-select">📱 환경 프리셋:</label>
+        <select id="device-select">
+          <option value="tab-landscape" selected>📟 태블릿 가로 (1024 × 768 / iPad)</option>
+          <option value="tab-portrait">📟 태블릿 세로 (768 × 1024 / iPad)</option>
+          <option value="desktop">💻 데스크톱 / 대화면 (1200 × 750)</option>
+          <option value="phone-portrait">📱 스마트폰 세로 (390 × 844 / iPhone)</option>
+          <option value="phone-landscape">📱 스마트폰 가로 (844 × 390 / iPhone)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="round-select">🎯 라운드 (삼각형 유형):</label>
+        <select id="round-select">
+          <option value="acute" selected>1, 2R: 예각삼각형</option>
+          <option value="right">3R: 직각삼각형</option>
+          <option value="obtuse">4, 5R: 둔각삼각형</option>
+        </select>
+      </div>
+
+      <button id="btn-regen" class="btn-action">🔄 새 삼각형 생성 (동시 비교)</button>
+      <button id="btn-toggle-layout" class="layout-toggle-btn">좌우 / 상하 전환</button>
+    </div>
+  </header>
+
+  <div class="test-instruction">
+    💡 <b>테스트 안내:</b>
+    1) 상단 <b>환경 프리셋</b>을 변경하여 태블릿 가로/세로 환경별 삼각형 크기 차이를 실시간으로 비교해보세요.
+    2) 보드 우하단의 <b>세부조정창(하얀 배경 패널)</b>을 클릭/터치했을 때 팥빙수 배치가 발생하는지(Before) vs 안전하게 차단되는지(After) 직접 확인해보세요!
+  </div>
+
+  <div class="compare-grid" id="compare-grid">
+    
+    <!-- BEFORE CARD -->
+    <div class="compare-card">
+      <div class="compare-card-header before">
+        <span>🔴 이전 커밋 버전 (Before)</span>
+        <small style="color:#f87171;">기존 R = min(W,H)*0.38 고정 / 패널 터치 관통</small>
+      </div>
+      <div class="metrics-bar" id="metrics-before">
+        <div class="metric-item">반지름(R): <span class="val" id="metric-r-before">-</span></div>
+        <div class="metric-item">지름: <span class="val" id="metric-d-before">-</span></div>
+        <div class="metric-item">가로 점유율: <span class="val" id="metric-wratio-before">-</span></div>
+        <div class="metric-item">최단변: <span class="val" id="metric-minedge-before">-</span></div>
+      </div>
+      <div class="viewport-wrapper">
+        <div class="viewport-frame" id="frame-before">
+          <div class="sim-board" id="board-before">
+            <div class="sim-grid-pattern"></div>
+            <svg class="sim-svg" id="svg-before"></svg>
+            <div id="elements-before"></div>
+            
+            <!-- Simulation D-Pad for Before -->
+            <div class="sim-dpad" id="dpad-before" title="하얀 배경을 클릭해보세요 (Before: 팥빙수가 이 위치로 이동함)">
+              <div class="sim-dpad-header">⠿ 세밀조정 (Before)</div>
+              <div class="sim-dpad-grid">
+                <div></div><div class="sim-dpad-btn">▲</div><div></div>
+                <div class="sim-dpad-btn">◀</div><div class="sim-dpad-btn">✛</div><div class="sim-dpad-btn">▶</div>
+                <div></div><div class="sim-dpad-btn">▼</div><div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dpad-click-status" id="status-dpad-before">
+        세부조정창 패널 클릭 테스트: <span class="dpad-status-tag" style="background:#334155;">클릭 대기 중</span>
+      </div>
+    </div>
+
+    <!-- AFTER CARD -->
+    <div class="compare-card">
+      <div class="compare-card-header after">
+        <span>🟢 현재 수정 버전 (After)</span>
+        <small style="color:#34d399;">태블릿/가로 대폭 확대 / D-Pad 패널 클릭 완벽 차단</small>
+      </div>
+      <div class="metrics-bar" id="metrics-after">
+        <div class="metric-item">반지름(R): <span class="val" id="metric-r-after">-</span></div>
+        <div class="metric-item">지름: <span class="val" id="metric-d-after">-</span></div>
+        <div class="metric-item">가로 점유율: <span class="val" id="metric-wratio-after">-</span></div>
+        <div class="metric-item">최단변: <span class="val" id="metric-minedge-after">-</span></div>
+      </div>
+      <div class="viewport-wrapper">
+        <div class="viewport-frame" id="frame-after">
+          <div class="sim-board" id="board-after">
+            <div class="sim-grid-pattern"></div>
+            <svg class="sim-svg" id="svg-after"></svg>
+            <div id="elements-after"></div>
+
+            <!-- Simulation D-Pad for After -->
+            <div class="sim-dpad" id="dpad-after" title="하얀 배경을 클릭해보세요 (After: 안전하게 차단되어 팥빙수가 이동하지 않음)">
+              <div class="sim-dpad-header">⠿ 세밀조정 (After)</div>
+              <div class="sim-dpad-grid">
+                <div></div><div class="sim-dpad-btn">▲</div><div></div>
+                <div class="sim-dpad-btn">◀</div><div class="sim-dpad-btn">✛</div><div class="sim-dpad-btn">▶</div>
+                <div></div><div class="sim-dpad-btn">▼</div><div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dpad-click-status" id="status-dpad-after">
+        세부조정창 패널 클릭 테스트: <span class="dpad-status-tag" style="background:#334155;">클릭 대기 중</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Device Configurations
+    const DEVICE_CONFIGS = {
+      'tab-landscape': { width: 880, height: 560, isCompact: false, label: '태블릿 가로 (iPad)' },
+      'tab-portrait': { width: 680, height: 560, isCompact: false, label: '태블릿 세로 (iPad)' },
+      'desktop': { width: 940, height: 580, isCompact: false, label: '데스크톱 / 대화면' },
+      'phone-portrait': { width: 375, height: 420, isCompact: true, label: '스마트폰 세로' },
+      'phone-landscape': { width: 700, height: 320, isCompact: true, label: '스마트폰 가로' }
+    };
+
+    let currentDevice = 'tab-landscape';
+    let currentRoundType = 'acute';
+
+    const deviceSelect = document.getElementById('device-select');
+    const roundSelect = document.getElementById('round-select');
+    const btnRegen = document.getElementById('btn-regen');
+    const btnToggleLayout = document.getElementById('btn-toggle-layout');
+    const compareGrid = document.getElementById('compare-grid');
+
+    const frameBefore = document.getElementById('frame-before');
+    const frameAfter = document.getElementById('frame-after');
+    const boardBefore = document.getElementById('board-before');
+    const boardAfter = document.getElementById('board-after');
+    const svgBefore = document.getElementById('svg-before');
+    const svgAfter = document.getElementById('svg-after');
+    const elementsBefore = document.getElementById('elements-before');
+    const elementsAfter = document.getElementById('elements-after');
+    const dpadBefore = document.getElementById('dpad-before');
+    const dpadAfter = document.getElementById('dpad-after');
+
+    function randomRange(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function isPointInside(pt, width, height, pad) {
+      return pt.x >= pad && pt.x <= width - pad && pt.y >= pad && pt.y <= height - pad;
+    }
+
+    // -----------------------------------------------------------
+    // BEFORE ALGORITHM GENERATOR
+    // -----------------------------------------------------------
+    function generateBeforeLayout(width, height, isCompact, roundType) {
+      const padding = isCompact ? Math.max(36, Math.round(Math.min(width, height) * 0.1)) : 65;
+      let valid = false;
+      let attempts = 0;
+      let target, R, A, B, C;
+
+      while (!valid && attempts < 350) {
+        attempts++;
+        if (roundType === 'acute') {
+          target = {
+            x: randomRange(padding + 60, width - padding - 60),
+            y: randomRange(padding + 60, height - padding - 60)
+          };
+          R = randomRange(110, Math.min(width, height) * 0.38);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + randomRange(Math.PI * 0.55, Math.PI * 0.80);
+          const a3 = a2 + randomRange(Math.PI * 0.55, Math.PI * 0.80);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+        } else if (roundType === 'right') {
+          target = {
+            x: randomRange(padding + 70, width - padding - 70),
+            y: randomRange(padding + 70, height - padding - 70)
+          };
+          R = randomRange(120, Math.min(width, height) * 0.40);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + Math.PI;
+          const a3 = a1 + randomRange(Math.PI * 0.35, Math.PI * 0.65);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+        } else {
+          // Obtuse
+          target = {
+            x: randomRange(padding + 70, width - padding - 70),
+            y: randomRange(padding + 70, height - padding - 70)
+          };
+          R = randomRange(125, Math.min(width, height) * 0.43);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + randomRange(Math.PI * 0.30, Math.PI * 0.42);
+          const a3 = a2 + randomRange(Math.PI * 0.30, Math.PI * 0.42);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+        }
+
+        if (isPointInside(A, width, height, padding) &&
+            isPointInside(B, width, height, padding) &&
+            isPointInside(C, width, height, padding)) {
+          valid = true;
+        }
+      }
+
+      if (!valid) {
+        target = { x: width / 2, y: height / 2 };
+        R = 130;
+        A = { x: width / 2 - 100, y: height / 2 - 70 };
+        B = { x: width / 2 + 100, y: height / 2 - 70 };
+        C = { x: width / 2, y: height / 2 + 100 };
+      }
+
+      return { target, R, vertices: [A, B, C], padding };
+    }
+
+    // -----------------------------------------------------------
+    // AFTER ALGORITHM GENERATOR
+    // -----------------------------------------------------------
+    function generateAfterLayout(width, height, isCompact, roundType) {
+      const padding = isCompact ? Math.max(36, Math.round(Math.min(width, height) * 0.1)) : 48;
+      const minDim = Math.min(width, height);
+      let valid = false;
+      let attempts = 0;
+      let target, R, A, B, C;
+
+      const minR = isCompact
+        ? (roundType === 'acute' ? 105 : (roundType === 'right' ? 115 : 120))
+        : (roundType === 'acute' ? Math.max(150, Math.round(minDim * 0.32)) : (roundType === 'right' ? Math.max(155, Math.round(minDim * 0.33)) : Math.max(165, Math.round(minDim * 0.35))));
+
+      const maxR = Math.round(minDim * (isCompact
+        ? (roundType === 'acute' ? 0.38 : (roundType === 'right' ? 0.40 : 0.43))
+        : (roundType === 'acute' ? 0.44 : (roundType === 'right' ? 0.45 : 0.47))));
+
+      while (!valid && attempts < 350) {
+        attempts++;
+        if (roundType === 'acute') {
+          target = {
+            x: randomRange(padding + (isCompact ? 60 : 50), width - padding - (isCompact ? 60 : 50)),
+            y: randomRange(padding + (isCompact ? 60 : 50), height - padding - (isCompact ? 60 : 50))
+          };
+          R = randomRange(minR, maxR);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + randomRange(Math.PI * 0.55, Math.PI * 0.80);
+          const a3 = a2 + randomRange(Math.PI * 0.55, Math.PI * 0.80);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+        } else if (roundType === 'right') {
+          target = {
+            x: randomRange(padding + (isCompact ? 70 : 55), width - padding - (isCompact ? 70 : 55)),
+            y: randomRange(padding + (isCompact ? 70 : 55), height - padding - (isCompact ? 70 : 55))
+          };
+          R = randomRange(minR, maxR);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + Math.PI;
+          const a3 = a1 + randomRange(Math.PI * 0.35, Math.PI * 0.65);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+        } else {
+          // Obtuse
+          target = {
+            x: randomRange(padding + (isCompact ? 70 : 55), width - padding - (isCompact ? 70 : 55)),
+            y: randomRange(padding + (isCompact ? 70 : 55), height - padding - (isCompact ? 70 : 55))
+          };
+          R = randomRange(minR, maxR);
+          const a1 = randomRange(0, Math.PI * 2);
+          const a2 = a1 + randomRange(Math.PI * 0.32, Math.PI * 0.44);
+          const a3 = a2 + randomRange(Math.PI * 0.32, Math.PI * 0.44);
+          A = { x: target.x + R * Math.cos(a1), y: target.y + R * Math.sin(a1) };
+          B = { x: target.x + R * Math.cos(a2), y: target.y + R * Math.sin(a2) };
+          C = { x: target.x + R * Math.cos(a3), y: target.y + R * Math.sin(a3) };
+
+          const distAB = Math.hypot(A.x - B.x, A.y - B.y);
+          const distBC = Math.hypot(B.x - C.x, B.y - C.y);
+          const distCA = Math.hypot(C.x - A.x, C.y - A.y);
+          const minSideLen = isCompact ? 70 : 100;
+          if (distAB < minSideLen || distBC < minSideLen || distCA < minSideLen) {
+            continue;
+          }
+        }
+
+        if (isPointInside(A, width, height, padding) &&
+            isPointInside(B, width, height, padding) &&
+            isPointInside(C, width, height, padding)) {
+          valid = true;
+        }
+      }
+
+      if (!valid) {
+        const fallbackR = isCompact ? 120 : Math.round(minDim * 0.36);
+        target = { x: width / 2, y: height / 2 };
+        R = fallbackR;
+        A = { x: width / 2 - Math.round(fallbackR * 0.8), y: height / 2 - Math.round(fallbackR * 0.55) };
+        B = { x: width / 2 + Math.round(fallbackR * 0.8), y: height / 2 - Math.round(fallbackR * 0.55) };
+        C = { x: width / 2, y: height / 2 + Math.round(fallbackR * 0.8) };
+      }
+
+      return { target, R, vertices: [A, B, C], padding };
+    }
+
+    // Render SVG and DOM elements
+    function renderSimView(svgEl, elementsEl, data, isAfter) {
+      const { target, R, vertices, padding } = data;
+      const [A, B, C] = vertices;
+
+      const strokeColor = isAfter ? '#059669' : '#dc2626';
+      const fillColor = isAfter ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+
+      svgEl.innerHTML = `
+        <!-- Circumcircle Guide -->
+        <circle cx="${target.x}" cy="${target.y}" r="${R}" fill="none" stroke="${isAfter ? '#10b981' : '#f87171'}" stroke-width="1.8" stroke-dasharray="5,5" opacity="0.65" />
+        <!-- Triangle Body -->
+        <polygon points="${A.x},${A.y} ${B.x},${B.y} ${C.x},${C.y}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3" stroke-linejoin="round" />
+      `;
+
+      elementsEl.innerHTML = `
+        <!-- Circumcenter Target -->
+        <div class="sim-circumcenter-pin" style="left:${target.x}px; top:${target.y}px;">
+          <span>🎯</span> 외심
+        </div>
+        <!-- Students -->
+        <div class="sim-student-pin" style="left:${A.x}px; top:${A.y}px;"><div class="sim-student-box">👦</div></div>
+        <div class="sim-student-pin" style="left:${B.x}px; top:${B.y}px;"><div class="sim-student-box">👧</div></div>
+        <div class="sim-student-pin" style="left:${C.x}px; top:${C.y}px;"><div class="sim-student-box">🧑</div></div>
+      `;
+    }
+
+    function updateMetrics(prefix, data, width) {
+      const { R, vertices } = data;
+      const [A, B, C] = vertices;
+      const dAB = Math.round(Math.hypot(A.x - B.x, A.y - B.y));
+      const dBC = Math.round(Math.hypot(B.x - C.x, B.y - C.y));
+      const dCA = Math.round(Math.hypot(C.x - A.x, C.y - A.y));
+      const minEdge = Math.min(dAB, dBC, dCA);
+
+      document.getElementById(`metric-r-${prefix}`).textContent = `${Math.round(R)}px`;
+      document.getElementById(`metric-d-${prefix}`).textContent = `${Math.round(R * 2)}px`;
+      document.getElementById(`metric-wratio-${prefix}`).textContent = `${Math.round((R * 2 / width) * 100)}%`;
+      document.getElementById(`metric-minedge-${prefix}`).textContent = `${minEdge}px`;
+    }
+
+    function renderAll() {
+      const cfg = DEVICE_CONFIGS[currentDevice];
+      
+      // Update viewport sizes
+      frameBefore.style.width = `${cfg.width}px`;
+      frameBefore.style.height = `${cfg.height}px`;
+      frameAfter.style.width = `${cfg.width}px`;
+      frameAfter.style.height = `${cfg.height}px`;
+
+      const dataBefore = generateBeforeLayout(cfg.width, cfg.height, cfg.isCompact, currentRoundType);
+      const dataAfter = generateAfterLayout(cfg.width, cfg.height, cfg.isCompact, currentRoundType);
+
+      renderSimView(svgBefore, elementsBefore, dataBefore, false);
+      renderSimView(svgAfter, elementsAfter, dataAfter, true);
+
+      updateMetrics('before', dataBefore, cfg.width);
+      updateMetrics('after', dataAfter, cfg.width);
+    }
+
+    // -----------------------------------------------------------
+    // D-PAD CLICK-THROUGH SIMULATION
+    // -----------------------------------------------------------
+    // Before simulation: clicking anywhere on board places pin (even on dpad!)
+    boardBefore.addEventListener('mousedown', (e) => {
+      // Old logic: only ignored .set-square-container etc, did NOT ignore dpad!
+      const isDpad = !!e.target.closest('.sim-dpad');
+      const rect = boardBefore.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let pin = document.getElementById('user-pin-before');
+      if (!pin) {
+        pin = document.createElement('div');
+        pin.id = 'user-pin-before';
+        pin.className = 'sim-bingsoo-pin';
+        pin.textContent = '🍨';
+        elementsBefore.appendChild(pin);
+      }
+      pin.style.left = `${x}px`;
+      pin.style.top = `${y}px`;
+
+      const status = document.getElementById('status-dpad-before');
+      if (isDpad) {
+        status.innerHTML = `세부조정창 패널 클릭 테스트: <span class="dpad-status-tag dpad-status-err">⚠️ 오작동! 팥빙수가 세부조정창 위치 (${Math.round(x)}, ${Math.round(y)})로 튀어버림</span>`;
+      } else {
+        status.innerHTML = `세부조정창 패널 클릭 테스트: <span class="dpad-status-tag" style="background:#334155;">일반 보드 클릭 (${Math.round(x)}, ${Math.round(y)})</span>`;
+      }
+    });
+
+    // After simulation: checks e.target.closest('.dpad-controller') and prevents placement
+    boardAfter.addEventListener('mousedown', (e) => {
+      const isDpad = !!e.target.closest('.sim-dpad');
+      const status = document.getElementById('status-dpad-after');
+
+      if (isDpad) {
+        // Ignored!
+        status.innerHTML = `세부조정창 패널 클릭 테스트: <span class="dpad-status-tag dpad-status-ok">🛡️ 정상 차단! 세부조정창 클릭이 무시되어 팥빙수가 튀지 않음</span>`;
+        return;
+      }
+
+      const rect = boardAfter.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let pin = document.getElementById('user-pin-after');
+      if (!pin) {
+        pin = document.createElement('div');
+        pin.id = 'user-pin-after';
+        pin.className = 'sim-bingsoo-pin';
+        pin.textContent = '🍨';
+        elementsAfter.appendChild(pin);
+      }
+      pin.style.left = `${x}px`;
+      pin.style.top = `${y}px`;
+
+      status.innerHTML = `세부조정창 패널 클릭 테스트: <span class="dpad-status-tag" style="background:#334155;">일반 보드 클릭 (${Math.round(x)}, ${Math.round(y)})</span>`;
+    });
+
+    // Event Listeners
+    deviceSelect.addEventListener('change', (e) => {
+      currentDevice = e.target.value;
+      renderAll();
+    });
+
+    roundSelect.addEventListener('change', (e) => {
+      currentRoundType = e.target.value;
+      renderAll();
+    });
+
+    btnRegen.addEventListener('click', () => {
+      renderAll();
+    });
+
+    btnToggleLayout.addEventListener('click', () => {
+      compareGrid.classList.toggle('is-stacked');
+    });
+
+    // Initial render
+    renderAll();
+  </script>
+</body>
+</html>

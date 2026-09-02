@@ -488,7 +488,7 @@ function initBingsoo2Game() {
     const height = gameBoard.clientHeight || 520;
     const padding = isCompactViewport()
       ? Math.max(36, Math.round(Math.min(width, height) * 0.1))
-      : 65;
+      : 48;
 
     // Round progression:
     // Round 1, 2: Acute Triangle (예각삼각형 - 외심이 삼각형 내부)
@@ -518,14 +518,19 @@ function initBingsoo2Game() {
   function generateAcuteLayout(width, height, padding) {
     let valid = false;
     let attempts = 0;
+    const compact = isCompactViewport();
+    const minDim = Math.min(width, height);
+
+    const minR = compact ? 105 : Math.max(150, Math.round(minDim * 0.32));
+    const maxR = Math.round(minDim * (compact ? 0.38 : 0.44));
 
     while (!valid && attempts < 250) {
       attempts++;
       const target = {
-        x: randomRange(padding + 60, width - padding - 60),
-        y: randomRange(padding + 60, height - padding - 60)
+        x: randomRange(padding + (compact ? 60 : 50), width - padding - (compact ? 60 : 50)),
+        y: randomRange(padding + (compact ? 60 : 50), height - padding - (compact ? 60 : 50))
       };
-      const R = randomRange(110, Math.min(width, height) * 0.38);
+      const R = randomRange(minR, maxR);
 
       const angle1 = randomRange(0, Math.PI * 2);
       const angle2 = angle1 + randomRange(Math.PI * 0.55, Math.PI * 0.80);
@@ -556,14 +561,19 @@ function initBingsoo2Game() {
   function generateRightLayout(width, height, padding) {
     let valid = false;
     let attempts = 0;
+    const compact = isCompactViewport();
+    const minDim = Math.min(width, height);
+
+    const minR = compact ? 115 : Math.max(155, Math.round(minDim * 0.33));
+    const maxR = Math.round(minDim * (compact ? 0.40 : 0.45));
 
     while (!valid && attempts < 350) {
       attempts++;
       const target = {
-        x: randomRange(padding + 70, width - padding - 70),
-        y: randomRange(padding + 70, height - padding - 70)
+        x: randomRange(padding + (compact ? 70 : 55), width - padding - (compact ? 70 : 55)),
+        y: randomRange(padding + (compact ? 70 : 55), height - padding - (compact ? 70 : 55))
       };
-      const R = randomRange(120, Math.min(width, height) * 0.40);
+      const R = randomRange(minR, maxR);
 
       const angle1 = randomRange(0, Math.PI * 2);
       // Diameter across circle (180 deg) forms the hypotenuse
@@ -596,25 +606,36 @@ function initBingsoo2Game() {
   function generateObtuseLayout(width, height, padding) {
     let valid = false;
     let attempts = 0;
+    const compact = isCompactViewport();
+    const minDim = Math.min(width, height);
+
+    const minR = compact ? 120 : Math.max(165, Math.round(minDim * 0.35));
+    const maxR = Math.round(minDim * (compact ? 0.43 : 0.47));
 
     while (!valid && attempts < 350) {
       attempts++;
       const target = {
-        x: randomRange(padding + 70, width - padding - 70),
-        y: randomRange(padding + 70, height - padding - 70)
+        x: randomRange(padding + (compact ? 70 : 55), width - padding - (compact ? 70 : 55)),
+        y: randomRange(padding + (compact ? 70 : 55), height - padding - (compact ? 70 : 55))
       };
-      const R = randomRange(125, Math.min(width, height) * 0.43);
+      const R = randomRange(minR, maxR);
 
       const angle1 = randomRange(0, Math.PI * 2);
       // Span of all 3 vertices is strictly less than PI (e.g. 110~150 deg), putting target outside the triangle
-      const angle2 = angle1 + randomRange(Math.PI * 0.30, Math.PI * 0.42);
-      const angle3 = angle2 + randomRange(Math.PI * 0.30, Math.PI * 0.42);
+      const angle2 = angle1 + randomRange(Math.PI * 0.32, Math.PI * 0.44);
+      const angle3 = angle2 + randomRange(Math.PI * 0.32, Math.PI * 0.44);
 
       const A = { x: target.x + R * Math.cos(angle1), y: target.y + R * Math.sin(angle1) };
       const B = { x: target.x + R * Math.cos(angle2), y: target.y + R * Math.sin(angle2) };
       const C = { x: target.x + R * Math.cos(angle3), y: target.y + R * Math.sin(angle3) };
 
-      if (isPointInside(A, width, height, padding) &&
+      const distAB = Math.hypot(A.x - B.x, A.y - B.y);
+      const distBC = Math.hypot(B.x - C.x, B.y - C.y);
+      const distCA = Math.hypot(C.x - A.x, C.y - A.y);
+      const minSideLen = compact ? 70 : 100;
+
+      if (distAB >= minSideLen && distBC >= minSideLen && distCA >= minSideLen &&
+          isPointInside(A, width, height, padding) &&
           isPointInside(B, width, height, padding) &&
           isPointInside(C, width, height, padding)) {
         
@@ -632,11 +653,13 @@ function initBingsoo2Game() {
   }
 
   function generateStandardFallback(width, height, padding) {
-    targetPoint = { x: width / 2, y: height / 2, radius: 130 };
+    const compact = isCompactViewport();
+    const R = compact ? 120 : Math.round(Math.min(width, height) * 0.36);
+    targetPoint = { x: width / 2, y: height / 2, radius: R };
     studentPositions = [
-      { name: '친구 A', baseEmoji: '👦', x: width / 2 - 100, y: height / 2 - 70, currentEmoji: '🤔' },
-      { name: '친구 B', baseEmoji: '👧', x: width / 2 + 100, y: height / 2 - 70, currentEmoji: '🤔' },
-      { name: '친구 C', baseEmoji: '🧑', x: width / 2, y: height / 2 + 100, currentEmoji: '🤔' }
+      { name: '친구 A', baseEmoji: '👦', x: width / 2 - Math.round(R * 0.8), y: height / 2 - Math.round(R * 0.55), currentEmoji: '🤔' },
+      { name: '친구 B', baseEmoji: '👧', x: width / 2 + Math.round(R * 0.8), y: height / 2 - Math.round(R * 0.55), currentEmoji: '🤔' },
+      { name: '친구 C', baseEmoji: '🧑', x: width / 2, y: height / 2 + Math.round(R * 0.8), currentEmoji: '🤔' }
     ];
   }
 
@@ -1117,7 +1140,7 @@ function initBingsoo2Game() {
   }
 
   function handleBoardClick(e) {
-    if (e.target.closest('.set-square-container') || e.target.closest('.ruler-toolbar') || e.target.closest('.controls-bar')) {
+    if (e.target.closest('.dpad-controller') || e.target.closest('.set-square-container') || e.target.closest('.ruler-toolbar') || e.target.closest('.controls-bar')) {
       return;
     }
 
