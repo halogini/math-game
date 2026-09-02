@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
   const leaderboardTableHeaderName = document.getElementById('th-header-name');
   const leaderboardTableHeaderMetric = document.getElementById('th-header-metric');
+  const leaderboardTableHeaderDelete = document.getElementById('th-header-delete');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const leaderboardTabs = document.getElementById('leaderboard-tabs');
   const logoBadge = document.getElementById('logo-badge');
@@ -330,11 +331,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     };
 
-    const visit = (obj, isDormsSubtree = false) => {
+    const visit = (obj, isDormsSubtree = false, keyPrefix = '') => {
       if (!obj || typeof obj !== 'object') return;
       Object.keys(obj).forEach((key) => {
         const item = obj[key];
         if (!item || typeof item !== 'object') return;
+        const path = keyPrefix ? `${keyPrefix}/${key}` : key;
         if (item.name) {
           if (!acceptGame(item)) return;
           if (!matchesActiveMode(item, key, isDormsSubtree)) return;
@@ -343,23 +345,37 @@ document.addEventListener('DOMContentLoaded', () => {
           const sid = sanitizeInput(item.studentId || '', 10);
           const userKey = activeMode === 'school' ? `${name}_${sid}` : name;
 
+          const keepKeys = (next, isWinner) => {
+            const prev = bestMap.get(userKey);
+            if (isWinner) {
+              const extra = [];
+              if (prev && prev.recordKey) extra.push(prev.recordKey);
+              if (prev && Array.isArray(prev.extraKeys)) extra.push.apply(extra, prev.extraKeys);
+              next.recordKey = path;
+              next.extraKeys = extra.filter((k) => k && k !== path);
+              bestMap.set(userKey, next);
+              return;
+            }
+            if (prev && path && prev.recordKey !== path) {
+              prev.extraKeys = prev.extraKeys || [];
+              if (prev.extraKeys.indexOf(path) === -1) prev.extraKeys.push(path);
+            }
+          };
+
           if (gameKey === 'three-chances') {
             const clearTimeMs = Number(item.clearTimeMs);
             if (!Number.isFinite(clearTimeMs) || clearTimeMs <= 0) return;
             const prev = bestMap.get(userKey);
-            if (!prev || clearTimeMs < prev.clearTimeMs) {
-              bestMap.set(userKey, {
-                name,
-                studentId: sid,
-                clearTimeMs,
-                metricLabel: formatClearTime(clearTimeMs)
-              });
-            }
+            keepKeys({
+              name,
+              studentId: sid,
+              clearTimeMs,
+              metricLabel: formatClearTime(clearTimeMs)
+            }, !prev || clearTimeMs < prev.clearTimeMs);
           } else {
             const rawScore = gameKey === 'prism-tycoon'
               ? (Number(item.score) || 0)
               : (parseInt(item.score, 10) || 0);
-            // 팥빙수나 합동게임은 500점 캡, 타이쿤 수익은 상한 없음
             const score = gameKey === 'prism-tycoon' ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
             const prev = bestMap.get(userKey);
 
@@ -367,36 +383,34 @@ document.addEventListener('DOMContentLoaded', () => {
               const totalErrorPx = getBingsoo2TotalErrorPx(item);
               const playTimeMs = getBingsoo2PlayTimeMs(item);
               const candidate = { score, totalErrorPx, playTimeMs, timestamp: item.timestamp || 0 };
-              if (isBetterBingsoo2Record(candidate, prev)) {
-                const formattedScore = score.toLocaleString();
-                let metricLabel = totalErrorPx != null
-                  ? `${formattedScore}점 · ${totalErrorPx}px`
-                  : `${formattedScore}점`;
-                if (playTimeMs != null) {
-                  metricLabel += ` · ${Math.floor(playTimeMs / 60000)}:${String(Math.floor((playTimeMs % 60000) / 1000)).padStart(2, '0')}`;
-                }
-                bestMap.set(userKey, {
-                  name,
-                  studentId: sid,
-                  score,
-                  totalErrorPx,
-                  playTimeMs,
-                  timestamp: item.timestamp || 0,
-                  metricLabel
-                });
-              }
-            } else if (!prev || score > prev.score) {
               const formattedScore = score.toLocaleString();
-              bestMap.set(userKey, {
+              let metricLabel = totalErrorPx != null
+                ? `${formattedScore}점 · ${totalErrorPx}px`
+                : `${formattedScore}점`;
+              if (playTimeMs != null) {
+                metricLabel += ` · ${Math.floor(playTimeMs / 60000)}:${String(Math.floor((playTimeMs % 60000) / 1000)).padStart(2, '0')}`;
+              }
+              keepKeys({
+                name,
+                studentId: sid,
+                score,
+                totalErrorPx,
+                playTimeMs,
+                timestamp: item.timestamp || 0,
+                metricLabel
+              }, isBetterBingsoo2Record(candidate, prev));
+            } else {
+              const formattedScore = score.toLocaleString();
+              keepKeys({
                 name,
                 studentId: sid,
                 score,
                 metricLabel: gameKey === 'prism-tycoon' ? `${formattedScore} 💰` : `${formattedScore}점`
-              });
+              }, !prev || score > prev.score);
             }
           }
         } else {
-          visit(item, key === 'dorms' || isDormsSubtree);
+          visit(item, key === 'dorms' || isDormsSubtree, path);
         }
       });
     };
@@ -490,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnAdminToggleMode.textContent = activeMode === 'school' ? '도름 기록 보기' : '학교 기록 보기';
     }
     applyChannelBranding();
+    if (leaderboardTableHeaderDelete) setElHidden(leaderboardTableHeaderDelete, !portalAdminUnlocked);
   }
 
   function enterAdminMode() {
@@ -619,13 +634,41 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(a.href);
   }
 
+  async function deleteAdminRecord(item) {
+    if (!portalAdminUnlocked || !currentAdminUser() || !firebaseDb || !item) return;
+    const label = activeMode === 'school' && item.studentId
+      ? `${item.name} (${item.studentId})`
+      : (item.name || '이 기록');
+    if (!window.confirm(`${label} 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+
+    const keys = [];
+    if (item.recordKey) keys.push(item.recordKey);
+    if (Array.isArray(item.extraKeys)) {
+      item.extraKeys.forEach((k) => {
+        if (k && keys.indexOf(k) === -1) keys.push(k);
+      });
+    }
+    if (!keys.length) {
+      window.alert('이 기록의 저장 위치를 찾지 못했습니다.');
+      return;
+    }
+
+    try {
+      await Promise.all(keys.map((k) => firebaseDb.ref(`scores/${k}`).remove()));
+      listenRealtimeLeaderboard();
+    } catch (err) {
+      console.error('Admin delete failed:', err);
+      window.alert('삭제에 실패했습니다. Firebase 규칙이 배포됐는지, 로그인 상태인지 확인해 주세요.');
+    }
+  }
+
   function renderLeaderboardTable(list) {
     if (!leaderboardTbody) return;
     leaderboardTbody.removeAttribute('aria-busy');
     leaderboardTbody.innerHTML = '';
 
     const visible = filterAdminList(list);
-    const colSpan = activeMode === 'school' ? 4 : 3;
+    const colSpan = (activeMode === 'school' ? 4 : 3) + (portalAdminUnlocked ? 1 : 0);
 
     if (adminCount) {
       adminCount.textContent = portalAdminUnlocked
@@ -660,6 +703,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ${idTd}
         <td><strong>${escapeHtml(item.metricLabel || (item.score != null ? `${item.score}점` : '-'))}</strong></td>
       `;
+      if (portalAdminUnlocked) {
+        const td = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'admin-btn admin-btn-delete';
+        btn.textContent = '삭제';
+        btn.addEventListener('click', () => deleteAdminRecord(item));
+        td.appendChild(btn);
+        tr.appendChild(td);
+      }
       leaderboardTbody.appendChild(tr);
     });
   }

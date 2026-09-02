@@ -369,6 +369,13 @@ body {
   color: #ffffff;
 }
 
+.admin-btn-delete {
+  border-color: #fecaca;
+  color: #b91c1c;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
 .admin-btn-exit {
   margin-left: auto;
   border-color: #fecaca;
