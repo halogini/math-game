@@ -798,9 +798,10 @@
 
     <div id="rotate-gate" class="rotate-gate hidden" aria-hidden="true">
       <div class="rotate-gate-card">
-        <div class="rotate-phone" aria-hidden="true"></div>
-        <p class="rotate-gate-title">가로로 돌려주세요</p>
-        <p class="rotate-gate-desc">이 게임은 가로 화면에 최적화되어 있습니다.</p>
+        <div id="rotate-phone-icon" class="rotate-phone" aria-hidden="true"></div>
+        <p id="rotate-gate-title" class="rotate-gate-title">가로로 돌려주세요</p>
+        <p id="rotate-gate-desc" class="rotate-gate-desc">이 게임은 가로 화면에 최적화되어 있습니다.</p>
+        <button type="button" id="btn-rotate-lock" class="btn-main hidden" style="margin-top: 14px; padding: 12px 18px; font-size: 15px;">⛶ 가로 모드로 전환</button>
       </div>
     </div>
 
@@ -3374,6 +3375,11 @@
       return (navigator.maxTouchPoints || 0) > 1;
     }
 
+    function isIOSDevice() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
     function syncMoveHint() {
       const note = document.getElementById('move-note');
       if (!note) return;
@@ -3390,7 +3396,29 @@
         return;
       }
       const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth < 800;
-      gate.classList.toggle('hidden', !isPortrait);
+      if (!isPortrait) {
+        gate.classList.add('hidden');
+        return;
+      }
+
+      const isIOS = isIOSDevice();
+      const lockBtn = document.getElementById('btn-rotate-lock');
+      const titleEl = document.getElementById('rotate-gate-title');
+      const descEl = document.getElementById('rotate-gate-desc');
+      const phoneIcon = document.getElementById('rotate-phone-icon');
+
+      if (isIOS) {
+        if (phoneIcon) phoneIcon.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = '가로로 돌려주세요';
+        if (descEl) descEl.textContent = '이 게임은 가로 화면에 최적화되어 있습니다.';
+        if (lockBtn) lockBtn.classList.add('hidden');
+      } else {
+        if (phoneIcon) phoneIcon.classList.add('hidden');
+        if (titleEl) titleEl.textContent = '가로 모드로 전환';
+        if (descEl) descEl.textContent = '아래 버튼을 누르면 자동으로 가로 전체화면으로 전환됩니다.';
+        if (lockBtn) lockBtn.classList.remove('hidden');
+      }
+      gate.classList.remove('hidden');
     }
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => { setTimeout(resize, 100); });
@@ -7837,12 +7865,28 @@
       }
     }
 
+    async function requestAppFullscreenAndOrientationLock() {
+      if (!fullscreenSupported()) return;
+      try {
+        if (!isAppFullscreen()) {
+          const req = appEl.requestFullscreen
+            ? appEl.requestFullscreen()
+            : appEl.webkitRequestFullscreen();
+          if (req && typeof req.then === 'function') {
+            await req;
+          }
+        }
+      } catch (_) {}
+
+      try {
+        if (screen.orientation && typeof screen.orientation.lock === 'function') {
+          await screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch (_) {}
+    }
+
     function requestAppFullscreen() {
-      if (!fullscreenSupported() || isAppFullscreen()) return;
-      const req = appEl.requestFullscreen
-        ? appEl.requestFullscreen()
-        : appEl.webkitRequestFullscreen();
-      if (req && typeof req.catch === 'function') req.catch(() => {});
+      requestAppFullscreenAndOrientationLock();
     }
 
     function requestAppFullscreenIfMobile() {
@@ -7872,6 +7916,15 @@
         e.stopPropagation();
         sound.init();
         requestAppFullscreen();
+      });
+    }
+
+    const btnRotateLock = document.getElementById('btn-rotate-lock');
+    if (btnRotateLock) {
+      btnRotateLock.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sound.init();
+        requestAppFullscreenAndOrientationLock();
       });
     }
 
