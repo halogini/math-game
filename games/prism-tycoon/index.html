@@ -47,6 +47,25 @@
       width: 100%; height: 100%;
       height: 100dvh;
     }
+    /* Android: Screen Orientation lock often fails; rotate the app box instead. */
+    html.force-landscape,
+    html.force-landscape body {
+      overflow: hidden;
+    }
+    html.force-landscape #app {
+      inset: auto;
+      right: auto;
+      bottom: auto;
+      top: 0;
+      left: 100vw;
+      left: 100dvw;
+      width: 100vh;
+      width: 100dvh;
+      height: 100vw;
+      height: 100dvw;
+      transform: rotate(90deg);
+      transform-origin: top left;
+    }
     #game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 
     .hud {
@@ -666,7 +685,15 @@
       padding: 24px;
     }
     .rotate-gate.hidden { display: none !important; }
-    .rotate-gate-card { text-align: center; max-width: 280px; }
+    .rotate-gate-card { text-align: center; max-width: 280px; pointer-events: auto; }
+    #btn-rotate-lock {
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
     .rotate-phone {
       width: 44px; height: 72px; margin: 0 auto 18px;
       border: 3px solid #5eead4; border-radius: 10px;
@@ -3388,6 +3415,14 @@
         : 'WASD(방향키), 드래그, 클릭으로 이동.';
     }
 
+    function isNaturalPortrait() {
+      return window.innerHeight > window.innerWidth && window.innerWidth < 800;
+    }
+
+    function isForcedLandscape() {
+      return document.documentElement.classList.contains('force-landscape');
+    }
+
     function checkOrientation() {
       const gate = document.getElementById('rotate-gate');
       if (!gate) return;
@@ -3395,8 +3430,12 @@
         gate.classList.add('hidden');
         return;
       }
-      const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth < 800;
-      if (!isPortrait) {
+      if (!isNaturalPortrait()) {
+        if (isForcedLandscape()) applyForcedLandscape(false);
+        gate.classList.add('hidden');
+        return;
+      }
+      if (isForcedLandscape()) {
         gate.classList.add('hidden');
         return;
       }
@@ -3415,10 +3454,11 @@
       } else {
         if (phoneIcon) phoneIcon.classList.add('hidden');
         if (titleEl) titleEl.textContent = '가로 모드로 전환';
-        if (descEl) descEl.textContent = '아래 버튼을 누르면 자동으로 가로 전체화면으로 전환됩니다.';
+        if (descEl) descEl.textContent = '아래 버튼을 누르면 가로 화면으로 전환됩니다.';
         if (lockBtn) lockBtn.classList.remove('hidden');
       }
       gate.classList.remove('hidden');
+      gate.setAttribute('aria-hidden', 'false');
     }
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => { setTimeout(resize, 100); });
@@ -7844,14 +7884,17 @@
     const appEl = document.getElementById('app');
     const btnFullscreen = document.getElementById('btn-fullscreen');
 
+    function fullscreenEl() {
+      return document.documentElement || appEl;
+    }
+
     function fullscreenSupported() {
-      if (!appEl) return false;
-      return !!(appEl.requestFullscreen || appEl.webkitRequestFullscreen);
+      const el = fullscreenEl();
+      return !!(el && (el.requestFullscreen || el.webkitRequestFullscreen));
     }
 
     function isAppFullscreen() {
-      const active = document.fullscreenElement || document.webkitFullscreenElement;
-      return active === appEl;
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
     }
 
     function wantsMobileFullscreen() {
@@ -7865,24 +7908,105 @@
       }
     }
 
-    async function requestAppFullscreenAndOrientationLock() {
-      if (!fullscreenSupported()) return;
-      try {
-        if (!isAppFullscreen()) {
-          const req = appEl.requestFullscreen
-            ? appEl.requestFullscreen()
-            : appEl.webkitRequestFullscreen();
-          if (req && typeof req.then === 'function') {
-            await req;
-          }
-        }
-      } catch (_) {}
+    function applyForcedLandscape(on) {
+      const root = document.documentElement;
+      const enable = !!on && isNaturalPortrait();
+      if (enable) root.classList.add('force-landscape');
+      else root.classList.remove('force-landscape');
 
-      try {
-        if (screen.orientation && typeof screen.orientation.lock === 'function') {
-          await screen.orientation.lock('landscape').catch(() => {});
+      if (!appEl) return;
+      if (!enable) {
+        appEl.style.inset = '';
+        appEl.style.top = '';
+        appEl.style.left = '';
+        appEl.style.right = '';
+        appEl.style.bottom = '';
+        appEl.style.width = '';
+        appEl.style.height = '';
+        appEl.style.transform = '';
+        appEl.style.transformOrigin = '';
+        return;
+      }
+
+      const vv = window.visualViewport;
+      const w = Math.round(vv ? vv.width : window.innerWidth);
+      const h = Math.round(vv ? vv.height : window.innerHeight);
+      const top = Math.round(vv ? vv.offsetTop : 0);
+      const left = Math.round(vv ? vv.offsetLeft : 0);
+      appEl.style.inset = 'auto';
+      appEl.style.right = 'auto';
+      appEl.style.bottom = 'auto';
+      appEl.style.top = top + 'px';
+      appEl.style.left = (left + w) + 'px';
+      appEl.style.width = h + 'px';
+      appEl.style.height = w + 'px';
+      appEl.style.transform = 'rotate(90deg)';
+      appEl.style.transformOrigin = 'top left';
+    }
+
+    function tryLockLandscape() {
+      const orient = screen.orientation;
+      if (!orient || typeof orient.lock !== 'function') return Promise.resolve(false);
+      const types = ['landscape', 'landscape-primary', 'landscape-secondary'];
+      return types.reduce((prev, type) => prev.then((ok) => {
+        if (ok) return true;
+        try {
+          const p = orient.lock(type);
+          return Promise.resolve(p).then(() => true).catch(() => false);
+        } catch (_) {
+          return false;
         }
+      }), Promise.resolve(false));
+    }
+
+    function requestFullscreenNow() {
+      const el = fullscreenEl();
+      if (!el || isAppFullscreen()) return Promise.resolve();
+      const tryReq = (target, withNav) => {
+        if (typeof target.requestFullscreen !== 'function') return null;
+        try {
+          return withNav
+            ? target.requestFullscreen({ navigationUI: 'hide' })
+            : target.requestFullscreen();
+        } catch (_) {
+          return null;
+        }
+      };
+      let req = tryReq(el, true) || tryReq(el, false) || tryReq(appEl, false);
+      if (req && typeof req.then === 'function') {
+        return req.catch(() => {
+          const retry = tryReq(el, false) || tryReq(appEl, false);
+          return retry && typeof retry.then === 'function' ? retry.catch(() => {}) : undefined;
+        });
+      }
+      try {
+        if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (appEl && appEl.webkitRequestFullscreen) appEl.webkitRequestFullscreen();
       } catch (_) {}
+      return Promise.resolve();
+    }
+
+    function requestAppFullscreenAndOrientationLock() {
+      const relayout = () => {
+        checkOrientation();
+        resize();
+        syncFullscreenBtn();
+      };
+
+      // Lock in the same user-gesture turn. Awaiting fullscreen first often
+      // drops activation on Android Chrome, so orientation.lock becomes a no-op.
+      tryLockLandscape();
+      requestFullscreenNow();
+      tryLockLandscape();
+
+      // Native lock is unreliable on Android; CSS rotate makes the button
+      // do something immediately even when Fullscreen/Orientation APIs fail.
+      if (isNaturalPortrait()) applyForcedLandscape(true);
+      requestAnimationFrame(relayout);
+
+      const afterFs = () => { tryLockLandscape().then(relayout); };
+      document.addEventListener('fullscreenchange', afterFs, { once: true });
+      document.addEventListener('webkitfullscreenchange', afterFs, { once: true });
     }
 
     function requestAppFullscreen() {
@@ -7901,6 +8025,8 @@
     }
 
     function onViewportChange() {
+      if (isForcedLandscape() && isNaturalPortrait()) applyForcedLandscape(true);
+      else if (!isNaturalPortrait()) applyForcedLandscape(false);
       resize();
       syncFullscreenBtn();
     }
@@ -7921,10 +8047,20 @@
 
     const btnRotateLock = document.getElementById('btn-rotate-lock');
     if (btnRotateLock) {
-      btnRotateLock.addEventListener('click', (e) => {
+      let lastRotateTap = 0;
+      const onRotateTap = (e) => {
+        const now = Date.now();
+        if (now - lastRotateTap < 500) return;
+        lastRotateTap = now;
+        e.preventDefault();
         e.stopPropagation();
         sound.init();
         requestAppFullscreenAndOrientationLock();
+      };
+      btnRotateLock.addEventListener('click', onRotateTap);
+      btnRotateLock.addEventListener('touchend', onRotateTap, { passive: false });
+      btnRotateLock.addEventListener('pointerup', (e) => {
+        if (e.pointerType === 'touch' || e.pointerType === 'pen') onRotateTap(e);
       });
     }
 
