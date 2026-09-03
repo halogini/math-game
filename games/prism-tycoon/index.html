@@ -51,6 +51,13 @@
     html.force-landscape,
     html.force-landscape body {
       overflow: hidden;
+      touch-action: none;
+    }
+    html.force-landscape input,
+    html.force-landscape textarea,
+    html.force-landscape button,
+    html.force-landscape a {
+      touch-action: manipulation;
     }
     html.force-landscape #app {
       inset: auto;
@@ -610,8 +617,9 @@
     .opening video {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; background: #050308;
+      pointer-events: none;
     }
-    .opening:not(.playing) video { visibility: hidden; }
+    .opening:not(.playing) video { visibility: hidden; pointer-events: none; }
     .opening-ui {
       position: absolute; inset: 0; z-index: 2;
       display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
@@ -3423,6 +3431,29 @@
       return document.documentElement.classList.contains('force-landscape');
     }
 
+    function forcedViewport() {
+      const vv = window.visualViewport;
+      return {
+        w: Math.round(vv ? vv.width : window.innerWidth),
+        h: Math.round(vv ? vv.height : window.innerHeight),
+        top: Math.round(vv ? vv.offsetTop : 0),
+        left: Math.round(vv ? vv.offsetLeft : 0)
+      };
+    }
+
+    function clientToAppLocal(clientX, clientY) {
+      const v = forcedViewport();
+      return {
+        x: clientY - v.top,
+        y: (v.left + v.w) - clientX
+      };
+    }
+
+    function canvasLocal(e) {
+      if (isForcedLandscape()) return clientToAppLocal(e.clientX, e.clientY);
+      return { x: e.offsetX, y: e.offsetY };
+    }
+
     function checkOrientation() {
       const gate = document.getElementById('rotate-gate');
       if (!gate) return;
@@ -3512,9 +3543,10 @@
     const STICK_R = 56;
 
     function mapPointer(e) {
+      const loc = canvasLocal(e);
       return {
-        x: e.offsetX / view.scale + camera.x,
-        y: e.offsetY / view.scale + camera.y
+        x: loc.x / view.scale + camera.x,
+        y: loc.y / view.scale + camera.y
       };
     }
 
@@ -3525,7 +3557,8 @@
         return;
       }
       if (stick || state.phase !== 'play') return;
-      stick = { id: e.pointerId, bx: e.offsetX, by: e.offsetY, x: e.offsetX, y: e.offsetY, moved: false };
+      const loc = canvasLocal(e);
+      stick = { id: e.pointerId, bx: loc.x, by: loc.y, x: loc.x, y: loc.y, moved: false };
       cv.setPointerCapture(e.pointerId);
     });
 
@@ -3535,8 +3568,9 @@
         return;
       }
       if (stick && stick.id === e.pointerId) {
-        stick.x = e.offsetX;
-        stick.y = e.offsetY;
+        const loc = canvasLocal(e);
+        stick.x = loc.x;
+        stick.y = loc.y;
         if (Math.hypot(stick.x - stick.bx, stick.y - stick.by) > 10) {
           stick.moved = true;
           if (state) state.targetPos = null; // 조이스틱 드래그 시 탭 이동 자동 취소
@@ -7928,11 +7962,11 @@
         return;
       }
 
-      const vv = window.visualViewport;
-      const w = Math.round(vv ? vv.width : window.innerWidth);
-      const h = Math.round(vv ? vv.height : window.innerHeight);
-      const top = Math.round(vv ? vv.offsetTop : 0);
-      const left = Math.round(vv ? vv.offsetLeft : 0);
+      const vv = forcedViewport();
+      const w = vv.w;
+      const h = vv.h;
+      const top = vv.top;
+      const left = vv.left;
       appEl.style.inset = 'auto';
       appEl.style.right = 'auto';
       appEl.style.bottom = 'auto';
@@ -8063,6 +8097,67 @@
         if (e.pointerType === 'touch' || e.pointerType === 'pen') onRotateTap(e);
       });
     }
+
+    (function bindForcedLandscapeScrolling() {
+      let drag = null;
+
+      function isScrollable(el) {
+        if (!el || el === document.body || el === document.documentElement) return false;
+        const style = window.getComputedStyle(el);
+        const canY = (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+          el.scrollHeight > el.clientHeight + 1;
+        const canX = (style.overflowX === 'auto' || style.overflowX === 'scroll') &&
+          el.scrollWidth > el.clientWidth + 1;
+        return canY || canX;
+      }
+
+      function findScrollable(start) {
+        let el = start;
+        while (el && el !== document.body) {
+          if (isScrollable(el)) return el;
+          el = el.parentElement;
+        }
+        return null;
+      }
+
+      document.addEventListener('touchmove', (e) => {
+        if (!isForcedLandscape()) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('input, textarea')) return;
+        e.preventDefault();
+      }, { passive: false });
+
+      document.addEventListener('pointerdown', (e) => {
+        if (!isForcedLandscape()) return;
+        const t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest('canvas, input, textarea, #rotate-gate')) return;
+        const sc = findScrollable(t) || t.closest('.overlay, .shop, .lb-wrap');
+        if (!sc) return;
+        const loc = clientToAppLocal(e.clientX, e.clientY);
+        drag = { id: e.pointerId, sc, x: loc.x, y: loc.y, moved: false };
+      }, true);
+
+      document.addEventListener('pointermove', (e) => {
+        if (!drag || drag.id !== e.pointerId || !isForcedLandscape()) return;
+        const loc = clientToAppLocal(e.clientX, e.clientY);
+        const dx = loc.x - drag.x;
+        const dy = loc.y - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+        drag.moved = true;
+        drag.sc.scrollLeft -= dx;
+        drag.sc.scrollTop -= dy;
+        drag.x = loc.x;
+        drag.y = loc.y;
+        e.preventDefault();
+      }, { capture: true, passive: false });
+
+      const endDrag = (e) => {
+        if (drag && (!e || drag.id === e.pointerId)) drag = null;
+      };
+      document.addEventListener('pointerup', endDrag, true);
+      document.addEventListener('pointercancel', endDrag, true);
+    })();
 
     btnStart.addEventListener('click', start);
     document.getElementById('btn-restart').addEventListener('click', () => {
