@@ -8054,7 +8054,7 @@
 
     function syncFullscreenBtn() {
       if (!btnFullscreen) return;
-      const show = fullscreenSupported() && !isAppFullscreen();
+      const show = fullscreenSupported() && !isAppFullscreen() && !isForcedLandscape();
       btnFullscreen.classList.toggle('hidden', !show);
     }
 

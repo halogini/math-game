@@ -27,11 +27,12 @@
 
     function isActive() {
       const active = document.fullscreenElement || document.webkitFullscreenElement;
-      return active === root;
-    }
-
-    function wants() {
-      return wantsMobileFullscreen();
+      if (active) return true;
+      try {
+        return document.documentElement.classList.contains("force-landscape");
+      } catch (_) {
+        return false;
+      }
     }
 
     function request() {
@@ -40,6 +41,10 @@
         ? root.requestFullscreen()
         : root.webkitRequestFullscreen();
       if (req && typeof req.catch === "function") req.catch(function () {});
+    }
+
+    function wants() {
+      return wantsMobileFullscreen();
     }
 
     function requestIfMobile() {

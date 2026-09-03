@@ -141,7 +141,7 @@ html.force-landscape .modal-card {
 .profile-text { display: flex; flex-direction: column; line-height: 1.2; }
 .profile-name { font-size: 0.85rem; font-weight: 700; }
 .profile-id { font-size: 0.7rem; color: var(--ink-dim); }
-.btn-small-edit, .btn-sound, .btn-fullscreen {
+.btn-small-edit {
   background: transparent;
   border: 1px solid var(--stroke);
   border-radius: 8px;
@@ -149,14 +149,39 @@ html.force-landscape .modal-card {
   cursor: pointer;
   padding: 4px 8px;
 }
-.btn-sound.muted { opacity: 0.55; }
 
+.btn-sound,
 .btn-fullscreen {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  z-index: 9;
+  width: 36px;
+  height: 36px;
   min-width: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(61, 232, 255, 0.35);
+  border-radius: 12px;
+  color: var(--ink);
+  cursor: pointer;
   font-size: 16px;
   line-height: 1;
+  background: rgba(4, 14, 24, 0.82);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
+.btn-sound {
+  right: max(8px, env(safe-area-inset-right, 0px));
+}
+.btn-sound.muted { opacity: 0.55; }
+.btn-sound:hover,
 .btn-fullscreen:hover { border-color: var(--accent-cyan); }
+.btn-fullscreen {
+  right: max(52px, calc(env(safe-area-inset-right, 0px) + 44px));
+}
+.btn-fullscreen.hidden { display: none !important; }
+html.force-landscape .btn-fullscreen { display: none !important; }
 
 .tool-slots {
   display: flex;
@@ -193,18 +218,25 @@ html.force-landscape .modal-card {
 
 .time-gauge {
   position: absolute;
-  top: 8px;
-  left: 12px;
-  right: 12px;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 6;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  width: 280px;
+  max-width: min(280px, 46%);
+  padding: 5px 10px 5px 8px;
+  background: rgba(4, 14, 24, 0.82);
+  border: 1px solid rgba(61, 232, 255, 0.38);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
 .time-gauge-track {
   flex: 1;
-  height: 10px;
+  height: 12px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(61, 232, 255, 0.35);
@@ -212,23 +244,25 @@ html.force-landscape .modal-card {
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35);
 }
 .time-gauge-fill {
+  display: block;
   height: 100%;
   width: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #ff6b8a 0%, #ffd56a 35%, #3de8ff 100%);
   transform-origin: left center;
   transform: scaleX(1);
-  transition: transform 0.2s linear;
+  transition: transform 0.15s linear;
 }
 .time-gauge-fill.low {
   background: linear-gradient(90deg, #ff3d5e, #ff8a5c);
 }
 .time-gauge-label {
+  flex-shrink: 0;
   min-width: 44px;
   text-align: right;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: var(--gold);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
@@ -236,7 +270,7 @@ html.force-landscape .modal-card {
 .mission-toast {
   position: absolute;
   left: 50%;
-  top: 38px;
+  top: 50px;
   transform: translateX(-50%);
   z-index: 6;
   width: max-content;
@@ -1003,7 +1037,7 @@ body.hud-overlay-mobile .tool-slot {
   font-size: 0.7rem;
 }
 body.hud-overlay-mobile .mission-toast {
-  top: max(36px, calc(env(safe-area-inset-top, 0px) + 28px));
+  top: max(48px, calc(env(safe-area-inset-top, 0px) + 42px));
   padding: 7px 14px;
 }
 body.hud-overlay-mobile .mission-text {
@@ -1011,9 +1045,17 @@ body.hud-overlay-mobile .mission-text {
   max-width: min(620px, 90vw);
 }
 body.hud-overlay-mobile .time-gauge {
-  top: max(6px, env(safe-area-inset-top, 0px));
-  left: max(10px, env(safe-area-inset-left, 0px));
-  right: max(10px, env(safe-area-inset-right, 0px));
+  top: max(8px, env(safe-area-inset-top, 0px));
+  width: 240px;
+  max-width: min(240px, 42%);
+  padding: 3px 8px 3px 6px;
+}
+body.hud-overlay-mobile .time-gauge-track {
+  height: 10px;
+}
+body.hud-overlay-mobile .time-gauge-label {
+  font-size: 0.85rem;
+  min-width: 40px;
 }
 body.hud-overlay-mobile .scene-chrome {
   padding:
