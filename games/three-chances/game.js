@@ -262,12 +262,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return window.innerHeight > window.innerWidth && window.innerWidth <= 1024;
   }
 
-  let forcedRotateDeg = 90;
-
-  function landscapeRotateDeg() {
-    return forcedRotateDeg === -90 ? -90 : 90;
-  }
-
   function forcedViewport() {
     const vv = window.visualViewport;
     return {
@@ -280,63 +274,63 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clientToAppLocal(clientX, clientY) {
     const v = forcedViewport();
-    if (landscapeRotateDeg() === 90) {
-      return {
-        x: clientY - v.top,
-        y: (v.left + v.w) - clientX
-      };
-    }
     return {
-      x: (v.top + v.h) - clientY,
-      y: clientX - v.left
+      x: clientY - v.top,
+      y: (v.left + v.w) - clientX
     };
   }
 
   function applyForcedLandscape(on) {
     const root = document.documentElement;
-    const el = document.body;
+    const appEl = document.getElementById("game-container");
     const enable = !!on && isNaturalPortrait();
     if (enable) root.classList.add("force-landscape");
     else root.classList.remove("force-landscape");
-    el.classList.toggle("force-rot-90", enable && landscapeRotateDeg() === 90);
-    el.classList.toggle("force-rot-m90", enable && landscapeRotateDeg() === -90);
 
+    document.body.classList.remove("force-rot-90", "force-rot-m90");
+    document.body.style.position = "";
+    document.body.style.inset = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.bottom = "";
+    document.body.style.width = "";
+    document.body.style.height = "";
+    document.body.style.transform = "";
+    document.body.style.transformOrigin = "";
+    root.style.removeProperty("--fl-w");
+    root.style.removeProperty("--fl-h");
+
+    if (!appEl) return;
     if (!enable) {
-      root.style.removeProperty("--fl-w");
-      root.style.removeProperty("--fl-h");
-      el.style.position = "";
-      el.style.inset = "";
-      el.style.top = "";
-      el.style.left = "";
-      el.style.right = "";
-      el.style.bottom = "";
-      el.style.width = "";
-      el.style.height = "";
-      el.style.transform = "";
-      el.style.transformOrigin = "";
+      appEl.style.position = "";
+      appEl.style.inset = "";
+      appEl.style.top = "";
+      appEl.style.left = "";
+      appEl.style.right = "";
+      appEl.style.bottom = "";
+      appEl.style.width = "";
+      appEl.style.height = "";
+      appEl.style.transform = "";
+      appEl.style.transformOrigin = "";
+      appEl.style.maxWidth = "";
+      appEl.style.margin = "";
       return;
     }
 
     const vv = forcedViewport();
-    const deg = landscapeRotateDeg();
-    root.style.setProperty("--fl-w", vv.h + "px");
-    root.style.setProperty("--fl-h", vv.w + "px");
-    el.style.position = "fixed";
-    el.style.inset = "auto";
-    el.style.right = "auto";
-    el.style.bottom = "auto";
-    el.style.width = vv.h + "px";
-    el.style.height = vv.w + "px";
-    el.style.transformOrigin = "top left";
-    if (deg === 90) {
-      el.style.top = vv.top + "px";
-      el.style.left = (vv.left + vv.w) + "px";
-      el.style.transform = "rotate(90deg)";
-    } else {
-      el.style.top = (vv.top + vv.h) + "px";
-      el.style.left = vv.left + "px";
-      el.style.transform = "rotate(-90deg)";
-    }
+    appEl.style.position = "fixed";
+    appEl.style.inset = "auto";
+    appEl.style.right = "auto";
+    appEl.style.bottom = "auto";
+    appEl.style.top = vv.top + "px";
+    appEl.style.left = (vv.left + vv.w) + "px";
+    appEl.style.width = vv.h + "px";
+    appEl.style.height = vv.w + "px";
+    appEl.style.maxWidth = "none";
+    appEl.style.margin = "0";
+    appEl.style.transform = "rotate(90deg)";
+    appEl.style.transformOrigin = "top left";
   }
 
   function tryLockLandscape() {
@@ -382,9 +376,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function requestLandscapeMode() {
-    if (lastGamma != null && Math.abs(lastGamma) >= 20) {
-      forcedRotateDeg = lastGamma < 0 ? 90 : -90;
-    }
     tryLockLandscape();
     requestFullscreenNow();
     tryLockLandscape();
@@ -476,29 +467,6 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(syncMobileLayout._t);
       syncMobileLayout._t = setTimeout(syncMobileLayout, 80);
     });
-  }
-
-  let lastGamma = null;
-
-  function applyTiltFromSensors(gamma) {
-    if (gamma == null || Number.isNaN(gamma)) return;
-    lastGamma = gamma;
-    if (Math.abs(gamma) < 30) return;
-    const next = gamma < 0 ? 90 : -90;
-    if (next === forcedRotateDeg) return;
-    forcedRotateDeg = next;
-    if (isForcedLandscape()) {
-      applyForcedLandscape(true);
-      syncMobileLayout();
-    }
-  }
-
-  window.addEventListener("deviceorientation", (e) => applyTiltFromSensors(e.gamma));
-  if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
-    const ask = () => {
-      DeviceOrientationEvent.requestPermission().catch(() => {});
-    };
-    document.addEventListener("pointerup", ask, { once: true });
   }
 
   const btnRotateLock = document.getElementById("btn-rotate-lock");
@@ -3454,30 +3422,20 @@ document.addEventListener("DOMContentLoaded", () => {
       || evt;
     if (isForcedLandscape()) {
       const loc = clientToAppLocal(src.clientX, src.clientY);
-      const r = canvas.getBoundingClientRect();
-      const v = forcedViewport();
-      let lx;
-      let ly;
-      let lw;
-      let lh;
-      if (landscapeRotateDeg() === 90) {
-        const originX = v.left + v.w;
-        const originY = v.top;
-        lx = r.top - originY;
-        ly = originX - r.right;
-        lw = r.height || 1;
-        lh = r.width || 1;
-      } else {
-        const originX = v.left;
-        const originY = v.top + v.h;
-        lx = originY - r.bottom;
-        ly = r.left - originX;
-        lw = r.height || 1;
-        lh = r.width || 1;
+      const root = document.getElementById("game-container");
+      let left = 0;
+      let top = 0;
+      let el = canvas;
+      while (el && el !== root) {
+        left += el.offsetLeft;
+        top += el.offsetTop;
+        el = el.offsetParent;
       }
+      const rw = canvas.offsetWidth || 1;
+      const rh = canvas.offsetHeight || 1;
       return {
-        x: ((loc.x - lx) / lw) * canvas.width,
-        y: ((loc.y - ly) / lh) * canvas.height,
+        x: ((loc.x - left) / rw) * canvas.width,
+        y: ((loc.y - top) / rh) * canvas.height,
         clientX: src.clientX,
         clientY: src.clientY
       };
