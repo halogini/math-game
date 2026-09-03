@@ -22,6 +22,10 @@ html, body {
 }
 
 /* Android rotation-lock: CSS landscape fallback (same idea as prism-tycoon). */
+html.force-landscape {
+  --fl-w: 100dvh;
+  --fl-h: 100dvw;
+}
 html.force-landscape,
 html.force-landscape body {
   overflow: hidden;
@@ -38,24 +42,30 @@ html.force-landscape body {
   inset: auto;
   right: auto;
   bottom: auto;
+  transform-origin: top left;
+}
+html.force-landscape body.force-rot-90 {
   top: 0;
   left: 100vw;
   left: 100dvw;
-  width: 100vh;
-  width: 100dvh;
-  height: 100vw;
-  height: 100dvw;
   transform: rotate(90deg);
-  transform-origin: top left;
 }
+html.force-landscape body.force-rot-m90 {
+  top: 100vh;
+  top: 100dvh;
+  left: 0;
+  transform: rotate(-90deg);
+}
+html.force-landscape body,
 html.force-landscape body.hud-overlay-mobile,
 html.force-landscape body.hud-overlay-mobile .game-container {
-  width: 100%;
-  height: 100%;
+  width: var(--fl-w);
+  height: var(--fl-h);
 }
 html.force-landscape body.hud-overlay-mobile .canvas-wrapper.world-wrap {
-  width: min(100%, calc(100% * 960 / 520));
-  max-height: 100%;
+  width: min(100%, calc(var(--fl-h) * 960 / 520));
+  max-width: 100%;
+  max-height: var(--fl-h);
 }
 
 .lab-bg {

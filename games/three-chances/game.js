@@ -262,6 +262,12 @@ document.addEventListener("DOMContentLoaded", () => {
     return window.innerHeight > window.innerWidth && window.innerWidth <= 1024;
   }
 
+  let forcedRotateDeg = 90;
+
+  function landscapeRotateDeg() {
+    return forcedRotateDeg === -90 ? -90 : 90;
+  }
+
   function forcedViewport() {
     const vv = window.visualViewport;
     return {
@@ -274,20 +280,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clientToAppLocal(clientX, clientY) {
     const v = forcedViewport();
+    if (landscapeRotateDeg() === 90) {
+      return {
+        x: clientY - v.top,
+        y: (v.left + v.w) - clientX
+      };
+    }
     return {
-      x: clientY - v.top,
-      y: (v.left + v.w) - clientX
+      x: (v.top + v.h) - clientY,
+      y: clientX - v.left
     };
   }
 
   function applyForcedLandscape(on) {
     const root = document.documentElement;
+    const el = document.body;
     const enable = !!on && isNaturalPortrait();
     if (enable) root.classList.add("force-landscape");
     else root.classList.remove("force-landscape");
+    el.classList.toggle("force-rot-90", enable && landscapeRotateDeg() === 90);
+    el.classList.toggle("force-rot-m90", enable && landscapeRotateDeg() === -90);
 
-    const el = document.body;
     if (!enable) {
+      root.style.removeProperty("--fl-w");
+      root.style.removeProperty("--fl-h");
       el.style.position = "";
       el.style.inset = "";
       el.style.top = "";
@@ -302,16 +318,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const vv = forcedViewport();
+    const deg = landscapeRotateDeg();
+    root.style.setProperty("--fl-w", vv.h + "px");
+    root.style.setProperty("--fl-h", vv.w + "px");
     el.style.position = "fixed";
     el.style.inset = "auto";
     el.style.right = "auto";
     el.style.bottom = "auto";
-    el.style.top = vv.top + "px";
-    el.style.left = (vv.left + vv.w) + "px";
     el.style.width = vv.h + "px";
     el.style.height = vv.w + "px";
-    el.style.transform = "rotate(90deg)";
     el.style.transformOrigin = "top left";
+    if (deg === 90) {
+      el.style.top = vv.top + "px";
+      el.style.left = (vv.left + vv.w) + "px";
+      el.style.transform = "rotate(90deg)";
+    } else {
+      el.style.top = (vv.top + vv.h) + "px";
+      el.style.left = vv.left + "px";
+      el.style.transform = "rotate(-90deg)";
+    }
   }
 
   function tryLockLandscape() {
@@ -357,6 +382,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function requestLandscapeMode() {
+    if (lastGamma != null && Math.abs(lastGamma) >= 20) {
+      forcedRotateDeg = lastGamma < 0 ? 90 : -90;
+    }
     tryLockLandscape();
     requestFullscreenNow();
     tryLockLandscape();
@@ -448,6 +476,29 @@ document.addEventListener("DOMContentLoaded", () => {
       clearTimeout(syncMobileLayout._t);
       syncMobileLayout._t = setTimeout(syncMobileLayout, 80);
     });
+  }
+
+  let lastGamma = null;
+
+  function applyTiltFromSensors(gamma) {
+    if (gamma == null || Number.isNaN(gamma)) return;
+    lastGamma = gamma;
+    if (Math.abs(gamma) < 30) return;
+    const next = gamma < 0 ? 90 : -90;
+    if (next === forcedRotateDeg) return;
+    forcedRotateDeg = next;
+    if (isForcedLandscape()) {
+      applyForcedLandscape(true);
+      syncMobileLayout();
+    }
+  }
+
+  window.addEventListener("deviceorientation", (e) => applyTiltFromSensors(e.gamma));
+  if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
+    const ask = () => {
+      DeviceOrientationEvent.requestPermission().catch(() => {});
+    };
+    document.addEventListener("pointerup", ask, { once: true });
   }
 
   const btnRotateLock = document.getElementById("btn-rotate-lock");
@@ -3403,19 +3454,30 @@ document.addEventListener("DOMContentLoaded", () => {
       || evt;
     if (isForcedLandscape()) {
       const loc = clientToAppLocal(src.clientX, src.clientY);
-      let left = 0;
-      let top = 0;
-      let el = canvas;
-      while (el && el !== document.body) {
-        left += el.offsetLeft;
-        top += el.offsetTop;
-        el = el.offsetParent;
+      const r = canvas.getBoundingClientRect();
+      const v = forcedViewport();
+      let lx;
+      let ly;
+      let lw;
+      let lh;
+      if (landscapeRotateDeg() === 90) {
+        const originX = v.left + v.w;
+        const originY = v.top;
+        lx = r.top - originY;
+        ly = originX - r.right;
+        lw = r.height || 1;
+        lh = r.width || 1;
+      } else {
+        const originX = v.left;
+        const originY = v.top + v.h;
+        lx = originY - r.bottom;
+        ly = r.left - originX;
+        lw = r.height || 1;
+        lh = r.width || 1;
       }
-      const rw = canvas.offsetWidth || 1;
-      const rh = canvas.offsetHeight || 1;
       return {
-        x: ((loc.x - left) / rw) * canvas.width,
-        y: ((loc.y - top) / rh) * canvas.height,
+        x: ((loc.x - lx) / lw) * canvas.width,
+        y: ((loc.y - ly) / lh) * canvas.height,
         clientX: src.clientX,
         clientY: src.clientY
       };
@@ -3431,6 +3493,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  function pointerMovedPx(p) {
+    if (isForcedLandscape() && pointer.startLocalX != null) {
+      const loc = clientToAppLocal(p.clientX, p.clientY);
+      return Math.hypot(loc.x - pointer.startLocalX, loc.y - pointer.startLocalY);
+    }
+    return Math.hypot(p.clientX - pointer.startClientX, p.clientY - pointer.startClientY);
+  }
+
   function onPointerDown(evt) {
     if (portraitBlocked) return;
     if (!running || phase === "idle" || phase === "result" || phase === "gameover" || phase === "quiz") return;
@@ -3444,6 +3514,11 @@ document.addEventListener("DOMContentLoaded", () => {
     pointer.lastX = p.x;
     pointer.startClientX = p.clientX;
     pointer.startClientY = p.clientY;
+    if (isForcedLandscape()) {
+      const loc = clientToAppLocal(p.clientX, p.clientY);
+      pointer.startLocalX = loc.x;
+      pointer.startLocalY = loc.y;
+    }
     pointer.moved = 0;
 
     if (scene === "tank" && tankMode === "measure") {
@@ -3495,10 +3570,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (asm && asm.drag && scene === "bench" && benchMode === "build") {
       evt.preventDefault();
       pointer.dragging = true;
-      pointer.moved = Math.hypot(
-        p.clientX - pointer.startClientX,
-        p.clientY - pointer.startClientY
-      );
+      pointer.moved = pointerMovedPx(p);
       asm.drag.x = p.x;
       asm.drag.y = p.y;
       return;
@@ -3507,10 +3579,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (patchDrag && scene === "tank" && tankMode === "install" && !dockAnim) {
       evt.preventDefault();
       pointer.dragging = true;
-      pointer.moved = Math.hypot(
-        p.clientX - pointer.startClientX,
-        p.clientY - pointer.startClientY
-      );
+      pointer.moved = pointerMovedPx(p);
       patchPose.x = Math.max(60, Math.min(VIEW_W - 60, p.x - patchDrag.dx));
       patchPose.y = Math.max(80, Math.min(VIEW_H - 40, p.y - patchDrag.dy));
       return;
@@ -3521,10 +3590,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dx = p.x - pointer.lastX;
     // Screen pixels, not canvas coords — on a phone the canvas is often ~half width,
     // so a 6px finger wobble already exceeds DRAG_THRESH when measured in canvas space.
-    pointer.moved = Math.hypot(
-      p.clientX - pointer.startClientX,
-      p.clientY - pointer.startClientY
-    );
+    pointer.moved = pointerMovedPx(p);
     pointer.lastX = p.x;
 
     if (scene === "world" && pointer.moved > DRAG_THRESH) {
