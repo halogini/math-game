@@ -20,7 +20,7 @@ let qrPopoutWindow = null;
 let qrPipWindow = null;
 
 function qrImageUrl(playHref, size) {
-  const s = size || 220;
+  const s = size || 600;
   return `https://api.qrserver.com/v1/create-qr-code/?size=${s}x${s}&ecc=M&data=${encodeURIComponent(playHref)}`;
 }
 
@@ -33,50 +33,295 @@ function fillQrPipDocument(pipWindow, code, playHref) {
   doc.title = `QR · ${code}`;
   doc.head.innerHTML = '';
   doc.body.innerHTML = '';
+
+  const qrImgSrc = qrImageUrl(playHref, 600);
+
   const style = doc.createElement('style');
   style.textContent = `
-    * { box-sizing: border-box; }
-    body {
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
       margin: 0;
-      font-family: 'Pretendard', system-ui, sans-serif;
-      background: #fff;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      user-select: none;
+    }
+    .qr-app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      padding: 10px 14px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .qr-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex: none;
+    }
+    .qr-badge {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .qr-badge strong {
+      letter-spacing: 0.1em;
+      color: #0369a1;
+    }
+    .size-chips {
+      display: flex;
+      gap: 4px;
+    }
+    .size-btn {
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .size-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .size-btn.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #ffffff;
+    }
+    .qr-stage {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      overflow: hidden;
     }
-    .qr-pip-card { text-align: center; padding: 12px; }
-    .qr-pip-label { margin: 0; font-size: 0.8rem; font-weight: 700; color: #0369a1; }
-    .qr-pip-code { margin: 4px 0 10px; font-size: 1.6rem; font-weight: 800; letter-spacing: 0.15em; color: #0f172a; }
-    .qr-pip-img { display: block; width: 220px; height: 220px; margin: 0 auto; }
-    .qr-pip-hint { margin: 10px 0 0; font-size: 0.78rem; color: #64748b; line-height: 1.4; }
+    .qr-img-wrapper {
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 16px;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.18s ease, height 0.18s ease;
+    }
+    .qr-img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .qr-footer {
+      width: 100%;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .qr-desc {
+      font-size: 0.78rem;
+      color: #64748b;
+      font-weight: 600;
+      text-align: center;
+    }
+    .qr-desc strong {
+      color: #0284c7;
+    }
+    .qr-zoom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 290px;
+    }
+    .zoom-step-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 6px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #334155;
+      cursor: pointer;
+    }
+    .zoom-step-btn:hover {
+      background: #cbd5e1;
+    }
+    .zoom-slider {
+      flex: 1;
+      accent-color: #0284c7;
+      cursor: pointer;
+      height: 6px;
+    }
   `;
   doc.head.appendChild(style);
 
-  const card = doc.createElement('div');
-  card.className = 'qr-pip-card';
+  const app = doc.createElement('div');
+  app.className = 'qr-app';
 
-  const label = doc.createElement('p');
-  label.className = 'qr-pip-label';
-  label.textContent = '세션 코드';
+  // Header
+  const header = doc.createElement('div');
+  header.className = 'qr-header';
 
-  const codeEl = doc.createElement('p');
-  codeEl.className = 'qr-pip-code';
-  codeEl.textContent = code;
+  const badge = doc.createElement('span');
+  badge.className = 'qr-badge';
+  badge.innerHTML = `세션 코드 <strong>${escapeHtml(code)}</strong>`;
+
+  const sizeChips = doc.createElement('div');
+  sizeChips.className = 'size-chips';
+
+  const sizes = [
+    { id: 'sm', label: '소 (220px)', px: 220 },
+    { id: 'md', label: '중 (280px)', px: 280 },
+    { id: 'lg', label: '대 (360px)', px: 360 },
+    { id: 'auto', label: '자동 (최대)', px: 'auto' }
+  ];
+
+  header.append(badge, sizeChips);
+
+  // Stage & QR
+  const stage = doc.createElement('div');
+  stage.className = 'qr-stage';
+
+  const imgWrapper = doc.createElement('div');
+  imgWrapper.className = 'qr-img-wrapper';
 
   const img = doc.createElement('img');
-  img.className = 'qr-pip-img';
+  img.className = 'qr-img';
   img.alt = '학생용 입장 QR';
-  img.width = 220;
-  img.height = 220;
-  img.src = qrImageUrl(playHref, 220);
+  img.src = qrImgSrc;
 
-  const hint = doc.createElement('p');
-  hint.className = 'qr-pip-hint';
-  hint.textContent = '학생이 카메라로 찍으세요';
+  imgWrapper.appendChild(img);
+  stage.appendChild(imgWrapper);
 
-  card.append(label, codeEl, img, hint);
-  doc.body.appendChild(card);
+  // Footer
+  const footer = doc.createElement('div');
+  footer.className = 'qr-footer';
+
+  const desc = doc.createElement('p');
+  desc.className = 'qr-desc';
+  desc.innerHTML = '학생이 카메라로 찍으면 <strong>바로 게임에 들어갑니다.</strong>';
+
+  const zoomBar = doc.createElement('div');
+  zoomBar.className = 'qr-zoom-bar';
+
+  const btnOut = doc.createElement('button');
+  btnOut.className = 'zoom-step-btn';
+  btnOut.textContent = '−';
+  btnOut.title = 'QR 축소';
+
+  const slider = doc.createElement('input');
+  slider.type = 'range';
+  slider.className = 'zoom-slider';
+  slider.min = '160';
+  slider.max = '600';
+  slider.step = '10';
+  slider.value = '300';
+  slider.title = 'QR 크기 조정';
+
+  const btnIn = doc.createElement('button');
+  btnIn.className = 'zoom-step-btn';
+  btnIn.textContent = '+';
+  btnIn.title = 'QR 확대';
+
+  zoomBar.append(btnOut, slider, btnIn);
+  footer.append(desc, zoomBar);
+
+  app.append(header, stage, footer);
+  doc.body.appendChild(app);
+
+  let currentMode = 'auto';
+
+  function applySize(val) {
+    if (val === 'auto') {
+      currentMode = 'auto';
+      const maxW = Math.max(160, doc.documentElement.clientWidth - 40);
+      const maxH = Math.max(160, doc.documentElement.clientHeight - 110);
+      const size = Math.min(maxW, maxH);
+      imgWrapper.style.width = `${size}px`;
+      imgWrapper.style.height = `${size}px`;
+      slider.value = String(Math.round(size));
+    } else {
+      currentMode = 'fixed';
+      const num = Math.min(600, Math.max(160, Number(val)));
+      imgWrapper.style.width = `${num}px`;
+      imgWrapper.style.height = `${num}px`;
+      slider.value = String(num);
+    }
+    sizeChips.querySelectorAll('.size-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.size === (currentMode === 'auto' ? 'auto' : val));
+    });
+  }
+
+  sizes.forEach(s => {
+    const btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'size-btn' + (s.id === 'auto' ? ' active' : '');
+    btn.dataset.size = s.id;
+    btn.textContent = s.id.toUpperCase();
+    btn.title = s.label;
+    btn.addEventListener('click', () => {
+      if (s.id === 'auto') {
+        applySize('auto');
+      } else {
+        applySize(s.px);
+      }
+    });
+    sizeChips.appendChild(btn);
+  });
+
+  slider.addEventListener('input', () => {
+    applySize(slider.value);
+  });
+
+  btnOut.addEventListener('click', () => {
+    const next = Math.max(160, parseInt(slider.value, 10) - 30);
+    applySize(next);
+  });
+
+  btnIn.addEventListener('click', () => {
+    const next = Math.min(600, parseInt(slider.value, 10) + 30);
+    applySize(next);
+  });
+
+  const win = pipWindow || doc.defaultView || window;
+  win.addEventListener('resize', () => {
+    if (currentMode === 'auto') {
+      applySize('auto');
+    }
+  });
+
+  setTimeout(() => {
+    applySize('auto');
+  }, 50);
 }
 
 async function openQrPip(code, playHref) {
@@ -87,8 +332,8 @@ async function openQrPip(code, playHref) {
       return true;
     }
     const pipWindow = await window.documentPictureInPicture.requestWindow({
-      width: 280,
-      height: 380
+      width: 380,
+      height: 490
     });
     qrPipWindow = pipWindow;
     fillQrPipDocument(pipWindow, code, playHref);
@@ -120,7 +365,7 @@ function qrPopoutUrl(code) {
 
 function openQrPopout(code) {
   const url = qrPopoutUrl(code);
-  const features = 'width=320,height=440,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+  const features = 'width=400,height=520,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
   if (qrPopoutWindow && !qrPopoutWindow.closed) {
     try {
       qrPopoutWindow.location.href = url;
@@ -156,7 +401,7 @@ function setStudentQr(url) {
     return;
   }
   img.alt = `학생용 입장 QR · ${url}`;
-  img.src = qrImageUrl(url, 220);
+  img.src = qrImageUrl(url, 360);
 }
 
 function escapeHtml(str) {

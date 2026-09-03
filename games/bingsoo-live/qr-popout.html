@@ -7,15 +7,178 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:;">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="lobby.css">
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      user-select: none;
+    }
+    .qr-app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      padding: 10px 14px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .qr-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex: none;
+    }
+    .qr-badge {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .qr-badge strong {
+      letter-spacing: 0.1em;
+      color: #0369a1;
+    }
+    .size-chips {
+      display: flex;
+      gap: 4px;
+    }
+    .size-btn {
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .size-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .size-btn.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #ffffff;
+    }
+    .qr-stage {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .qr-img-wrapper {
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 16px;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.18s ease, height 0.18s ease;
+    }
+    .qr-img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .qr-footer {
+      width: 100%;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .qr-desc {
+      font-size: 0.78rem;
+      color: #64748b;
+      font-weight: 600;
+      text-align: center;
+    }
+    .qr-desc strong {
+      color: #0284c7;
+    }
+    .qr-zoom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 290px;
+    }
+    .zoom-step-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 6px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #334155;
+      cursor: pointer;
+    }
+    .zoom-step-btn:hover {
+      background: #cbd5e1;
+    }
+    .zoom-slider {
+      flex: 1;
+      accent-color: #0284c7;
+      cursor: pointer;
+      height: 6px;
+    }
+    .qr-popout-error {
+      color: #dc2626;
+      font-weight: 700;
+      padding: 20px;
+      text-align: center;
+    }
+  </style>
 </head>
-<body class="qr-popout-body">
-  <div class="qr-popout-card">
-    <p class="qr-popout-label">세션 코드</p>
-    <p class="qr-popout-code" id="qr-code">————</p>
-    <img id="qr-img" class="qr-popout-img" alt="학생용 입장 QR" width="260" height="260">
-    <p class="qr-popout-hint">학생이 카메라로 찍으면<br>바로 게임에 들어갑니다.</p>
+<body>
+  <div class="qr-app" id="qr-app">
+    <div class="qr-header">
+      <span class="qr-badge">세션 코드 <strong id="qr-code">————</strong></span>
+      <div class="size-chips" id="size-chips"></div>
+    </div>
+    <div class="qr-stage">
+      <div class="qr-img-wrapper" id="qr-img-wrapper">
+        <img id="qr-img" class="qr-img" alt="학생용 입장 QR">
+      </div>
+    </div>
+    <div class="qr-footer">
+      <p class="qr-desc">학생이 카메라로 찍으면 <strong>바로 게임에 들어갑니다.</strong></p>
+      <div class="qr-zoom-bar">
+        <button type="button" class="zoom-step-btn" id="btn-zoom-out" title="QR 축소">−</button>
+        <input type="range" class="zoom-slider" id="zoom-slider" min="160" max="600" step="10" value="300" title="QR 크기 조정">
+        <button type="button" class="zoom-step-btn" id="btn-zoom-in" title="QR 확대">+</button>
+      </div>
+    </div>
   </div>
   <script>
     (function () {
@@ -27,8 +190,85 @@
       }
       const playHref = new URL(`../bingsoo/index.html?live=1&room=${encodeURIComponent(room)}`, window.location.href).href;
       document.getElementById('qr-code').textContent = room;
-      document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&ecc=M&data=${encodeURIComponent(playHref)}`;
+      document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=M&data=${encodeURIComponent(playHref)}`;
       document.title = `QR · ${room}`;
+
+      const imgWrapper = document.getElementById('qr-img-wrapper');
+      const slider = document.getElementById('zoom-slider');
+      const sizeChips = document.getElementById('size-chips');
+      const btnOut = document.getElementById('btn-zoom-out');
+      const btnIn = document.getElementById('btn-zoom-in');
+
+      const sizes = [
+        { id: 'sm', label: '소 (220px)', px: 220 },
+        { id: 'md', label: '중 (280px)', px: 280 },
+        { id: 'lg', label: '대 (360px)', px: 360 },
+        { id: 'auto', label: '자동 (최대)', px: 'auto' }
+      ];
+
+      let currentMode = 'auto';
+
+      function applySize(val) {
+        if (val === 'auto') {
+          currentMode = 'auto';
+          const maxW = Math.max(160, document.documentElement.clientWidth - 40);
+          const maxH = Math.max(160, document.documentElement.clientHeight - 110);
+          const size = Math.min(maxW, maxH);
+          imgWrapper.style.width = `${size}px`;
+          imgWrapper.style.height = `${size}px`;
+          slider.value = String(Math.round(size));
+        } else {
+          currentMode = 'fixed';
+          const num = Math.min(600, Math.max(160, Number(val)));
+          imgWrapper.style.width = `${num}px`;
+          imgWrapper.style.height = `${num}px`;
+          slider.value = String(num);
+        }
+        sizeChips.querySelectorAll('.size-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.size === (currentMode === 'auto' ? 'auto' : val));
+        });
+      }
+
+      sizes.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'size-btn' + (s.id === 'auto' ? ' active' : '');
+        btn.dataset.size = s.id;
+        btn.textContent = s.id.toUpperCase();
+        btn.title = s.label;
+        btn.addEventListener('click', () => {
+          if (s.id === 'auto') {
+            applySize('auto');
+          } else {
+            applySize(s.px);
+          }
+        });
+        sizeChips.appendChild(btn);
+      });
+
+      slider.addEventListener('input', () => {
+        applySize(slider.value);
+      });
+
+      btnOut.addEventListener('click', () => {
+        const next = Math.max(160, parseInt(slider.value, 10) - 30);
+        applySize(next);
+      });
+
+      btnIn.addEventListener('click', () => {
+        const next = Math.min(600, parseInt(slider.value, 10) + 30);
+        applySize(next);
+      });
+
+      window.addEventListener('resize', () => {
+        if (currentMode === 'auto') {
+          applySize('auto');
+        }
+      });
+
+      setTimeout(() => {
+        applySize('auto');
+      }, 50);
     }());
   </script>
 </body>
