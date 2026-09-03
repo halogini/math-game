@@ -59,6 +59,16 @@ html.force-landscape body.hud-overlay-mobile .canvas-wrapper.world-wrap {
 html.force-landscape .lab-bg {
   display: none;
 }
+html.force-landscape .modal-backdrop {
+  align-items: flex-start;
+  overflow: auto;
+  height: 100%;
+  max-height: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+html.force-landscape .modal-card {
+  max-height: none;
+}
 
 .lab-bg {
   position: fixed;

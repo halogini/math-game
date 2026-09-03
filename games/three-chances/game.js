@@ -522,10 +522,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const t = e.target;
       if (!t || !t.closest) return;
       if (t.closest("canvas, input, textarea, #rotate-gate")) return;
-      const sc = findScrollable(t) || t.closest(".modal-backdrop, .modal-card, .leaderboard-table-wrapper, .measure-ref-overlay");
+      const sc = findScrollable(t) || t.closest(".modal-backdrop, .modal-card, .leaderboard-table-wrapper, .measure-ref-overlay, #profile-modal");
       if (!sc) return;
       const loc = clientToAppLocal(e.clientX, e.clientY);
-      drag = { id: e.pointerId, sc, x: loc.x, y: loc.y, moved: false };
+      drag = {
+        id: e.pointerId,
+        sc,
+        x: loc.x,
+        y: loc.y,
+        cx: e.clientX,
+        cy: e.clientY,
+        moved: false
+      };
     }, true);
 
     document.addEventListener("pointermove", (e) => {
@@ -533,12 +541,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const loc = clientToAppLocal(e.clientX, e.clientY);
       const dx = loc.x - drag.x;
       const dy = loc.y - drag.y;
-      if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+      const pdx = e.clientX - drag.cx;
+      const pdy = e.clientY - drag.cy;
+      if (!drag.moved && Math.hypot(dx, dy, pdx, pdy) < 8) return;
       drag.moved = true;
-      drag.sc.scrollLeft -= dx;
-      drag.sc.scrollTop -= dy;
+      const useX = Math.abs(dx) >= Math.abs(pdx) ? dx : pdx;
+      const useY = Math.abs(dy) >= Math.abs(pdy) ? dy : pdy;
+      drag.sc.scrollLeft -= useX;
+      drag.sc.scrollTop -= useY;
       drag.x = loc.x;
       drag.y = loc.y;
+      drag.cx = e.clientX;
+      drag.cy = e.clientY;
       e.preventDefault();
     }, { capture: true, passive: false });
 
@@ -3154,25 +3168,20 @@ document.addEventListener("DOMContentLoaded", () => {
       successOverlay.setAttribute("aria-hidden", "false");
     }
     document.body.classList.add("modal-open");
-    try {
-      if (successVideo) {
-        successVideo.currentTime = 0;
-        const p = successVideo.play();
-        if (p && p.catch) p.catch(() => {});
-      }
-    } catch (e) { /* ignore */ }
+    playCutsceneVideo(successVideo);
   }
 
   function finishSuccessCutscene() {
     if (!pendingGameOverAfterSuccess) return;
     pendingGameOverAfterSuccess = false;
-    try { if (successVideo) successVideo.pause(); } catch (e) { /* ignore */ }
+    stopCutsceneVideo(successVideo);
     if (successOverlay) {
       successOverlay.classList.add("hidden");
       successOverlay.setAttribute("aria-hidden", "true");
     }
     document.body.classList.remove("modal-open");
     openGameOver();
+    requestAnimationFrame(relayoutForcedLandscape);
   }
 
   function playTimeoutThenGameOver() {
@@ -3183,25 +3192,20 @@ document.addEventListener("DOMContentLoaded", () => {
       timeoutOverlay.setAttribute("aria-hidden", "false");
     }
     document.body.classList.add("modal-open");
-    try {
-      if (timeoutVideo) {
-        timeoutVideo.currentTime = 0;
-        const p = timeoutVideo.play();
-        if (p && p.catch) p.catch(() => {});
-      }
-    } catch (e) { /* ignore */ }
+    playCutsceneVideo(timeoutVideo);
   }
 
   function finishTimeoutCutscene() {
     if (!pendingGameOverAfterTimeout) return;
     pendingGameOverAfterTimeout = false;
-    try { if (timeoutVideo) timeoutVideo.pause(); } catch (e) { /* ignore */ }
+    stopCutsceneVideo(timeoutVideo);
     if (timeoutOverlay) {
       timeoutOverlay.classList.add("hidden");
       timeoutOverlay.setAttribute("aria-hidden", "true");
     }
     document.body.classList.remove("modal-open");
     openGameOver();
+    requestAnimationFrame(relayoutForcedLandscape);
   }
 
   function openGameOver() {
@@ -3274,14 +3278,40 @@ document.addEventListener("DOMContentLoaded", () => {
     if (clearTimeMs != null) registerScoreToLeaderboard();
   }
 
+  function stopCutsceneVideo(v) {
+    if (!v) return;
+    try { v.pause(); } catch (e) { /* ignore */ }
+    if (!v.getAttribute("data-src")) {
+      const src = v.getAttribute("src") || v.currentSrc || "";
+      if (src) v.setAttribute("data-src", src);
+    }
+    v.removeAttribute("src");
+    try { v.load(); } catch (e) { /* ignore */ }
+  }
+
+  function playCutsceneVideo(v) {
+    if (!v) return;
+    const src = v.getAttribute("data-src") || v.getAttribute("src") || v.currentSrc;
+    if (src && v.getAttribute("src") !== src) v.src = src;
+    try {
+      v.currentTime = 0;
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) { /* ignore */ }
+  }
+
+  function relayoutForcedLandscape() {
+    if (!isForcedLandscape()) return;
+    applyForcedLandscape(true);
+    syncMobileLayout();
+  }
+
   /** 열려 있는 모달·컷신을 모두 닫고 대기 중인 컷신 상태를 해제 */
   function closeAllOverlays() {
     pendingStartAfterIntro = false;
     pendingGameOverAfterSuccess = false;
     pendingGameOverAfterTimeout = false;
-    [introVideo, successVideo, timeoutVideo].forEach((v) => {
-      try { if (v) v.pause(); } catch (e) { /* ignore */ }
-    });
+    [introVideo, successVideo, timeoutVideo].forEach(stopCutsceneVideo);
     [introOverlay, successOverlay, timeoutOverlay].forEach((el) => {
       if (!el) return;
       el.classList.add("hidden");
@@ -3314,9 +3344,13 @@ document.addEventListener("DOMContentLoaded", () => {
     lastTs = performance.now();
     beginTank();
     if (mobileFs) {
-      mobileFs.requestIfMobile();
+      if (!isForcedLandscape()) mobileFs.requestIfMobile();
       mobileFs.syncButton();
     }
+    requestAnimationFrame(() => {
+      relayoutForcedLandscape();
+      requestAnimationFrame(relayoutForcedLandscape);
+    });
   }
 
   // ---------- Measure (tank scene) ----------
@@ -5524,11 +5558,7 @@ document.addEventListener("DOMContentLoaded", () => {
     introOverlay.classList.remove("hidden");
     introOverlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
-    try {
-      introVideo.currentTime = 0;
-      const p = introVideo.play();
-      if (p && p.catch) p.catch(() => {});
-    } catch (e) { /* ignore */ }
+    playCutsceneVideo(introVideo);
   }
 
   function finishIntro() {

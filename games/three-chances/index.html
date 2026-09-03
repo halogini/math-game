@@ -11,16 +11,36 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:image" content="https://math-game-zeta-one.vercel.app/og-image.jpg">
-  <link rel="stylesheet" href="style.css?v=fs5">
+  <link rel="stylesheet" href="style.css?v=fs7">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700;800&family=Outfit:wght@400;600;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="../../config.sample.js"></script>
+  <style>
+    #rotate-gate {
+      position: fixed; inset: 0; z-index: 400;
+      display: none;
+      align-items: center; justify-content: center;
+      background: rgba(2, 8, 14, 0.94);
+      padding: 24px;
+    }
+    @media (orientation: portrait) and (max-width: 1024px) {
+      html:not(.force-landscape) #rotate-gate { display: flex !important; }
+    }
+    html.force-landscape #rotate-gate { display: none !important; }
+    @media (orientation: landscape), (min-width: 1025px) {
+      #rotate-gate { display: none !important; }
+    }
+  </style>
 </head>
 <body class="theme-lab">
+  <div id="rotate-gate" class="rotate-gate" role="dialog" aria-modal="true" aria-labelledby="rotate-gate-title">
+    <div class="rotate-gate-card">
+      <div id="rotate-phone-icon" class="rotate-phone" aria-hidden="true"></div>
+      <p id="rotate-gate-title" class="rotate-gate-title">가로로 돌려 주세요</p>
+      <p id="rotate-gate-desc" class="rotate-gate-desc">이 게임은 가로 화면에 맞춰져 있어요.</p>
+      <button type="button" id="btn-rotate-lock" class="btn-modal-action btn-primary">⛶ 가로 모드로 전환</button>
+    </div>
+  </div>
   <div class="lab-bg" aria-hidden="true"></div>
   <div class="game-container" id="game-container">
     <header class="game-header">
@@ -266,20 +286,16 @@
     </div>
   </div>
 
-  <div id="rotate-gate" class="rotate-gate hidden" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="rotate-gate-title">
-    <div class="rotate-gate-card">
-      <div id="rotate-phone-icon" class="rotate-phone" aria-hidden="true"></div>
-      <p id="rotate-gate-title" class="rotate-gate-title">가로로 돌려 주세요</p>
-      <p id="rotate-gate-desc" class="rotate-gate-desc">이 게임은 가로 화면에 맞춰져 있어요.</p>
-      <button type="button" id="btn-rotate-lock" class="btn-modal-action btn-primary hidden">⛶ 가로 모드로 전환</button>
-    </div>
-  </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="../../config.sample.js"></script>
   <script src="../../shared/halomath-mode.js?v=fs2"></script>
   <script src="../../shared/halomath-profile.js?v=fs2"></script>
   <script src="../../shared/halomath-scores.js?v=fs2"></script>
   <script src="../../shared/mobile-fullscreen.js?v=fs2"></script>
-  <script src="game.js?v=fs5"></script>
+  <script src="game.js?v=fs7"></script>
 </body>
 </html>
