@@ -2135,109 +2135,291 @@ function initBingsoo2Game() {
     doc.head.innerHTML = '';
     doc.body.innerHTML = '';
 
-    const qrImgSrc = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&ecc=M&data=${encodeURIComponent(targetUrl)}`;
+    const qrImgSrc = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=M&data=${encodeURIComponent(targetUrl)}`;
 
     const style = doc.createElement('style');
     style.textContent = `
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body {
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
         font-family: 'Pretendard', system-ui, -apple-system, sans-serif;
         background: #f8fafc;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 14px;
-        text-align: center;
         color: #0f172a;
         user-select: none;
       }
-      .qr-card {
-        background: #ffffff;
-        padding: 16px;
-        border-radius: 16px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-        border: 1px solid #e2e8f0;
-        width: 100%;
-        max-width: 280px;
+      .qr-app {
         display: flex;
         flex-direction: column;
+        height: 100%;
+        width: 100%;
+        padding: 10px 14px;
+        justify-content: space-between;
         align-items: center;
+        gap: 6px;
+      }
+      .qr-header {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex: none;
       }
       .qr-badge {
-        display: inline-block;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: 700;
         color: #0284c7;
         background: #e0f2fe;
-        padding: 3px 10px;
+        padding: 4px 10px;
         border-radius: 20px;
-        margin-bottom: 6px;
+        white-space: nowrap;
       }
-      .qr-title {
-        font-size: 1.05rem;
-        font-weight: 800;
-        color: #1e293b;
-        margin-bottom: 10px;
+      .size-chips {
+        display: flex;
+        gap: 4px;
       }
-      .qr-img-wrapper {
+      .size-btn {
         background: #ffffff;
-        padding: 8px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .size-btn:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+      }
+      .size-btn.active {
+        background: #0284c7;
+        border-color: #0284c7;
+        color: #ffffff;
+      }
+      .qr-stage {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 10px;
+        overflow: hidden;
+      }
+      .qr-img-wrapper {
+        background: #ffffff;
+        padding: 10px;
+        border-radius: 16px;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: width 0.18s ease, height 0.18s ease;
       }
       .qr-img {
         display: block;
-        width: 200px;
-        height: 200px;
-        border-radius: 6px;
+        width: 100%;
+        height: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+        border-radius: 8px;
+      }
+      .qr-footer {
+        width: 100%;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
       }
       .qr-desc {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: #64748b;
-        line-height: 1.4;
-        font-weight: 500;
+        font-weight: 600;
+        text-align: center;
       }
       .qr-desc strong {
         color: #0284c7;
       }
+      .qr-zoom-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 290px;
+      }
+      .zoom-step-btn {
+        background: #e2e8f0;
+        border: none;
+        border-radius: 6px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #334155;
+        cursor: pointer;
+      }
+      .zoom-step-btn:hover {
+        background: #cbd5e1;
+      }
+      .zoom-slider {
+        flex: 1;
+        accent-color: #0284c7;
+        cursor: pointer;
+        height: 6px;
+      }
     `;
     doc.head.appendChild(style);
 
-    const card = doc.createElement('div');
-    card.className = 'qr-card';
+    const app = doc.createElement('div');
+    app.className = 'qr-app';
+
+    // Header
+    const header = doc.createElement('div');
+    header.className = 'qr-header';
 
     const badge = doc.createElement('span');
     badge.className = 'qr-badge';
     badge.textContent = '🍧 할로매쓰 빙수 2탄';
 
-    const title = doc.createElement('div');
-    title.className = 'qr-title';
-    title.textContent = '학생 접속 QR 코드';
+    const sizeChips = doc.createElement('div');
+    sizeChips.className = 'size-chips';
 
-    const imgWrap = doc.createElement('div');
-    imgWrap.className = 'qr-img-wrapper';
+    const sizes = [
+      { id: 'sm', label: '소 (220px)', px: 220 },
+      { id: 'md', label: '중 (280px)', px: 280 },
+      { id: 'lg', label: '대 (360px)', px: 360 },
+      { id: 'auto', label: '자동 (최대)', px: 'auto' }
+    ];
+
+    header.append(badge, sizeChips);
+
+    // Stage & QR
+    const stage = doc.createElement('div');
+    stage.className = 'qr-stage';
+
+    const imgWrapper = doc.createElement('div');
+    imgWrapper.className = 'qr-img-wrapper';
 
     const img = doc.createElement('img');
     img.className = 'qr-img';
-    img.alt = '빙수 2탄 입장 QR 코드';
-    img.width = 200;
-    img.height = 200;
+    img.alt = '빙수 2탄 학생 입장 QR 코드';
     img.src = qrImgSrc;
 
-    imgWrap.appendChild(img);
+    imgWrapper.appendChild(img);
+    stage.appendChild(imgWrapper);
+
+    // Footer
+    const footer = doc.createElement('div');
+    footer.className = 'qr-footer';
 
     const desc = doc.createElement('p');
     desc.className = 'qr-desc';
-    desc.innerHTML = '스마트폰/태블릿 카메라로 비추면<br><strong>바로 게임에 접속</strong>할 수 있습니다.';
+    desc.innerHTML = '스마트폰/태블릿 카메라로 비추면 <strong>바로 접속</strong>됩니다.';
 
-    card.append(badge, title, imgWrap, desc);
-    doc.body.appendChild(card);
+    const zoomBar = doc.createElement('div');
+    zoomBar.className = 'qr-zoom-bar';
+
+    const btnOut = doc.createElement('button');
+    btnOut.className = 'zoom-step-btn';
+    btnOut.textContent = '−';
+    btnOut.title = 'QR 축소';
+
+    const slider = doc.createElement('input');
+    slider.type = 'range';
+    slider.className = 'zoom-slider';
+    slider.min = '160';
+    slider.max = '600';
+    slider.step = '10';
+    slider.value = '300';
+    slider.title = 'QR 크기 조정';
+
+    const btnIn = doc.createElement('button');
+    btnIn.className = 'zoom-step-btn';
+    btnIn.textContent = '+';
+    btnIn.title = 'QR 확대';
+
+    zoomBar.append(btnOut, slider, btnIn);
+    footer.append(desc, zoomBar);
+
+    app.append(header, stage, footer);
+    doc.body.appendChild(app);
+
+    let currentMode = 'auto'; // 'auto' or fixed px
+
+    function applySize(val) {
+      if (val === 'auto') {
+        currentMode = 'auto';
+        const maxW = Math.max(160, doc.documentElement.clientWidth - 40);
+        const maxH = Math.max(160, doc.documentElement.clientHeight - 110);
+        const size = Math.min(maxW, maxH);
+        imgWrapper.style.width = `${size}px`;
+        imgWrapper.style.height = `${size}px`;
+        slider.value = String(Math.round(size));
+      } else {
+        currentMode = 'fixed';
+        const num = Math.min(600, Math.max(160, Number(val)));
+        imgWrapper.style.width = `${num}px`;
+        imgWrapper.style.height = `${num}px`;
+        slider.value = String(num);
+      }
+      sizeChips.querySelectorAll('.size-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.size === (currentMode === 'auto' ? 'auto' : val));
+      });
+    }
+
+    sizes.forEach(s => {
+      const btn = doc.createElement('button');
+      btn.className = 'size-btn' + (s.id === 'auto' ? ' active' : '');
+      btn.dataset.size = s.id;
+      btn.textContent = s.id.toUpperCase();
+      btn.title = s.label;
+      btn.addEventListener('click', () => {
+        if (s.id === 'auto') {
+          applySize('auto');
+        } else {
+          applySize(s.px);
+        }
+      });
+      sizeChips.appendChild(btn);
+    });
+
+    slider.addEventListener('input', () => {
+      applySize(slider.value);
+    });
+
+    btnOut.addEventListener('click', () => {
+      const next = Math.max(160, parseInt(slider.value, 10) - 30);
+      applySize(next);
+    });
+
+    btnIn.addEventListener('click', () => {
+      const next = Math.min(600, parseInt(slider.value, 10) + 30);
+      applySize(next);
+    });
+
+    // Auto-fit on window resize (PiP window drag resize)
+    const win = doc.defaultView || window;
+    win.addEventListener('resize', () => {
+      if (currentMode === 'auto') {
+        applySize('auto');
+      }
+    });
+
+    // Initial size
+    setTimeout(() => {
+      applySize('auto');
+    }, 50);
   }
 
   async function openQrPipOrPopup() {
@@ -2250,8 +2432,8 @@ function initBingsoo2Game() {
           return;
         }
         const pipWindow = await window.documentPictureInPicture.requestWindow({
-          width: 290,
-          height: 380
+          width: 380,
+          height: 490
         });
         qrPipWindow = pipWindow;
         fillQrPipDocument(pipWindow.document, targetUrl);
@@ -2264,7 +2446,7 @@ function initBingsoo2Game() {
       }
     }
 
-    const features = 'width=320,height=420,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
+    const features = 'width=400,height=520,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
     if (qrPopoutWindow && !qrPopoutWindow.closed) {
       try {
         fillQrPipDocument(qrPopoutWindow.document, targetUrl);
