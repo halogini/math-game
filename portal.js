@@ -249,6 +249,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const widths = showId
       ? ['w-xs', 'w-md', 'w-sm', 'w-lg']
       : ['w-xs', 'w-md', 'w-lg'];
+    if (portalAdminUnlocked) {
+      widths.push('w-xs');
+    }
     let html = '';
     for (let i = 0; i < rowCount; i++) {
       html += `<tr class="lb-skeleton-row" aria-hidden="true">${widths.map((w) =>
@@ -285,29 +288,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function fetchScoresDataViaRest(timeoutMs = 4000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const dbUrl = (firebaseConfig && firebaseConfig.databaseURL) || 'https://math-game-halogini-default-rtdb.firebaseio.com';
+      const res = await fetch(`${dbUrl}/scores.json`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.warn('Leaderboard REST fetch failed:', err);
+      return null;
+    }
+  }
+
   function listenRealtimeLeaderboard() {
     stopLeaderboardListeners();
     const fetchId = ++leaderboardFetchGen;
     renderLeaderboardSkeleton(leaderboardTbody);
-    if (!firebaseDb) {
-      lastFullList = [];
-      renderLeaderboardTable([]);
-      return;
-    }
 
-    firebaseDb.ref('scores').once('value')
-      .then((snap) => {
-        if (fetchId !== leaderboardFetchGen) return;
-        const list = collectGameScores(snap.val(), activeLeaderboardGame);
-        lastFullList = list;
-        renderLeaderboardTable(getLeaderboardDisplayList(list, activeLeaderboardGame));
-      })
-      .catch((err) => {
-        if (fetchId !== leaderboardFetchGen) return;
-        console.error('Leaderboard fetch error:', err);
-        lastFullList = [];
-        renderLeaderboardTable([]);
-      });
+    const applyData = (dataObj) => {
+      if (fetchId !== leaderboardFetchGen) return;
+      const list = collectGameScores(dataObj, activeLeaderboardGame);
+      lastFullList = list;
+      renderLeaderboardTable(getLeaderboardDisplayList(list, activeLeaderboardGame));
+    };
+
+    let resolved = false;
+    const timeoutId = setTimeout(() => {
+      if (resolved || fetchId !== leaderboardFetchGen) return;
+      resolved = true;
+      console.warn('Leaderboard SDK fetch timed out; attempting REST fallback.');
+      fetchScoresDataViaRest()
+        .then((data) => {
+          if (fetchId !== leaderboardFetchGen) return;
+          applyData(data);
+        })
+        .catch(() => {
+          if (fetchId !== leaderboardFetchGen) return;
+          lastFullList = [];
+          renderLeaderboardTable([]);
+        });
+    }, 3500);
+
+    if (firebaseDb) {
+      firebaseDb.ref('scores').once('value')
+        .then((snap) => {
+          if (resolved || fetchId !== leaderboardFetchGen) return;
+          resolved = true;
+          clearTimeout(timeoutId);
+          applyData(snap.val());
+        })
+        .catch((err) => {
+          if (resolved || fetchId !== leaderboardFetchGen) return;
+          resolved = true;
+          clearTimeout(timeoutId);
+          console.warn('Leaderboard SDK fetch failed; attempting REST fallback.', err);
+          fetchScoresDataViaRest()
+            .then((data) => {
+              if (fetchId !== leaderboardFetchGen) return;
+              applyData(data);
+            })
+            .catch(() => {
+              if (fetchId !== leaderboardFetchGen) return;
+              lastFullList = [];
+              renderLeaderboardTable([]);
+            });
+        });
+    } else {
+      clearTimeout(timeoutId);
+      fetchScoresDataViaRest()
+        .then((data) => {
+          if (fetchId !== leaderboardFetchGen) return;
+          applyData(data);
+        })
+        .catch(() => {
+          if (fetchId !== leaderboardFetchGen) return;
+          lastFullList = [];
+          renderLeaderboardTable([]);
+        });
+    }
   }
 
   function collectGameScores(dataObj, gameKey) {
@@ -616,9 +678,16 @@ document.addEventListener('DOMContentLoaded', () => {
       ...(showId ? ['학번'] : []),
       activeLeaderboardGame === 'three-chances' ? '클리어 시간' : (activeLeaderboardGame === 'prism-tycoon' ? '총 수익' : '최고 점수')
     ]];
-    const ranked = activeLeaderboardGame === 'three-chances'
-      ? withCompetitionRanks(list, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
-      : withCompetitionRanks(list, (item) => item.score);
+    const getCompetitionRankKey = (item) => {
+      if (activeLeaderboardGame === 'three-chances') {
+        return item.metricLabel || formatClearTime(item.clearTimeMs);
+      }
+      if (activeLeaderboardGame === 'bingsoo2') {
+        return `${item.score}_${item.totalErrorPx}_${item.playTimeMs}`;
+      }
+      return item.score;
+    };
+    const ranked = withCompetitionRanks(list, getCompetitionRankKey);
     ranked.forEach(({ item, rank }) => {
       const line = [String(rank), item.name || ''];
       if (showId) line.push(item.studentId || '');
@@ -684,9 +753,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const ranked = activeLeaderboardGame === 'three-chances'
-      ? withCompetitionRanks(visible, (item) => item.metricLabel || formatClearTime(item.clearTimeMs))
-      : withCompetitionRanks(visible, (item) => item.score);
+    const getCompetitionRankKey = (item) => {
+      if (activeLeaderboardGame === 'three-chances') {
+        return item.metricLabel || formatClearTime(item.clearTimeMs);
+      }
+      if (activeLeaderboardGame === 'bingsoo2') {
+        return `${item.score}_${item.totalErrorPx}_${item.playTimeMs}`;
+      }
+      return item.score;
+    };
+
+    const ranked = withCompetitionRanks(visible, getCompetitionRankKey);
 
     ranked.forEach(({ item, rank, tied }) => {
       const tr = document.createElement('tr');
