@@ -249,31 +249,171 @@ document.addEventListener("DOMContentLoaded", () => {
   // Declared before MobileFullscreen() — its constructor calls isPlaying() immediately.
   let running = false;
 
+  function isIOSDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function isForcedLandscape() {
+    return document.documentElement.classList.contains("force-landscape");
+  }
+
+  function isNaturalPortrait() {
+    return window.innerHeight > window.innerWidth && window.innerWidth <= 1024;
+  }
+
+  function forcedViewport() {
+    const vv = window.visualViewport;
+    return {
+      w: Math.round(vv ? vv.width : window.innerWidth),
+      h: Math.round(vv ? vv.height : window.innerHeight),
+      top: Math.round(vv ? vv.offsetTop : 0),
+      left: Math.round(vv ? vv.offsetLeft : 0)
+    };
+  }
+
+  function clientToAppLocal(clientX, clientY) {
+    const v = forcedViewport();
+    return {
+      x: clientY - v.top,
+      y: (v.left + v.w) - clientX
+    };
+  }
+
+  function applyForcedLandscape(on) {
+    const root = document.documentElement;
+    const enable = !!on && isNaturalPortrait();
+    if (enable) root.classList.add("force-landscape");
+    else root.classList.remove("force-landscape");
+
+    const el = document.body;
+    if (!enable) {
+      el.style.position = "";
+      el.style.inset = "";
+      el.style.top = "";
+      el.style.left = "";
+      el.style.right = "";
+      el.style.bottom = "";
+      el.style.width = "";
+      el.style.height = "";
+      el.style.transform = "";
+      el.style.transformOrigin = "";
+      return;
+    }
+
+    const vv = forcedViewport();
+    el.style.position = "fixed";
+    el.style.inset = "auto";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+    el.style.top = vv.top + "px";
+    el.style.left = (vv.left + vv.w) + "px";
+    el.style.width = vv.h + "px";
+    el.style.height = vv.w + "px";
+    el.style.transform = "rotate(90deg)";
+    el.style.transformOrigin = "top left";
+  }
+
   function tryLockLandscape() {
     const orient = screen.orientation;
-    if (!orient || typeof orient.lock !== "function") return;
-    const p = orient.lock("landscape");
-    if (p && typeof p.catch === "function") p.catch(() => {});
+    if (!orient || typeof orient.lock !== "function") return Promise.resolve(false);
+    const types = ["landscape", "landscape-primary", "landscape-secondary"];
+    return types.reduce((prev, type) => prev.then((ok) => {
+      if (ok) return true;
+      try {
+        const p = orient.lock(type);
+        return Promise.resolve(p).then(() => true).catch(() => false);
+      } catch (_) {
+        return false;
+      }
+    }), Promise.resolve(false));
+  }
+
+  function requestFullscreenNow() {
+    const el = document.documentElement;
+    const active = document.fullscreenElement || document.webkitFullscreenElement;
+    if (active) return Promise.resolve();
+    const tryReq = (target, withNav) => {
+      if (!target || typeof target.requestFullscreen !== "function") return null;
+      try {
+        return withNav
+          ? target.requestFullscreen({ navigationUI: "hide" })
+          : target.requestFullscreen();
+      } catch (_) {
+        return null;
+      }
+    };
+    const req = tryReq(el, true) || tryReq(el, false);
+    if (req && typeof req.then === "function") {
+      return req.catch(() => {
+        const retry = tryReq(el, false);
+        return retry && typeof retry.then === "function" ? retry.catch(() => {}) : undefined;
+      });
+    }
+    try {
+      if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (_) {}
+    return Promise.resolve();
+  }
+
+  function requestLandscapeMode() {
+    tryLockLandscape();
+    requestFullscreenNow();
+    tryLockLandscape();
+    if (isNaturalPortrait()) applyForcedLandscape(true);
+    requestAnimationFrame(() => {
+      syncMobileLayout();
+      if (mobileFs) mobileFs.syncButton();
+    });
+    const afterFs = () => { tryLockLandscape().then(() => syncMobileLayout()); };
+    document.addEventListener("fullscreenchange", afterFs, { once: true });
+    document.addEventListener("webkitfullscreenchange", afterFs, { once: true });
   }
 
   function syncRotateGate() {
-    portraitBlocked = portraitGateMq.matches;
+    const forced = isForcedLandscape();
+    portraitBlocked = !forced && portraitGateMq.matches;
     document.body.classList.toggle("needs-landscape", portraitBlocked);
     if (!rotateGate) return;
-    rotateGate.classList.toggle("hidden", !portraitBlocked);
-    rotateGate.hidden = !portraitBlocked;
-    rotateGate.setAttribute("aria-hidden", portraitBlocked ? "false" : "true");
+
+    if (!portraitBlocked) {
+      rotateGate.classList.add("hidden");
+      rotateGate.hidden = true;
+      rotateGate.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    const lockBtn = document.getElementById("btn-rotate-lock");
+    const titleEl = document.getElementById("rotate-gate-title");
+    const descEl = document.getElementById("rotate-gate-desc");
+    const phoneIcon = document.getElementById("rotate-phone-icon");
+    if (isIOSDevice()) {
+      if (phoneIcon) phoneIcon.classList.remove("hidden");
+      if (titleEl) titleEl.textContent = "가로로 돌려 주세요";
+      if (descEl) descEl.textContent = "이 게임은 가로 화면에 맞춰져 있어요.";
+      if (lockBtn) lockBtn.classList.add("hidden");
+    } else {
+      if (phoneIcon) phoneIcon.classList.add("hidden");
+      if (titleEl) titleEl.textContent = "가로 모드로 전환";
+      if (descEl) descEl.textContent = "아래 버튼을 누르면 가로 화면으로 전환됩니다.";
+      if (lockBtn) lockBtn.classList.remove("hidden");
+    }
+    rotateGate.classList.remove("hidden");
+    rotateGate.hidden = false;
+    rotateGate.setAttribute("aria-hidden", "false");
   }
 
   function syncHudPlacement() {
     if (!playHud || !headerHudSlot || !playHudSlot) return;
-    const overlay = hudOverlayMq.matches;
+    const overlay = hudOverlayMq.matches || isForcedLandscape();
     document.body.classList.toggle("hud-overlay-mobile", overlay);
     const host = overlay ? playHudSlot : headerHudSlot;
     if (playHud.parentElement !== host) host.appendChild(playHud);
   }
 
   function syncMobileLayout() {
+    if (isForcedLandscape() && isNaturalPortrait()) applyForcedLandscape(true);
+    else if (!isNaturalPortrait()) applyForcedLandscape(false);
     syncRotateGate();
     syncHudPlacement();
   }
@@ -289,20 +429,106 @@ document.addEventListener("DOMContentLoaded", () => {
     : null;
 
   if (typeof hudOverlayMq.addEventListener === "function") {
-    hudOverlayMq.addEventListener("change", syncHudPlacement);
+    hudOverlayMq.addEventListener("change", syncMobileLayout);
   } else if (typeof hudOverlayMq.addListener === "function") {
-    hudOverlayMq.addListener(syncHudPlacement);
+    hudOverlayMq.addListener(syncMobileLayout);
   }
   if (typeof portraitGateMq.addEventListener === "function") {
-    portraitGateMq.addEventListener("change", syncRotateGate);
+    portraitGateMq.addEventListener("change", syncMobileLayout);
   } else if (typeof portraitGateMq.addListener === "function") {
-    portraitGateMq.addListener(syncRotateGate);
+    portraitGateMq.addListener(syncMobileLayout);
   }
   window.addEventListener("orientationchange", () => setTimeout(syncMobileLayout, 50));
   window.addEventListener("resize", () => {
     clearTimeout(syncMobileLayout._t);
     syncMobileLayout._t = setTimeout(syncMobileLayout, 80);
   });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+      clearTimeout(syncMobileLayout._t);
+      syncMobileLayout._t = setTimeout(syncMobileLayout, 80);
+    });
+  }
+
+  const btnRotateLock = document.getElementById("btn-rotate-lock");
+  if (btnRotateLock) {
+    let lastRotateTap = 0;
+    const onRotateTap = (e) => {
+      const now = Date.now();
+      if (now - lastRotateTap < 500) return;
+      lastRotateTap = now;
+      e.preventDefault();
+      e.stopPropagation();
+      sound.init();
+      requestLandscapeMode();
+    };
+    btnRotateLock.addEventListener("click", onRotateTap);
+    btnRotateLock.addEventListener("touchend", onRotateTap, { passive: false });
+    btnRotateLock.addEventListener("pointerup", (e) => {
+      if (e.pointerType === "touch" || e.pointerType === "pen") onRotateTap(e);
+    });
+  }
+
+  (function bindForcedLandscapeScrolling() {
+    let drag = null;
+
+    function isScrollable(el) {
+      if (!el || el === document.body || el === document.documentElement) return false;
+      const style = window.getComputedStyle(el);
+      const canY = (style.overflowY === "auto" || style.overflowY === "scroll") &&
+        el.scrollHeight > el.clientHeight + 1;
+      const canX = (style.overflowX === "auto" || style.overflowX === "scroll") &&
+        el.scrollWidth > el.clientWidth + 1;
+      return canY || canX;
+    }
+
+    function findScrollable(start) {
+      let el = start;
+      while (el && el !== document.body) {
+        if (isScrollable(el)) return el;
+        el = el.parentElement;
+      }
+      return null;
+    }
+
+    document.addEventListener("touchmove", (e) => {
+      if (!isForcedLandscape()) return;
+      const t = e.target;
+      if (t && t.closest && t.closest("input, textarea, canvas")) return;
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener("pointerdown", (e) => {
+      if (!isForcedLandscape()) return;
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest("canvas, input, textarea, #rotate-gate")) return;
+      const sc = findScrollable(t) || t.closest(".modal-backdrop, .modal-card, .leaderboard-table-wrapper, .measure-ref-overlay");
+      if (!sc) return;
+      const loc = clientToAppLocal(e.clientX, e.clientY);
+      drag = { id: e.pointerId, sc, x: loc.x, y: loc.y, moved: false };
+    }, true);
+
+    document.addEventListener("pointermove", (e) => {
+      if (!drag || drag.id !== e.pointerId || !isForcedLandscape()) return;
+      const loc = clientToAppLocal(e.clientX, e.clientY);
+      const dx = loc.x - drag.x;
+      const dy = loc.y - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 8) return;
+      drag.moved = true;
+      drag.sc.scrollLeft -= dx;
+      drag.sc.scrollTop -= dy;
+      drag.x = loc.x;
+      drag.y = loc.y;
+      e.preventDefault();
+    }, { capture: true, passive: false });
+
+    const endDrag = (e) => {
+      if (drag && (!e || drag.id === e.pointerId)) drag = null;
+    };
+    document.addEventListener("pointerup", endDrag, true);
+    document.addEventListener("pointercancel", endDrag, true);
+  })();
 
   const quizModal = document.getElementById("quiz-modal");
   const quizPrompt = document.getElementById("quiz-prompt");
@@ -3171,12 +3397,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------- Pointer ----------
   function canvasPos(evt) {
-    const rect = canvas.getBoundingClientRect();
-    // touchend has an empty touches list that is still truthy — prefer changedTouches.
     const src =
       (evt.changedTouches && evt.changedTouches.length > 0 && evt.changedTouches[0])
       || (evt.touches && evt.touches.length > 0 && evt.touches[0])
       || evt;
+    if (isForcedLandscape()) {
+      const loc = clientToAppLocal(src.clientX, src.clientY);
+      let left = 0;
+      let top = 0;
+      let el = canvas;
+      while (el && el !== document.body) {
+        left += el.offsetLeft;
+        top += el.offsetTop;
+        el = el.offsetParent;
+      }
+      const rw = canvas.offsetWidth || 1;
+      const rh = canvas.offsetHeight || 1;
+      return {
+        x: ((loc.x - left) / rw) * canvas.width,
+        y: ((loc.y - top) / rh) * canvas.height,
+        clientX: src.clientX,
+        clientY: src.clientY
+      };
+    }
+    const rect = canvas.getBoundingClientRect();
     const rw = rect.width || 1;
     const rh = rect.height || 1;
     return {
@@ -5516,7 +5760,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.remove("modal-open");
     updateHud();
     sound.init();
-    tryLockLandscape();
+    requestLandscapeMode();
     // 시작 버튼은 진행 중이어도 항상 처음부터 다시 시작
     closeAllOverlays();
     playIntroThenStart();

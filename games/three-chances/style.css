@@ -21,6 +21,43 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Android rotation-lock: CSS landscape fallback (same idea as prism-tycoon). */
+html.force-landscape,
+html.force-landscape body {
+  overflow: hidden;
+  touch-action: none;
+}
+html.force-landscape input,
+html.force-landscape textarea,
+html.force-landscape button,
+html.force-landscape a {
+  touch-action: manipulation;
+}
+html.force-landscape body {
+  position: fixed;
+  inset: auto;
+  right: auto;
+  bottom: auto;
+  top: 0;
+  left: 100vw;
+  left: 100dvw;
+  width: 100vh;
+  width: 100dvh;
+  height: 100vw;
+  height: 100dvw;
+  transform: rotate(90deg);
+  transform-origin: top left;
+}
+html.force-landscape body.hud-overlay-mobile,
+html.force-landscape body.hud-overlay-mobile .game-container {
+  width: 100%;
+  height: 100%;
+}
+html.force-landscape body.hud-overlay-mobile .canvas-wrapper.world-wrap {
+  width: min(100%, calc(100% * 960 / 520));
+  max-height: 100%;
+}
+
 .lab-bg {
   position: fixed;
   inset: 0;
@@ -710,6 +747,7 @@ body.mode-dorms #opening-champ-id {
   height: 100%;
   object-fit: contain;
   background: #000;
+  pointer-events: none;
 }
 .intro-chrome {
   position: absolute;
@@ -820,6 +858,11 @@ body.mode-dorms #opening-champ-id {
 .rotate-gate-card {
   text-align: center;
   max-width: 280px;
+  pointer-events: auto;
+}
+#btn-rotate-lock {
+  margin-top: 14px;
+  touch-action: manipulation;
 }
 .rotate-phone {
   width: 46px;
