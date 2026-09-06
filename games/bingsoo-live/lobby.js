@@ -1,14 +1,33 @@
+const LIVE_GAME = Object.assign({
+  gameId: 'bingsoo',
+  compareMode: 'higher',
+  sessionWindowName: 'halomath-bingsoo-session',
+  qrWindowName: 'halomath-bingsoo-qr',
+  qrPopoutPath: 'qr-popout.html'
+}, (typeof window !== 'undefined' && window.HalomathLiveGame) || {});
+
+function liveGameId() {
+  return LIVE_GAME.gameId || 'bingsoo';
+}
+
+function liveOptions() {
+  return { gameId: liveGameId(), compareMode: LIVE_GAME.compareMode || 'higher' };
+}
+
 function hostUrl(code) {
   return new URL(`host.html?room=${encodeURIComponent(code)}`, window.location.href).href;
 }
 
 function qrPopoutUrl(code) {
-  return new URL(`qr-popout.html?room=${encodeURIComponent(code)}`, window.location.href).href;
+  const url = new URL(LIVE_GAME.qrPopoutPath || 'qr-popout.html', window.location.href);
+  url.searchParams.set('room', code);
+  if (liveGameId() !== 'bingsoo') url.searchParams.set('game', liveGameId());
+  return url.href;
 }
 
 function openQrPopout(code) {
   const features = 'width=320,height=440,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no';
-  const opened = window.open(qrPopoutUrl(code), 'halomath-bingsoo-qr', features);
+  const opened = window.open(qrPopoutUrl(code), LIVE_GAME.qrWindowName || 'halomath-bingsoo-qr', features);
   if (opened) {
     try { opened.focus(); } catch (e) { /* ignore */ }
   }
@@ -17,7 +36,7 @@ function openQrPopout(code) {
 
 function openHostWindow(code) {
   const url = hostUrl(code);
-  const opened = window.open(url, 'halomath-bingsoo-session');
+  const opened = window.open(url, LIVE_GAME.sessionWindowName || 'halomath-bingsoo-session');
   if (!opened) {
     window.location.href = url;
     return false;
@@ -80,9 +99,9 @@ document.getElementById('btn-host').addEventListener('click', async () => {
 
   try {
     await HalomathLive.ensureHostAuth();
-    let existing = HalomathLive.loadLastRoom();
+    let existing = HalomathLive.loadLastRoom(liveGameId());
     if (existing && !(await HalomathLive.roomIsActive(existing))) {
-      HalomathLive.saveLastRoom('');
+      HalomathLive.saveLastRoom('', liveGameId());
       hideReopen();
       existing = '';
     }
@@ -96,18 +115,18 @@ document.getElementById('btn-host').addEventListener('click', async () => {
         setStatus('진행 중 세션 창을 열었습니다.');
         return;
       }
-      const shouldEnd = await HalomathLive.promptEndRoom(existing);
+      const shouldEnd = await HalomathLive.promptEndRoom(existing, liveOptions());
       if (!shouldEnd) {
         setStatus('이전 세션을 그대로 둡니다.');
         return;
       }
-      await HalomathLive.deleteRoom(existing);
+      await HalomathLive.deleteRoom(existing, liveGameId());
       hideReopen();
     }
 
     setStatus('빈 세션 코드를 찾는 중…');
-    const code = await HalomathLive.createRoom();
-    HalomathLive.saveLastRoom(code);
+    const code = await HalomathLive.createRoom(liveGameId());
+    HalomathLive.saveLastRoom(code, liveGameId());
     showReopen(code);
 
     const popped = openHostWindow(code);
@@ -123,7 +142,7 @@ document.getElementById('btn-host').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-reopen').addEventListener('click', async () => {
-  const code = window.HalomathLive ? HalomathLive.loadLastRoom() : '';
+  const code = window.HalomathLive ? HalomathLive.loadLastRoom(liveGameId()) : '';
   if (!code) {
     hideReopen();
     return;
@@ -141,15 +160,20 @@ document.getElementById('btn-reopen').addEventListener('click', async () => {
 window.addEventListener('message', (e) => {
   if (!e.data || e.data.type !== 'halomath-live-ended') return;
   if (e.origin !== window.location.origin && e.origin !== 'null') return;
-  if (window.HalomathLive) HalomathLive.saveLastRoom('');
+  const msgGame = e.data.gameId || 'bingsoo';
+  if (msgGame !== liveGameId()) return;
+  if (window.HalomathLive) HalomathLive.saveLastRoom('', liveGameId());
   hideReopen();
   setStatus('세션이 종료되었습니다.');
 });
 
 window.addEventListener('storage', (e) => {
   if (!window.HalomathLive) return;
-  if (e.key && e.key !== HalomathLive.LAST_ROOM_KEY) return;
-  const code = HalomathLive.loadLastRoom();
+  const roomKey = HalomathLive.lastRoomKey
+    ? HalomathLive.lastRoomKey(liveGameId())
+    : HalomathLive.LAST_ROOM_KEY;
+  if (e.key && e.key !== roomKey) return;
+  const code = HalomathLive.loadLastRoom(liveGameId());
   if (code) showReopen(code);
   else hideReopen();
 });
@@ -161,7 +185,7 @@ window.addEventListener('storage', (e) => {
   }
   const params = new URLSearchParams(window.location.search);
   if (params.get('ended') === '1') {
-    HalomathLive.saveLastRoom('');
+    HalomathLive.saveLastRoom('', liveGameId());
     hideReopen();
     setStatus('세션이 종료되었습니다.');
     try {
@@ -169,12 +193,12 @@ window.addEventListener('storage', (e) => {
     } catch (e) { /* ignore */ }
     return;
   }
-  const code = HalomathLive.loadLastRoom();
+  const code = HalomathLive.loadLastRoom(liveGameId());
   if (!code) return;
   HalomathLive.roomIsActive(code).then((active) => {
     if (active) showReopen(code);
     else {
-      HalomathLive.saveLastRoom('');
+      HalomathLive.saveLastRoom('', liveGameId());
       hideReopen();
     }
   }).catch(() => showReopen(code));

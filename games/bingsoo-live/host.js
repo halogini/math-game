@@ -1,5 +1,26 @@
+const LIVE_GAME = Object.assign({
+  gameId: 'bingsoo',
+  playPath: '../bingsoo/index.html',
+  compareMode: 'higher',
+  qrWindowName: 'halomath-bingsoo-qr',
+  qrPopoutPath: 'qr-popout.html'
+}, (typeof window !== 'undefined' && window.HalomathLiveGame) || {});
+
+function liveGameId() {
+  return LIVE_GAME.gameId || 'bingsoo';
+}
+
+function liveOptions() {
+  return { gameId: liveGameId(), compareMode: LIVE_GAME.compareMode || 'higher' };
+}
+
+function isBingsoo2Live() {
+  return liveGameId() === 'bingsoo2' || LIVE_GAME.compareMode === 'bingsoo2';
+}
+
 function playUrl(code) {
-  return `../bingsoo/index.html?live=1&room=${encodeURIComponent(code)}`;
+  const path = LIVE_GAME.playPath || '../bingsoo/index.html';
+  return `${path}?live=1&room=${encodeURIComponent(code)}`;
 }
 
 function absolutePlayUrl(code) {
@@ -13,6 +34,7 @@ function absolutePlayUrl(code) {
 let currentRoomCode = '';
 let hostCreatedAt = 0;
 let hostUid = '';
+let hostGameId = liveGameId();
 let autoEndArmed = true;
 let lastLiveList = [];
 let pollTimer = null;
@@ -360,7 +382,10 @@ function closeAllQrWindows() {
 }
 
 function qrPopoutUrl(code) {
-  return new URL(`qr-popout.html?room=${encodeURIComponent(code)}`, window.location.href).href;
+  const url = new URL(LIVE_GAME.qrPopoutPath || 'qr-popout.html', window.location.href);
+  url.searchParams.set('room', code);
+  if (liveGameId() !== 'bingsoo') url.searchParams.set('game', liveGameId());
+  return url.href;
 }
 
 function openQrPopout(code) {
@@ -373,7 +398,7 @@ function openQrPopout(code) {
       return true;
     } catch (e) { /* fall through */ }
   }
-  qrPopoutWindow = window.open(url, 'halomath-bingsoo-qr', features);
+  qrPopoutWindow = window.open(url, LIVE_GAME.qrWindowName || 'halomath-bingsoo-qr', features);
   if (qrPopoutWindow) {
     try { qrPopoutWindow.focus(); } catch (e) { /* ignore */ }
     return true;
@@ -386,7 +411,7 @@ function closeQrPopout() {
     if (qrPopoutWindow && !qrPopoutWindow.closed) qrPopoutWindow.close();
   } catch (e) { /* ignore */ }
   try {
-    const w = window.open('', 'halomath-bingsoo-qr');
+    const w = window.open('', LIVE_GAME.qrWindowName || 'halomath-bingsoo-qr');
     if (w) w.close();
   } catch (e) { /* ignore */ }
   qrPopoutWindow = null;
@@ -414,6 +439,24 @@ function escapeHtml(str) {
   }[m]));
 }
 
+function formatPlayTimeMs(ms) {
+  if (ms == null || !Number.isFinite(Number(ms)) || Number(ms) < 0) return '—';
+  const total = Math.floor(Number(ms) / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function liveColSpan() {
+  return isBingsoo2Live() ? 5 : 3;
+}
+
+function extraRankCells(item) {
+  if (!isBingsoo2Live()) return '';
+  const err = item.totalErrorPx == null ? '—' : `${item.totalErrorPx}px`;
+  return `<td>${err}</td><td>${formatPlayTimeMs(item.playTimeMs)}</td>`;
+}
+
 function renderLiveRows(data) {
   const tbody = document.getElementById('live-tbody');
   const countEl = document.getElementById('player-count');
@@ -425,13 +468,13 @@ function renderLiveRows(data) {
       : '0명 참여';
   }
   if (!lastLiveList.length) {
-    tbody.innerHTML = '<tr class="live-host-empty-row"><td colspan="3">아직 기록이 없습니다. 학생이 입장하면 여기에 표시됩니다.</td></tr>';
+    tbody.innerHTML = `<tr class="live-host-empty-row"><td colspan="${liveColSpan()}">아직 기록이 없습니다. 학생이 입장하면 여기에 표시됩니다.</td></tr>`;
     return;
   }
   tbody.innerHTML = lastLiveList.map((item, i) => {
     const rank = i === 0 ? '🥇 1위' : i === 1 ? '🥈 2위' : i === 2 ? '🥉 3위' : `${i + 1}위`;
     const rowClass = i < 3 ? ` class="live-host-rank-top live-host-rank-${i + 1}"` : '';
-    return `<tr${rowClass}><td>${rank}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.score}점</strong></td></tr>`;
+    return `<tr${rowClass}><td>${rank}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.score}점</strong></td>${extraRankCells(item)}</tr>`;
   }).join('');
 }
 
@@ -449,7 +492,7 @@ function listenLiveBoard(code) {
 }
 
 function returnToLobby() {
-  if (window.HalomathLive) HalomathLive.returnToLobby(window);
+  if (window.HalomathLive) HalomathLive.returnToLobby(window, liveGameId());
   else window.location.replace('index.html?ended=1');
 }
 
@@ -466,7 +509,7 @@ function bindHost(code) {
   if (linkEl) linkEl.value = playHref;
   if (playBtn) playBtn.href = playUrl(code);
   setStudentQr(playHref);
-  HalomathLive.saveLastRoom(code);
+  HalomathLive.saveLastRoom(code, liveGameId());
   listenLiveBoard(code);
 }
 
@@ -479,14 +522,14 @@ function leaveHostIfClosing(event) {
   if (event && event.persisted) return;
   autoEndArmed = false;
   closeAllQrWindows();
-  HalomathLive.leaveHostWindow(currentRoomCode, hostCreatedAt, hostUid);
+  HalomathLive.leaveHostWindow(currentRoomCode, hostCreatedAt, hostUid, hostGameId);
 }
 
 window.addEventListener('pagehide', leaveHostIfClosing);
 window.addEventListener('pageshow', (event) => {
   if (!event.persisted || !currentRoomCode || !window.HalomathLive) return;
   autoEndArmed = true;
-  HalomathLive.markHostOpen(currentRoomCode, hostCreatedAt, hostUid).catch(() => {});
+  HalomathLive.markHostOpen(currentRoomCode, hostCreatedAt, hostUid, hostGameId).catch(() => {});
 });
 window.addEventListener('keydown', (event) => {
   if (event.key === 'F5' || ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'r')) {
@@ -501,16 +544,16 @@ async function sweepExpiredRoom(code) {
     const meta = await HalomathLive.getMeta(code);
     if (!meta) {
       if (status) status.textContent = '이 세션은 이미 종료되었습니다.';
-      HalomathLive.saveLastRoom('');
+      HalomathLive.saveLastRoom('', liveGameId());
       return true;
     }
     if (!HalomathLive.isExpired(meta.createdAt)) return false;
     const expiredList = HalomathLive.collectLiveList(await HalomathLive.getPlayers(code));
     if (expiredList.length) {
       const saveFile = window.confirm('이 세션 기록을 삭제합니다.\n순위를 파일로 저장할까요?');
-      if (saveFile) HalomathLive.downloadLiveRanks(code, expiredList);
+      if (saveFile) HalomathLive.downloadLiveRanks(code, expiredList, liveOptions());
     }
-    await HalomathLive.deleteRoom(code);
+    await HalomathLive.deleteRoom(code, liveGameId());
     if (status) status.textContent = '이 세션 기록을 삭제했습니다.';
     return true;
   } catch (err) {
@@ -537,11 +580,11 @@ document.getElementById('btn-end-session').addEventListener('click', async (even
   }
 
   try {
-    const shouldLeave = await HalomathLive.promptEndRoom(code);
+    const shouldLeave = await HalomathLive.promptEndRoom(code, liveOptions());
     if (!shouldLeave) return;
   } catch (err) {
     console.warn(err);
-    HalomathLive.saveLastRoom('');
+    HalomathLive.saveLastRoom('', liveGameId());
   }
 
   disarmAutoEnd();
@@ -550,7 +593,7 @@ document.getElementById('btn-end-session').addEventListener('click', async (even
   if (btn) btn.disabled = true;
   closeAllQrWindows();
   returnToLobby();
-  HalomathLive.deleteRoom(code).catch((err) => console.warn('live room delete failed:', err));
+  HalomathLive.deleteRoom(code, liveGameId()).catch((err) => console.warn('live room delete failed:', err));
 });
 
 document.getElementById('btn-save-ranks').addEventListener('click', () => {
@@ -559,7 +602,7 @@ document.getElementById('btn-save-ranks').addEventListener('click', () => {
     if (status) status.textContent = '저장할 순위가 아직 없습니다.';
     return;
   }
-  HalomathLive.downloadLiveRanks(currentRoomCode, lastLiveList);
+  HalomathLive.downloadLiveRanks(currentRoomCode, lastLiveList, liveOptions());
   if (status) status.textContent = '순위 CSV를 이 컴퓨터에 저장했습니다.';
 });
 
@@ -634,14 +677,20 @@ document.getElementById('btn-qr-popout').addEventListener('click', () => {
     const meta = await HalomathLive.getMeta(code);
     if (!meta) {
       if (status) status.textContent = '이 세션은 이미 종료되었습니다.';
-      HalomathLive.saveLastRoom('');
+      HalomathLive.saveLastRoom('', liveGameId());
+      return;
+    }
+    const metaGame = String(meta.gameId || 'bingsoo');
+    if (metaGame !== liveGameId()) {
+      if (status) status.textContent = '이 세션은 다른 게임용입니다. 해당 게임 세션 화면에서 열어 주세요.';
       return;
     }
     hostCreatedAt = Number(meta.createdAt) || Date.now();
     hostUid = String(meta.hostUid || '');
+    hostGameId = metaGame;
     const expired = await sweepExpiredRoom(code);
     if (expired) return;
-    await HalomathLive.markHostOpen(code, hostCreatedAt, hostUid);
+    await HalomathLive.markHostOpen(code, hostCreatedAt, hostUid, hostGameId);
   } catch (err) {
     console.warn('host session restore failed:', err);
   }

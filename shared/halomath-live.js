@@ -56,9 +56,50 @@
     return Number(meta.hostSeenAt) === 0;
   }
 
-  function metaBody(createdAt, hostSeenAt, hostUid) {
+  function normalizeGameId(gameId) {
+    const id = String(gameId || 'bingsoo').trim().slice(0, 24);
+    return id || 'bingsoo';
+  }
+
+  function lastRoomStorageKey(gameId) {
+    const id = normalizeGameId(gameId);
+    return id === 'bingsoo' ? LAST_ROOM_KEY : `${LAST_ROOM_KEY}_${id}`;
+  }
+
+  function compareNullableAsc(a, b) {
+    if (a != null && b != null && a !== b) return a - b;
+    if (a != null && b == null) return -1;
+    if (a == null && b != null) return 1;
+    return 0;
+  }
+
+  function parseOptionalPx(value) {
+    if (value == null || value === '') return null;
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(0, n) : null;
+  }
+
+  function parseOptionalMs(value) {
+    if (value == null || value === '') return null;
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  function isBetterBingsoo2Record(candidate, previous) {
+    if (!previous) return true;
+    const cs = Number(candidate && candidate.score) || 0;
+    const es = Number(previous && previous.score) || 0;
+    if (cs !== es) return cs > es;
+    const errCmp = compareNullableAsc(candidate && candidate.totalErrorPx, previous && previous.totalErrorPx);
+    if (errCmp !== 0) return errCmp < 0;
+    const timeCmp = compareNullableAsc(candidate && candidate.playTimeMs, previous && previous.playTimeMs);
+    if (timeCmp !== 0) return timeCmp < 0;
+    return (Number(candidate && candidate.timestamp) || 0) < (Number(previous && previous.timestamp) || 0);
+  }
+
+  function metaBody(createdAt, hostSeenAt, hostUid, gameId) {
     const payload = {
-      gameId: 'bingsoo',
+      gameId: normalizeGameId(gameId),
       createdAt: Number(createdAt) || Date.now()
     };
     if (hostSeenAt != null) payload.hostSeenAt = Number(hostSeenAt) || 0;
@@ -66,16 +107,17 @@
     return payload;
   }
 
-  function saveLastRoom(code) {
+  function saveLastRoom(code, gameId) {
+    const key = lastRoomStorageKey(gameId);
     try {
-      if (code) localStorage.setItem(LAST_ROOM_KEY, code);
-      else localStorage.removeItem(LAST_ROOM_KEY);
+      if (code) localStorage.setItem(key, code);
+      else localStorage.removeItem(key);
     } catch (e) { /* ignore */ }
   }
 
-  function loadLastRoom() {
+  function loadLastRoom(gameId) {
     try {
-      return normalizeCode(localStorage.getItem(LAST_ROOM_KEY) || '');
+      return normalizeCode(localStorage.getItem(lastRoomStorageKey(gameId)) || '');
     } catch (e) {
       return '';
     }
@@ -157,7 +199,7 @@
     return `${url}${url.indexOf('?') >= 0 ? '&' : '?'}auth=${encodeURIComponent(token)}`;
   }
 
-  function writeMetaKeepalive(code, createdAt, hostSeenAt, hostUid, token) {
+  function writeMetaKeepalive(code, createdAt, hostSeenAt, hostUid, token, gameId) {
     const normalized = normalizeCode(code);
     if (!normalized) return;
     const url = withAuth(`${roomPath(normalized)}/meta.json`, token || cachedHostToken);
@@ -165,7 +207,7 @@
       fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(metaBody(createdAt, hostSeenAt, hostUid || cachedHostUid)),
+        body: JSON.stringify(metaBody(createdAt, hostSeenAt, hostUid || cachedHostUid, gameId)),
         keepalive: true
       });
     } catch (e) { /* page is unloading */ }
@@ -216,11 +258,12 @@
     return data && typeof data === 'object' ? data : {};
   }
 
-  async function createRoom() {
+  async function createRoom(gameId) {
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     cachedHostToken = token;
     cachedHostUid = user.uid;
+    const gid = normalizeGameId(gameId);
     for (let i = 0; i < CODE_ATTEMPTS; i += 1) {
       const code = randomCode();
       let existing = null;
@@ -234,7 +277,7 @@
       try {
         await fetchRest(`${roomPath(code)}/meta.json`, {
           method: 'PUT',
-          body: JSON.stringify(metaBody(now, now, user.uid)),
+          body: JSON.stringify(metaBody(now, now, user.uid, gid)),
           authToken: token
         });
         return code;
@@ -248,7 +291,7 @@
     throw err;
   }
 
-  async function markHostOpen(code, createdAt, hostUid) {
+  async function markHostOpen(code, createdAt, hostUid, gameId) {
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     cachedHostToken = token;
@@ -261,23 +304,25 @@
     }
     const uid = String(hostUid || meta.hostUid || user.uid);
     const created = Number(createdAt || meta.createdAt) || Date.now();
+    const gid = normalizeGameId(gameId || meta.gameId);
     await fetchRest(`${roomPath(code)}/meta.json`, {
       method: 'PUT',
-      body: JSON.stringify(metaBody(created, Date.now(), uid)),
+      body: JSON.stringify(metaBody(created, Date.now(), uid, gid)),
       authToken: token
     });
   }
 
-  function leaveHostWindow(code, createdAt, hostUid) {
+  function leaveHostWindow(code, createdAt, hostUid, gameId) {
     const normalized = normalizeCode(code);
     if (!normalized) return;
-    saveLastRoom('');
+    const gid = normalizeGameId(gameId);
+    saveLastRoom('', gid);
     const uid = hostUid || cachedHostUid;
-    writeMetaKeepalive(normalized, createdAt, 0, uid, cachedHostToken);
+    writeMetaKeepalive(normalized, createdAt, 0, uid, cachedHostToken, gid);
     deleteRoomKeepalive(normalized, cachedHostToken);
     try {
       if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type: 'halomath-live-ended', code: normalized }, '*');
+        window.opener.postMessage({ type: 'halomath-live-ended', code: normalized, gameId: gid }, '*');
       }
     } catch (e) { /* ignore */ }
   }
@@ -291,11 +336,11 @@
     }
   }
 
-  async function deleteRoom(code) {
+  async function deleteRoom(code, gameId) {
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     await fetchRest(`${roomPath(code)}.json`, { method: 'DELETE', authToken: token });
-    saveLastRoom('');
+    saveLastRoom('', gameId);
   }
 
   function collectLiveList(data) {
@@ -307,10 +352,20 @@
         const name = String(row.name || '').trim().slice(0, 12);
         const score = Math.max(0, Math.min(500, Number(row.score) || 0));
         if (!name) return;
-        list.push({ name, score });
+        list.push({
+          name,
+          score,
+          totalErrorPx: parseOptionalPx(row.totalErrorPx),
+          playTimeMs: parseOptionalMs(row.playTimeMs)
+        });
       });
     }
-    list.sort((a, b) => b.score - a.score);
+    list.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const errCmp = compareNullableAsc(a.totalErrorPx, b.totalErrorPx);
+      if (errCmp !== 0) return errCmp;
+      return compareNullableAsc(a.playTimeMs, b.playTimeMs);
+    });
     return list;
   }
 
@@ -321,10 +376,24 @@
     return `halomath-session-${code || 'room'}-${stamp}.csv`;
   }
 
-  function downloadLiveRanks(code, list) {
-    const rows = [['순위', '닉네임', '점수', '세션코드']];
+  function downloadLiveRanks(code, list, options) {
+    const bingsoo2 = options && (options.compareMode === 'bingsoo2' || options.gameId === 'bingsoo2');
+    const rows = bingsoo2
+      ? [['순위', '닉네임', '점수', '총오차px', '시간ms', '세션코드']]
+      : [['순위', '닉네임', '점수', '세션코드']];
     (list || []).forEach((item, i) => {
-      rows.push([String(i + 1), item.name || '', String(item.score), code || '']);
+      if (bingsoo2) {
+        rows.push([
+          String(i + 1),
+          item.name || '',
+          String(item.score),
+          item.totalErrorPx == null ? '' : String(item.totalErrorPx),
+          item.playTimeMs == null ? '' : String(item.playTimeMs),
+          code || ''
+        ]);
+      } else {
+        rows.push([String(i + 1), item.name || '', String(item.score), code || '']);
+      }
     });
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -335,7 +404,7 @@
     URL.revokeObjectURL(a.href);
   }
 
-  async function promptEndRoom(code) {
+  async function promptEndRoom(code, options) {
     const ok = window.confirm(`세션 ${code}을 종료하고 서버 기록을 지울까요?`);
     if (!ok) return false;
 
@@ -348,40 +417,72 @@
 
     if (list.length) {
       const saveFile = window.confirm('종료하면 이 방 순위는 서버에서 사라집니다.\n순위를 파일로 저장할까요?');
-      if (saveFile) downloadLiveRanks(code, list);
+      if (saveFile) downloadLiveRanks(code, list, options);
     }
 
-    saveLastRoom('');
+    saveLastRoom('', options && options.gameId);
     return true;
   }
 
-  async function submitScore(code, name, score) {
+  async function submitScore(code, name, score, extras) {
+    extras = extras && typeof extras === 'object' ? extras : {};
     const meta = await getMeta(code);
     if (!meta || isExpired(meta.createdAt) || isHostClosed(meta)) {
       const err = new Error('SESSION_ENDED');
       err.code = 'SESSION_ENDED';
       throw err;
     }
+    if (extras.expectedGameId && meta.gameId && String(meta.gameId) !== String(extras.expectedGameId)) {
+      const err = new Error('GAME_MISMATCH');
+      err.code = 'GAME_MISMATCH';
+      throw err;
+    }
     const trimmedName = String(name || '').trim().slice(0, 12);
     const numScore = Math.max(0, Math.min(500, Number(score) || 0));
     const key = playerKey(trimmedName);
+    const body = { name: trimmedName, score: numScore };
+    const totalErrorPx = parseOptionalPx(extras.totalErrorPx);
+    const playTimeMs = parseOptionalMs(extras.playTimeMs);
+    if (totalErrorPx != null) body.totalErrorPx = totalErrorPx;
+    if (playTimeMs != null) body.playTimeMs = playTimeMs;
+
     let existing = null;
     try {
       existing = await fetchRest(`${roomPath(code)}/players/${encodeURIComponent(key)}.json`);
     } catch (e) { /* first score */ }
     const existingScore = existing && typeof existing === 'object' ? Number(existing.score) || 0 : 0;
-    if (existingScore >= numScore) {
-      return { updated: false, existingScore };
+    const compareMode = extras.compareMode || (totalErrorPx != null ? 'bingsoo2' : 'higher');
+    if (existing && typeof existing === 'object') {
+      if (compareMode === 'bingsoo2') {
+        const candidate = {
+          score: numScore,
+          totalErrorPx,
+          playTimeMs,
+          timestamp: Date.now()
+        };
+        const previous = {
+          score: existingScore,
+          totalErrorPx: parseOptionalPx(existing.totalErrorPx),
+          playTimeMs: parseOptionalMs(existing.playTimeMs),
+          timestamp: existing.timestamp || 0
+        };
+        if (!isBetterBingsoo2Record(candidate, previous)) {
+          return { updated: false, existingScore };
+        }
+      } else if (existingScore >= numScore) {
+        return { updated: false, existingScore };
+      }
     }
     await fetchRest(`${roomPath(code)}/players/${encodeURIComponent(key)}.json`, {
       method: 'PUT',
-      body: JSON.stringify({ name: trimmedName, score: numScore })
+      body: JSON.stringify(body)
     });
-    return { updated: existingScore > 0, existingScore };
+    return { updated: true, existingScore };
   }
 
-  function playersToLeaderboardMap(raw) {
+  function playersToLeaderboardMap(raw, options) {
     const mapped = {};
+    const gameId = normalizeGameId(options && options.gameId);
     if (!raw || typeof raw !== 'object') return mapped;
     Object.keys(raw).forEach((key) => {
       const row = raw[key];
@@ -389,7 +490,9 @@
       mapped[key] = {
         name: row.name,
         score: row.score,
-        gameId: 'bingsoo',
+        totalErrorPx: row.totalErrorPx,
+        playTimeMs: row.playTimeMs,
+        gameId,
         studentId: '',
         channel: 'live'
       };
@@ -405,16 +508,17 @@
     }
   }
 
-  function returnToLobby(fromWindow) {
+  function returnToLobby(fromWindow, gameId) {
     const win = fromWindow || (typeof window !== 'undefined' ? window : null);
     if (!win) return;
+    const gid = normalizeGameId(gameId);
     const target = lobbyUrl(win.location.href);
-    saveLastRoom('');
+    saveLastRoom('', gid);
 
     if (win.opener && !win.opener.closed) {
       try { win.opener.location.replace(target); } catch (e) { /* ignore */ }
       try { win.opener.focus(); } catch (e) { /* ignore */ }
-      try { win.opener.postMessage({ type: 'halomath-live-ended' }, '*'); } catch (e) { /* ignore */ }
+      try { win.opener.postMessage({ type: 'halomath-live-ended', gameId: gid }, '*'); } catch (e) { /* ignore */ }
       try { win.close(); } catch (e) { /* ignore */ }
       win.setTimeout(() => {
         if (!win.closed) win.location.replace(target);
@@ -439,6 +543,7 @@
 
   global.HalomathLive = {
     normalizeCode,
+    normalizeGameId,
     detectRoomFromUrl,
     randomCode,
     playerKey,
@@ -451,6 +556,7 @@
     markHostOpen,
     leaveHostWindow,
     LAST_ROOM_KEY,
+    lastRoomKey: lastRoomStorageKey,
     saveLastRoom,
     loadLastRoom,
     restBase,

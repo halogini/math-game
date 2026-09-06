@@ -188,7 +188,9 @@
         document.body.innerHTML = '<p class="qr-popout-error">세션 코드가 없습니다.</p>';
         return;
       }
-      const playHref = new URL(`../bingsoo/index.html?live=1&room=${encodeURIComponent(room)}`, window.location.href).href;
+      const game = String(params.get('game') || 'bingsoo').toLowerCase();
+      const playFile = game === 'bingsoo2' ? '../bingsoo2/index.html' : '../bingsoo/index.html';
+      const playHref = new URL(`${playFile}?live=1&room=${encodeURIComponent(room)}`, window.location.href).href;
       document.getElementById('qr-code').textContent = room;
       document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&ecc=M&data=${encodeURIComponent(playHref)}`;
       document.title = `QR · ${room}`;
