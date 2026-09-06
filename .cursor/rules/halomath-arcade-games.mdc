@@ -54,10 +54,6 @@ alwaysApply: false
 - 고유 `gameId` 문자열 필수 (예: `my-new-game`)
 - 포털 `index.html` 탭 + `portal.js`의 `acceptGame` / `CONGRUENCE_GAME_IDS` 등에 등록
 
-## 수업 세션 화면
-
-- `games/<game>-live/` 로비·진행 화면은 포털 하늘색이 아니라 **본편 게임 톤**. 자세한 규칙은 `halomath-live-session-theme.mdc`.
-
 ## 모드
 
 - 공통 모듈: `shared/halomath-mode.js` → `HalomathMode.detectActiveMode()`
