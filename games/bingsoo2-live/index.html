@@ -4,8 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍧 팥빙수 2탄 수업 세션 | 할로매쓰</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="description" content="수업 시간에만 쓰는 팥빙수 2탄 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
+  <meta property="og:title" content="팥빙수 2탄 수업 세션 | 할로매쓰">
+  <meta property="og:description" content="수업 시간에만 쓰는 팥빙수 2탄 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
+  <meta property="og:type" content="website">
   <link rel="stylesheet" href="../../style.css">
   <link rel="stylesheet" href="../bingsoo-live/lobby.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -114,17 +117,11 @@
         </div>
       </div>
     </aside>
+    <footer class="app-footer">
+      <a href="../../privacy.html" target="_blank" rel="noopener noreferrer" class="privacy-link">개인정보처리방침</a>
+    </footer>
   </div>
-  <script>
-    window.HalomathLiveGame = {
-      gameId: 'bingsoo2',
-      playPath: '../bingsoo2/index.html',
-      compareMode: 'bingsoo2',
-      sessionWindowName: 'halomath-bingsoo2-session',
-      qrWindowName: 'halomath-bingsoo2-qr',
-      qrPopoutPath: '../bingsoo-live/qr-popout.html'
-    };
-  </script>
+  <script src="live-game-config.js"></script>
   <script src="../../shared/halomath-live.js"></script>
   <script src="../bingsoo-live/lobby.js"></script>
 </body>

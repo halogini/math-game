@@ -350,7 +350,7 @@
         const row = data[key];
         if (!row || typeof row !== 'object') return;
         const name = String(row.name || '').trim().slice(0, 12);
-        const score = Math.max(0, Math.min(500, Number(row.score) || 0));
+        const score = Math.max(0, Math.min(999999999, Number(row.score) || 0));
         if (!name) return;
         list.push({
           name,
@@ -438,7 +438,7 @@
       throw err;
     }
     const trimmedName = String(name || '').trim().slice(0, 12);
-    const numScore = Math.max(0, Math.min(500, Number(score) || 0));
+    const numScore = Math.max(0, Math.min(999999999, Number(score) || 0));
     const key = playerKey(trimmedName);
     const body = { name: trimmedName, score: numScore };
     const totalErrorPx = parseOptionalPx(extras.totalErrorPx);

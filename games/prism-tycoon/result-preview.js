@@ -1,0 +1,1 @@
+location.replace('index.html?skipopen=1&result=1');

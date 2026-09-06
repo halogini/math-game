@@ -1,7 +1,7 @@
 {
   "rules": {
-    ".read": true,
     "scores": {
+      ".read": true,
       ".indexOn": ["score", "gameId"],
       "$score_id": {
         ".write": "(auth != null && !newData.exists()) || !data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())) || (data.hasChild('clearTimeMs') && newData.hasChild('clearTimeMs') && newData.child('clearTimeMs').val() > 0 && newData.child('clearTimeMs').val() < data.child('clearTimeMs').val())",
@@ -31,6 +31,7 @@
     },
     "liveRooms": {
       "$code": {
+        ".read": true,
         ".write": "!newData.exists() && auth != null && data.child('meta').child('hostUid').val() === auth.uid",
         "meta": {
           ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || (data.child('hostUid').val() === auth.uid && newData.child('hostUid').val() === data.child('hostUid').val() && newData.child('createdAt').val() === data.child('createdAt').val()))",
@@ -39,7 +40,7 @@
         "players": {
           "$playerId": {
             ".write": "newData.exists() && root.child('liveRooms').child($code).child('meta').exists() && now < root.child('liveRooms').child($code).child('meta').child('createdAt').val() + 86400000 && (!root.child('liveRooms').child($code).child('meta').child('hostSeenAt').exists() || root.child('liveRooms').child($code).child('meta').child('hostSeenAt').val() !== 0) && (!data.exists() || (newData.hasChild('score') && newData.child('score').val() >= data.child('score').val()))",
-            ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
+            ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && (newData.child('score').val() <= 500 || ((root.child('liveRooms').child($code).child('meta').child('gameId').val() === 'prism-tycoon' || root.child('liveRooms').child($code).child('meta').child('gameId').val() === 'tycoon') && newData.child('score').val() <= 999999999))"
           }
         }
       }

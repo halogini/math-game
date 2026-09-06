@@ -222,11 +222,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo/index.html');
-    if (btnPlayBingsoo2) btnPlayBingsoo2.href = gameHref('games/bingsoo2/index.html');
+    if (btnPlayBingsoo) btnPlayBingsoo.href = gameHref('games/bingsoo-live/index.html');
+    if (btnPlayBingsoo2) btnPlayBingsoo2.href = gameHref('games/bingsoo2-live/index.html');
     if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
     if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
-    if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon/index.html');
+    if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon-live/index.html');
   }
 
   // ----------------------------------------------------

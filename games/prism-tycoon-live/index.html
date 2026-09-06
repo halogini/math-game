@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🍧 팥빙수 수업 세션 | 할로매쓰</title>
+  <title>🔮 보석 타이쿤 수업 세션 | 할로매쓰</title>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <meta name="description" content="수업 시간에만 쓰는 팥빙수 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
-  <meta property="og:title" content="팥빙수 수업 세션 | 할로매쓰">
-  <meta property="og:description" content="수업 시간에만 쓰는 팥빙수 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
+  <meta name="description" content="수업 시간에만 쓰는 보석 타이쿤 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
+  <meta property="og:title" content="보석 타이쿤 수업 세션 | 할로매쓰">
+  <meta property="og:description" content="수업 시간에만 쓰는 보석 타이쿤 세션. QR로 학생을 초대하고, 수업이 끝나면 기록을 정리하세요.">
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="../../style.css">
-  <link rel="stylesheet" href="lobby.css">
+  <link rel="stylesheet" href="../bingsoo-live/lobby.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -22,10 +22,10 @@
   <div class="portal-container live-lobby">
     <header class="portal-header live-header">
       <div class="brand">
-        <span class="logo-badge">🍧</span>
+        <span class="logo-badge">🔮</span>
         <div>
-          <h1>팥빙수 수업 세션</h1>
-          <p class="subtitle">수업 시간에 학생들과 함께 플레이하는 선생님용 시작 화면입니다. 학생 등록 없이 QR만 보여주면 됩니다.</p>
+          <h1>보석 타이쿤 수업 세션</h1>
+          <p class="subtitle">수업 시간에 학생들과 함께 플레이하는 선생님용 시작 화면입니다. 별도 등록 없이 QR만 보여주면 됩니다.</p>
         </div>
       </div>
     </header>
@@ -84,14 +84,14 @@
 
       <section class="live-card live-card-play" aria-labelledby="play-card-title">
         <span class="live-card-badge live-card-badge-muted">연습 · 미리보기</span>
-        <h2 class="live-card-title" id="play-card-title">팥빙수 게임 플레이하기</h2>
+        <h2 class="live-card-title" id="play-card-title">보석 타이쿤 게임 플레이하기</h2>
         <p class="live-card-desc">수업 전에 게임 규칙을 익히거나, 혼자 연습할 때 사용하세요. 닉네임만 넣고 플레이합니다.</p>
         <ul class="live-card-points live-card-points-muted">
           <li>명예의 전당에 기록</li>
           <li>수업 세션과 별개 (QR·코드 불필요)</li>
         </ul>
-        <a href="../bingsoo/index.html?mode=dorms" class="btn-play-game btn-play-outline" id="btn-play-solo">
-          팥빙수 게임 플레이하기
+        <a href="../prism-tycoon/index.html?mode=dorms" class="btn-play-game btn-play-outline" id="btn-play-solo">
+          보석 타이쿤 게임 플레이하기
         </a>
       </section>
     </main>
@@ -117,11 +117,13 @@
         </div>
       </div>
     </aside>
+
     <footer class="app-footer">
       <a href="../../privacy.html" target="_blank" rel="noopener noreferrer" class="privacy-link">개인정보처리방침</a>
     </footer>
   </div>
+  <script src="live-game-config.js"></script>
   <script src="../../shared/halomath-live.js"></script>
-  <script src="lobby.js"></script>
+  <script src="../bingsoo-live/lobby.js"></script>
 </body>
 </html>
