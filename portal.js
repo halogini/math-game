@@ -782,38 +782,51 @@ document.addEventListener('DOMContentLoaded', () => {
       || 'https://math-game-halogini-default-rtdb.firebaseio.com';
   }
 
+  function withAsyncTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(label || 'timeout')), ms);
+      })
+    ]);
+  }
+
   async function deleteScoreKey(path, idToken) {
     const segments = scoreRecordPath(path);
     if (!segments) throw new Error('empty-path');
     if (!idToken) throw new Error('no-auth');
 
-    if (firebaseDb) {
-      try {
-        await firebaseDb.ref(`scores/${segments}`).remove();
-        return;
-      } catch (err) {
-        console.warn('SDK remove failed, trying REST:', segments, err);
-      }
-    }
-
     const urlPath = segments.split('/').map(encodeURIComponent).join('/');
-    const res = await fetch(
-      `${scoresDatabaseUrl()}/scores/${urlPath}.json?auth=${encodeURIComponent(idToken)}`,
-      { method: 'DELETE' }
-    );
-    if (res.ok) return;
-
-    const text = await res.text();
-    let message = text;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
     try {
-      const parsed = JSON.parse(text);
-      message = String((parsed && parsed.error) || text);
-    } catch (e) { /* ignore */ }
-    const err = new Error(message || `HTTP ${res.status}`);
-    if (res.status === 401 || /permission denied/i.test(message)) {
-      err.code = 'PERMISSION_DENIED';
+      const res = await fetch(
+        `${scoresDatabaseUrl()}/scores/${urlPath}.json?auth=${encodeURIComponent(idToken)}`,
+        { method: 'DELETE', signal: controller.signal }
+      );
+      if (res.ok) return;
+
+      const text = await res.text();
+      let message = text;
+      try {
+        const parsed = JSON.parse(text);
+        message = String((parsed && parsed.error) || text);
+      } catch (e) { /* ignore */ }
+      const err = new Error(message || `HTTP ${res.status}`);
+      if (res.status === 401 || /permission denied/i.test(message)) {
+        err.code = 'PERMISSION_DENIED';
+      }
+      throw err;
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        const timeoutErr = new Error('delete-timeout');
+        timeoutErr.code = 'TIMEOUT';
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    throw err;
   }
 
   async function deleteAdminRecord(item, triggerBtn) {
@@ -844,26 +857,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      let dataObj = await fetchScoresDataViaRest(8000);
-      if (!dataObj && firebaseDb) {
-        try {
-          const snap = await Promise.race([
-            firebaseDb.ref('scores').once('value'),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('scan-timeout')), 4000))
-          ]);
-          dataObj = snap.val();
-        } catch (err) {
-          console.warn('Admin delete scan failed:', err);
-        }
+      let keys = collectPlayerScoreKeys(item, null);
+      if (!keys.length) {
+        const dataObj = await fetchScoresDataViaRest(5000);
+        keys = collectPlayerScoreKeys(item, dataObj);
       }
 
-      const keys = collectPlayerScoreKeys(item, dataObj);
       if (!keys.length) {
         window.alert('이 기록의 저장 위치를 찾지 못했습니다.');
         return;
       }
 
-      const idToken = await adminUser.getIdToken(true);
+      const idToken = await withAsyncTimeout(adminUser.getIdToken(true), 6000, 'auth-timeout');
       let deleted = 0;
       const failures = [];
       for (let i = 0; i < keys.length; i++) {
@@ -884,6 +889,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const code = String((first && first.code) || (first && first.message) || '');
         if (/PERMISSION_DENIED|permission-denied|permission denied/i.test(code)) {
           window.alert('삭제 권한이 없습니다. Firebase 콘솔 → Realtime Database → 규칙에서 validate 끝에 `: true`가 있는지 확인해 주세요.');
+        } else if (/TIMEOUT|auth-timeout|delete-timeout/i.test(code)) {
+          window.alert('삭제 요청 시간이 초과됐습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
         } else {
           window.alert('삭제에 실패했습니다. 로그인 상태와 네트워크를 확인해 주세요.');
         }
