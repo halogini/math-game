@@ -1,0 +1,37 @@
+---
+description: 수업 세션 로비·진행 화면은 해당 게임 본편의 톤앤매너를 따른다
+globs: games/**-live/**
+alwaysApply: true
+---
+
+# 수업 세션 화면의 톤앤매너
+
+수업 세션(`games/<game>-live/`)은 아케이드 포털(밝은 하늘색 카드)이 아니라 **그 게임 본편**의 색·글꼴·버튼·카피 톤을 따른다.
+
+## 적용 범위
+
+- 선생님용 시작 화면(`index.html`)과 진행 화면(`host.html`) 모두
+- 앞으로 새로 만드는 게임의 수업 세션에도 동일
+
+## 해야 할 것
+
+- 본편 `index.html`의 배경·패널·강조색·주 버튼을 세션 CSS로 옮긴다. 예: 보석 타이쿤은 `#160e22` 동굴 배경, `#f0c36a` 금색 제목, 금색 그라데이션 버튼.
+- 공유 `lobby.js` / `host.js` / `lobby.css`는 구조용으로 재사용해도 된다. **게임별 `session.css`(또는 동등한 테마 시트)를 뒤에 얹어 덮어쓴다.**
+- 본편 훅 문장(예: 「동굴이 무너지기 전에…」)을 세션 헤더에도 살려, 포털 안내문투만 쓰지 않는다.
+
+## 하지 말 것
+
+```html
+<!-- ❌ 다른 게임인데 팥빙수/포털 하늘색을 그대로 -->
+<link rel="stylesheet" href="../bingsoo-live/lobby.css">
+<!-- 테마 시트 없음 -->
+```
+
+```html
+<!-- ✅ 구조 CSS 뒤에 본편 테마 -->
+<link rel="stylesheet" href="../bingsoo-live/lobby.css">
+<link rel="stylesheet" href="session.css">
+<body class="tycoon-session">
+```
+
+포털 링크·내부 모드명·학번 대비 문구는 `halomath-public-surface` 규칙을 그대로 따른다.

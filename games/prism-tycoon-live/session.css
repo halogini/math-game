@@ -1,0 +1,247 @@
+/* 보석 타이쿤 수업 세션 — 게임 본편과 같은 동굴·금색 톤 */
+html:has(body.tycoon-session),
+body.tycoon-session {
+  --tycoon-bg: #160e22;
+  --tycoon-panel: #1a1026;
+  --tycoon-gold: #f0c36a;
+  --tycoon-gold-deep: #e8a54b;
+  --tycoon-ink: #2a1608;
+  --tycoon-text: #f5e9d6;
+  --tycoon-muted: #b8a48e;
+  --tycoon-line: rgba(240, 195, 106, 0.32);
+  --tycoon-teal: #c4b5fd;
+  background: var(--tycoon-bg);
+  color: var(--tycoon-text);
+  font-family: Pretendard, 'Apple SD Gothic Neo', sans-serif;
+}
+
+body.tycoon-session .portal-container {
+  background: var(--tycoon-panel);
+  border: 1px solid var(--tycoon-line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: none;
+}
+
+body.tycoon-session .portal-header,
+body.tycoon-session .live-host-header {
+  border-bottom-color: var(--tycoon-line);
+}
+
+body.tycoon-session .logo-badge {
+  background: linear-gradient(135deg, rgba(240, 195, 106, 0.22), rgba(76, 29, 149, 0.45));
+  border: 1px solid var(--tycoon-line);
+}
+
+body.tycoon-session h1,
+body.tycoon-session .live-host-title,
+body.tycoon-session .brand h1 {
+  font-family: Pretendard, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .subtitle,
+body.tycoon-session .live-host-eyebrow,
+body.tycoon-session .live-guide-lead,
+body.tycoon-session .live-card-desc,
+body.tycoon-session .live-status,
+body.tycoon-session .app-footer,
+body.tycoon-session .privacy-link {
+  color: var(--tycoon-muted);
+}
+
+body.tycoon-session .privacy-link:hover {
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .live-guide {
+  background: rgba(232, 195, 106, 0.1);
+  border: 1px solid var(--tycoon-line);
+}
+
+body.tycoon-session .live-guide-head h2,
+body.tycoon-session .live-card-title,
+body.tycoon-session .live-compare h3,
+body.tycoon-session .live-host-panel-head h2,
+body.tycoon-session .live-host-ranks h2 {
+  font-family: Pretendard, sans-serif;
+  font-weight: 800;
+  color: var(--tycoon-gold);
+  letter-spacing: 0.04em;
+}
+
+body.tycoon-session .live-step,
+body.tycoon-session .live-card,
+body.tycoon-session .live-compare,
+body.tycoon-session .live-compare-col,
+body.tycoon-session .live-host-panel,
+body.tycoon-session .live-host-ranks,
+body.tycoon-session .live-active-banner {
+  background: rgba(8, 4, 18, 0.45);
+  border: 1px solid var(--tycoon-line);
+  color: var(--tycoon-text);
+}
+
+body.tycoon-session .live-step-num {
+  background: linear-gradient(135deg, var(--tycoon-gold), var(--tycoon-gold-deep));
+  color: var(--tycoon-ink);
+}
+
+body.tycoon-session .live-step strong,
+body.tycoon-session .live-card-points,
+body.tycoon-session .live-host-hints,
+body.tycoon-session .live-host-panel-head p,
+body.tycoon-session .live-host-ranks-note,
+body.tycoon-session .live-host-qr-note,
+body.tycoon-session .live-host-field-label,
+body.tycoon-session .live-code-label {
+  color: var(--tycoon-text);
+}
+
+body.tycoon-session .live-step p,
+body.tycoon-session .live-card-points-muted,
+body.tycoon-session .live-compare-col ul,
+body.tycoon-session .live-host-footer {
+  color: var(--tycoon-muted);
+}
+
+body.tycoon-session .live-card-points li::before,
+body.tycoon-session .live-card-points-muted li::before {
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .live-card-badge {
+  background: rgba(240, 195, 106, 0.18);
+  color: var(--tycoon-gold);
+  border: 1px solid var(--tycoon-line);
+}
+
+body.tycoon-session .live-card-badge-muted {
+  background: rgba(196, 181, 253, 0.12);
+  color: var(--tycoon-teal);
+  border-color: rgba(196, 181, 253, 0.35);
+}
+
+body.tycoon-session .live-compare-col h4,
+body.tycoon-session .live-compare-col:last-child h4,
+body.tycoon-session .live-active-code,
+body.tycoon-session .live-host-code,
+body.tycoon-session .live-code {
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .btn-play-game,
+body.tycoon-session .admin-btn-primary,
+body.tycoon-session #btn-host {
+  background: linear-gradient(135deg, var(--tycoon-gold), var(--tycoon-gold-deep));
+  color: var(--tycoon-ink);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border: none;
+  font-weight: 800;
+}
+
+body.tycoon-session .btn-play-game:hover,
+body.tycoon-session .admin-btn-primary:hover {
+  background: linear-gradient(135deg, #f6d48a, var(--tycoon-gold));
+  color: var(--tycoon-ink);
+}
+
+body.tycoon-session .btn-play-outline {
+  background: transparent;
+  color: var(--tycoon-gold);
+  border: 1px solid var(--tycoon-line);
+  box-shadow: none;
+}
+
+body.tycoon-session .btn-play-outline:hover {
+  background: rgba(240, 195, 106, 0.12);
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .admin-btn {
+  background: rgba(28, 16, 36, 0.9);
+  color: var(--tycoon-text);
+  border: 1px solid var(--tycoon-line);
+}
+
+body.tycoon-session .admin-btn-exit {
+  background: rgba(127, 29, 29, 0.45);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+body.tycoon-session .live-host-live-pill {
+  background: rgba(76, 29, 149, 0.45);
+  border-color: var(--tycoon-teal);
+  color: var(--tycoon-teal);
+}
+
+body.tycoon-session .live-host-link-row input,
+body.tycoon-session #host-link {
+  background: rgba(8, 4, 18, 0.7);
+  border: 1px solid var(--tycoon-line);
+  color: var(--tycoon-text);
+}
+
+body.tycoon-session .live-host-qr-figure {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--tycoon-line);
+}
+
+body.tycoon-session .leaderboard-table,
+body.tycoon-session .live-host-table {
+  color: var(--tycoon-text);
+}
+
+body.tycoon-session .live-host-code-block {
+  background: rgba(8, 4, 18, 0.55);
+  border: 2px dashed var(--tycoon-line);
+}
+
+body.tycoon-session .live-code-label,
+body.tycoon-session .live-host-field-label {
+  color: var(--tycoon-gold);
+}
+  background: rgba(240, 195, 106, 0.16);
+  border-color: var(--tycoon-line);
+  color: var(--tycoon-gold);
+}
+
+body.tycoon-session .live-host-table-wrap {
+  border-color: var(--tycoon-line);
+  background: rgba(8, 4, 18, 0.55);
+}
+
+body.tycoon-session .live-host-table th,
+body.tycoon-session .leaderboard-table th {
+  background: rgba(28, 16, 36, 0.95);
+  color: var(--tycoon-gold);
+  border-bottom-color: var(--tycoon-line);
+}
+
+body.tycoon-session .live-host-table td,
+body.tycoon-session .leaderboard-table td {
+  background: transparent;
+  color: var(--tycoon-text);
+  border-bottom-color: rgba(240, 195, 106, 0.14);
+}
+
+body.tycoon-session .live-host-empty-row td {
+  color: var(--tycoon-muted);
+}
+
+body.tycoon-session .live-host-rank-top td {
+  background: rgba(240, 195, 106, 0.08);
+}
+
+body.tycoon-session .live-host-player-count {
+  color: var(--tycoon-teal);
+  background: rgba(76, 29, 149, 0.45);
+  border: 1px solid rgba(196, 181, 253, 0.35);
+}
+
+body.tycoon-session .live-host-footer a {
+  color: var(--tycoon-gold);
+}
