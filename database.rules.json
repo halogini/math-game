@@ -4,28 +4,28 @@
       ".read": true,
       ".indexOn": ["score", "gameId"],
       "$score_id": {
-        ".write": "(auth != null && !newData.exists()) || !data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())) || (data.hasChild('clearTimeMs') && newData.hasChild('clearTimeMs') && newData.child('clearTimeMs').val() > 0 && newData.child('clearTimeMs').val() < data.child('clearTimeMs').val())",
-        ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && ((newData.child('gameId').val() === 'prism-tycoon' || newData.child('gameId').val() === 'tycoon') && newData.child('score').val() <= 999999999 || newData.child('score').val() <= 500) && (!newData.hasChild('studentId') || (newData.child('studentId').isString() && newData.child('studentId').val().length > 0 && newData.child('studentId').val().length <= 10)) && (!newData.hasChild('gameId') || newData.child('gameId').isString()) && (!newData.hasChild('clearTimeMs') || newData.child('clearTimeMs').isNumber()) && (!newData.hasChild('channel') || newData.child('channel').isString())"
+        ".write": "!newData.exists() ? auth != null : ($score_id !== 'school' && $score_id !== 'dorms' && $score_id !== 'dorems' && (!data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())) || (data.hasChild('clearTimeMs') && newData.hasChild('clearTimeMs') && newData.child('clearTimeMs').val() > 0 && newData.child('clearTimeMs').val() < data.child('clearTimeMs').val())))",
+        ".validate": "newData.exists() ? (newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && ((newData.child('gameId').val() === 'prism-tycoon' || newData.child('gameId').val() === 'tycoon') && newData.child('score').val() <= 999999999 || newData.child('score').val() <= 500) && (!newData.hasChild('studentId') || (newData.child('studentId').isString() && newData.child('studentId').val().length > 0 && newData.child('studentId').val().length <= 10)) && (!newData.hasChild('gameId') || newData.child('gameId').isString()) && (!newData.hasChild('clearTimeMs') || newData.child('clearTimeMs').isNumber()) && (!newData.hasChild('channel') || newData.child('channel').isString())) : true"
       },
       "school": {
         ".indexOn": ["score"],
         "$score_id": {
-          ".write": "(auth != null && !newData.exists()) || !data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val()))",
-          ".validate": "newData.hasChildren(['name', 'studentId', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('studentId').isString() && newData.child('studentId').val().length > 0 && newData.child('studentId').val().length <= 10 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
+          ".write": "!newData.exists() ? auth != null : (!data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())))",
+          ".validate": "newData.exists() ? (newData.hasChildren(['name', 'studentId', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('studentId').isString() && newData.child('studentId').val().length > 0 && newData.child('studentId').val().length <= 10 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500) : true"
         }
       },
       "dorems": {
         ".indexOn": ["score"],
         "$score_id": {
-          ".write": "(auth != null && !newData.exists()) || !data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val()))",
-          ".validate": "newData.hasChildren(['name', 'score']) && !newData.hasChild('studentId') && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
+          ".write": "!newData.exists() ? auth != null : (!data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())))",
+          ".validate": "newData.exists() ? (newData.hasChildren(['name', 'score']) && !newData.hasChild('studentId') && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500) : true"
         }
       },
       "dorms": {
         ".indexOn": ["score"],
         "$score_id": {
-          ".write": "(auth != null && !newData.exists()) || !data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val()))",
-          ".validate": "newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500"
+          ".write": "!newData.exists() ? auth != null : (!data.exists() || (newData.hasChild('score') && (!data.hasChild('score') || newData.child('score').val() > data.child('score').val())))",
+          ".validate": "newData.exists() ? (newData.hasChildren(['name', 'score']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 12 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 500) : true"
         }
       }
     },

@@ -541,24 +541,44 @@
 .live-host-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
+.live-host-brand > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.live-host-logo.logo-badge,
 .live-host-logo {
-  font-size: 2.4rem;
-  padding: 8px 12px;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid #d7e4f4;
+  border-radius: 18px;
+  color: inherit;
+  font-size: 2rem;
+  line-height: 1;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(30, 58, 104, 0.1);
 }
 
 .live-host-eyebrow {
+  margin: 0;
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.2;
   color: #64748b;
-  margin-bottom: 2px;
 }
 
 .live-host-title {
+  margin: 0;
   font-family: 'Jua', sans-serif;
-  font-size: 2rem;
+  font-size: 1.85rem;
+  line-height: 1.15;
   color: #0284c7;
   letter-spacing: 0.02em;
 }

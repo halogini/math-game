@@ -372,26 +372,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function acceptGame(entry, gameKey) {
+    const key = gameKey || activeLeaderboardGame;
+    const id = String((entry && (entry.gameId || entry.game)) || '').trim();
+    if (key === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
+    if (key === 'prism-tycoon') return PRISM_TYCOON_GAME_IDS.has(id);
+    if (key === 'three-chances') {
+      return id === 'three-chances' || id === 'three_chances';
+    }
+    if (key === 'bingsoo2') {
+      return BINGSOO2_GAME_IDS.has(id);
+    }
+    if (id === 'bingsoo') return true;
+    if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id) && !PRISM_TYCOON_GAME_IDS.has(id) && !BINGSOO2_GAME_IDS.has(id)) {
+      return true;
+    }
+    return false;
+  }
+
   function collectGameScores(dataObj, gameKey) {
     const bestMap = new Map();
-
-    const acceptGame = (entry) => {
-      const id = String((entry && (entry.gameId || entry.game)) || '').trim();
-      if (gameKey === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
-      if (gameKey === 'prism-tycoon') return PRISM_TYCOON_GAME_IDS.has(id);
-      if (gameKey === 'three-chances') {
-        return id === 'three-chances' || id === 'three_chances';
-      }
-      if (gameKey === 'bingsoo2') {
-        return BINGSOO2_GAME_IDS.has(id);
-      }
-      // bingsoo 1: explicit id or legacy rows with no gameId and a numeric score (not clear-time)
-      if (id === 'bingsoo') return true;
-      if (!id && entry && entry.score != null && entry.clearTimeMs == null && !CONGRUENCE_GAME_IDS.has(id) && !PRISM_TYCOON_GAME_IDS.has(id) && !BINGSOO2_GAME_IDS.has(id)) {
-        return true;
-      }
-      return false;
-    };
 
     const visit = (obj, isDormsSubtree = false, keyPrefix = '') => {
       if (!obj || typeof obj !== 'object') return;
@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item || typeof item !== 'object') return;
         const path = keyPrefix ? `${keyPrefix}/${key}` : key;
         if (item.name) {
-          if (!acceptGame(item)) return;
+          if (!acceptGame(item, gameKey)) return;
           if (!matchesActiveMode(item, key, isDormsSubtree)) return;
 
           const name = sanitizeInput(item.name, 12);
@@ -703,31 +703,182 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(a.href);
   }
 
+  function scoreRecordPath(key) {
+    const raw = String(key || '').trim().replace(/^\/+/, '');
+    if (!raw) return '';
+    return raw.replace(/^scores\//, '');
+  }
+
+  function addScoreKey(keys, key) {
+    const path = scoreRecordPath(key);
+    if (path && keys.indexOf(path) === -1) keys.push(path);
+  }
+
+  function leaderboardGameIds() {
+    if (activeLeaderboardGame === 'congruence') {
+      return ['congruence', 'triangle', 'congruence_game'];
+    }
+    if (activeLeaderboardGame === 'prism-tycoon') {
+      return ['prism-tycoon', 'tycoon'];
+    }
+    if (activeLeaderboardGame === 'three-chances') {
+      return ['three-chances', 'three_chances'];
+    }
+    if (activeLeaderboardGame === 'bingsoo2') {
+      return ['bingsoo2', 'bingsoo-2'];
+    }
+    return ['bingsoo'];
+  }
+
+  function entryMatchesLeaderboardPlayer(entry, item) {
+    if (!entry || !item) return false;
+    const targetName = sanitizeInput(item.name || '', 12);
+    const targetSid = sanitizeInput(item.studentId || '', 10);
+    const entryName = String((entry.name || entry.playerName) || '').trim();
+    const nameMatch = sanitizeInput(entryName, 12) === targetName || entryName === String(item.name || '').trim();
+    if (!nameMatch) return false;
+
+    if (typeof HalomathScores !== 'undefined') {
+      if (!HalomathScores.matchesGameId(entry, leaderboardGameIds())) return false;
+      return HalomathScores.matchesPlayer(entry, item.name || entryName, item.studentId || '', activeMode);
+    }
+
+    if (!acceptGame(entry, activeLeaderboardGame)) return false;
+    if (activeMode === 'school') {
+      return sanitizeInput(entry.studentId || '', 10) === targetSid;
+    }
+    return isDormsRecord(entry, '', false);
+  }
+
+  function collectPlayerScoreKeys(item, dataObj) {
+    const keys = [];
+    addScoreKey(keys, item && item.recordKey);
+    if (item && Array.isArray(item.extraKeys)) {
+      item.extraKeys.forEach((k) => addScoreKey(keys, k));
+    }
+    if (!dataObj || typeof dataObj !== 'object' || !item) return keys;
+
+    const walk = (obj, prefix, isDormsSubtree) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((key) => {
+        const entry = obj[key];
+        if (!entry || typeof entry !== 'object') return;
+        const path = prefix ? `${prefix}/${key}` : key;
+        if (entry.name || entry.playerName) {
+          if (!matchesActiveMode(entry, key, isDormsSubtree)) return;
+          if (!entryMatchesLeaderboardPlayer(entry, item)) return;
+          addScoreKey(keys, path);
+          return;
+        }
+        walk(entry, path, key === 'dorms' || isDormsSubtree);
+      });
+    };
+    walk(dataObj, '', false);
+    return keys;
+  }
+
+  function scoresDatabaseUrl() {
+    return (firebaseConfig && firebaseConfig.databaseURL)
+      || 'https://math-game-halogini-default-rtdb.firebaseio.com';
+  }
+
+  async function deleteScoreKey(path, idToken) {
+    const segments = scoreRecordPath(path);
+    if (!segments) throw new Error('empty-path');
+    if (!idToken) throw new Error('no-auth');
+
+    const urlPath = segments.split('/').map(encodeURIComponent).join('/');
+    const res = await fetch(
+      `${scoresDatabaseUrl()}/scores/${urlPath}.json?auth=${encodeURIComponent(idToken)}`,
+      { method: 'DELETE' }
+    );
+    if (res.ok) return;
+
+    const text = await res.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      message = String((parsed && parsed.error) || text);
+    } catch (e) { /* ignore */ }
+    const err = new Error(message || `HTTP ${res.status}`);
+    if (res.status === 401 || /permission denied/i.test(message)) {
+      err.code = 'PERMISSION_DENIED';
+    }
+    throw err;
+  }
+
   async function deleteAdminRecord(item) {
-    if (!portalAdminUnlocked || !currentAdminUser() || !firebaseDb || !item) return;
+    if (!portalAdminUnlocked || !item) return;
+    if (!firebaseDb || !firebaseAuth) {
+      window.alert('데이터베이스에 연결되지 않았습니다. 페이지를 새로고침해 주세요.');
+      return;
+    }
+    const adminUser = currentAdminUser();
+    if (!adminUser) {
+      window.alert('관리자 로그인이 풀렸습니다. 다시 로그인해 주세요.');
+      portalAdminUnlocked = false;
+      applyAdminChrome();
+      listenRealtimeLeaderboard();
+      openAdminGate();
+      return;
+    }
     const label = activeMode === 'school' && item.studentId
       ? `${item.name} (${item.studentId})`
       : (item.name || '이 기록');
     if (!window.confirm(`${label} 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
 
-    const keys = [];
-    if (item.recordKey) keys.push(item.recordKey);
-    if (Array.isArray(item.extraKeys)) {
-      item.extraKeys.forEach((k) => {
-        if (k && keys.indexOf(k) === -1) keys.push(k);
-      });
+    let dataObj = null;
+    try {
+      const snap = await firebaseDb.ref('scores').once('value');
+      dataObj = snap.val();
+    } catch (err) {
+      console.warn('Admin delete scan failed:', err);
+      dataObj = await fetchScoresDataViaRest(5000);
     }
+
+    const keys = collectPlayerScoreKeys(item, dataObj);
     if (!keys.length) {
       window.alert('이 기록의 저장 위치를 찾지 못했습니다.');
       return;
     }
 
     try {
-      await Promise.all(keys.map((k) => firebaseDb.ref(`scores/${k}`).remove()));
+      const idToken = await adminUser.getIdToken(true);
+      let deleted = 0;
+      const failures = [];
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          await deleteScoreKey(keys[i], idToken);
+          deleted += 1;
+        } catch (err) {
+          console.error('Delete failed for', keys[i], err);
+          failures.push({ key: keys[i], err });
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 350));
       listenRealtimeLeaderboard();
+
+      if (deleted === 0) {
+        const first = failures[0] && failures[0].err;
+        const code = String((first && first.code) || (first && first.message) || '');
+        if (/PERMISSION_DENIED|permission-denied|permission denied/i.test(code)) {
+          window.alert('삭제 권한이 없습니다. Firebase Realtime Database 규칙에서 삭제 시 validate가 막지 않도록 newData.exists() ? … : true 형태인지 확인한 뒤, 이 사이트의 최신 portal.js가 배포됐는지도 확인해 주세요.');
+        } else {
+          window.alert('삭제에 실패했습니다. 로그인 상태와 네트워크를 확인해 주세요.');
+        }
+        return;
+      }
+
+      if (failures.length) {
+        window.alert(`${deleted}개 기록은 삭제했지만 ${failures.length}개는 남았습니다. 잠시 후 다시 시도해 주세요.`);
+        return;
+      }
+
+      window.alert(`${label} 기록 ${deleted}개를 삭제했습니다.`);
     } catch (err) {
       console.error('Admin delete failed:', err);
-      window.alert('삭제에 실패했습니다. Firebase 규칙이 배포됐는지, 로그인 상태인지 확인해 주세요.');
+      window.alert('삭제에 실패했습니다. 로그인 상태와 네트워크를 확인해 주세요.');
     }
   }
 
