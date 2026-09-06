@@ -787,6 +787,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!segments) throw new Error('empty-path');
     if (!idToken) throw new Error('no-auth');
 
+    if (firebaseDb) {
+      try {
+        await firebaseDb.ref(`scores/${segments}`).remove();
+        return;
+      } catch (err) {
+        console.warn('SDK remove failed, trying REST:', segments, err);
+      }
+    }
+
     const urlPath = segments.split('/').map(encodeURIComponent).join('/');
     const res = await fetch(
       `${scoresDatabaseUrl()}/scores/${urlPath}.json?auth=${encodeURIComponent(idToken)}`,
@@ -807,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
     throw err;
   }
 
-  async function deleteAdminRecord(item) {
+  async function deleteAdminRecord(item, triggerBtn) {
     if (!portalAdminUnlocked || !item) return;
     if (!firebaseDb || !firebaseAuth) {
       window.alert('데이터베이스에 연결되지 않았습니다. 페이지를 새로고침해 주세요.');
@@ -827,22 +836,33 @@ document.addEventListener('DOMContentLoaded', () => {
       : (item.name || '이 기록');
     if (!window.confirm(`${label} 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
 
-    let dataObj = null;
-    try {
-      const snap = await firebaseDb.ref('scores').once('value');
-      dataObj = snap.val();
-    } catch (err) {
-      console.warn('Admin delete scan failed:', err);
-      dataObj = await fetchScoresDataViaRest(5000);
-    }
-
-    const keys = collectPlayerScoreKeys(item, dataObj);
-    if (!keys.length) {
-      window.alert('이 기록의 저장 위치를 찾지 못했습니다.');
-      return;
+    const btn = triggerBtn && triggerBtn.tagName ? triggerBtn : null;
+    const btnLabel = btn ? btn.textContent : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '삭제 중…';
     }
 
     try {
+      let dataObj = await fetchScoresDataViaRest(8000);
+      if (!dataObj && firebaseDb) {
+        try {
+          const snap = await Promise.race([
+            firebaseDb.ref('scores').once('value'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('scan-timeout')), 4000))
+          ]);
+          dataObj = snap.val();
+        } catch (err) {
+          console.warn('Admin delete scan failed:', err);
+        }
+      }
+
+      const keys = collectPlayerScoreKeys(item, dataObj);
+      if (!keys.length) {
+        window.alert('이 기록의 저장 위치를 찾지 못했습니다.');
+        return;
+      }
+
       const idToken = await adminUser.getIdToken(true);
       let deleted = 0;
       const failures = [];
@@ -863,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const first = failures[0] && failures[0].err;
         const code = String((first && first.code) || (first && first.message) || '');
         if (/PERMISSION_DENIED|permission-denied|permission denied/i.test(code)) {
-          window.alert('삭제 권한이 없습니다. Firebase Realtime Database 규칙에서 삭제 시 validate가 막지 않도록 newData.exists() ? … : true 형태인지 확인한 뒤, 이 사이트의 최신 portal.js가 배포됐는지도 확인해 주세요.');
+          window.alert('삭제 권한이 없습니다. Firebase 콘솔 → Realtime Database → 규칙에서 validate 끝에 `: true`가 있는지 확인해 주세요.');
         } else {
           window.alert('삭제에 실패했습니다. 로그인 상태와 네트워크를 확인해 주세요.');
         }
@@ -879,6 +899,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error('Admin delete failed:', err);
       window.alert('삭제에 실패했습니다. 로그인 상태와 네트워크를 확인해 주세요.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btnLabel || '삭제';
+      }
     }
   }
 
@@ -937,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.type = 'button';
         btn.className = 'admin-btn admin-btn-delete';
         btn.textContent = '삭제';
-        btn.addEventListener('click', () => deleteAdminRecord(item));
+        btn.addEventListener('click', () => deleteAdminRecord(item, btn));
         td.appendChild(btn);
         tr.appendChild(td);
       }
