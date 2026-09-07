@@ -54,29 +54,20 @@
         }
       },
       "totals": {
-        "externalQualified": {
-          ".write": "auth != null"
-        },
-        "ownerQualified": {
+        "qualified": {
           ".write": "auth != null"
         }
       },
       "byDay": {
         "$day": {
-          "externalQualified": {
-            ".write": "auth != null"
-          },
-          "ownerQualified": {
+          "qualified": {
             ".write": "auth != null"
           }
         }
       },
       "byGame": {
         "$gameId": {
-          "externalQualified": {
-            ".write": "auth != null"
-          },
-          "ownerQualified": {
+          "qualified": {
             ".write": "auth != null"
           }
         }

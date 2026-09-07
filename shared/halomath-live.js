@@ -223,17 +223,6 @@
     } catch (e) { /* page is unloading */ }
   }
 
-  function ownerHostUidSet() {
-    try {
-      const raw = (global.ENV && global.ENV.SESSION_OWNER_HOST_UIDS)
-        || (typeof window !== 'undefined' && window.ENV && window.ENV.SESSION_OWNER_HOST_UIDS);
-      if (!Array.isArray(raw)) return new Set();
-      return new Set(raw.map((id) => String(id || '').trim()).filter(Boolean));
-    } catch (e) {
-      return new Set();
-    }
-  }
-
   function usageDayKey(nowMs) {
     const t = Number(nowMs) || Date.now();
     const kst = new Date(t + 9 * 60 * 60 * 1000);
@@ -243,31 +232,26 @@
     return `${y}-${m}-${d}`;
   }
 
-  function usageCounterKey(isOwner) {
-    return isOwner ? 'ownerQualified' : 'externalQualified';
-  }
-
   function dedupKeyForRoom(code, createdAt, fallbackAt) {
     const ca = Number(createdAt) || Number(fallbackAt) || 0;
     return `${normalizeCode(code)}_${ca}`.replace(/[.#$\[\]/]/g, '_');
   }
 
-  function buildUsagePatchBody(isOwner, gameId, endedAt) {
-    const counter = usageCounterKey(isOwner);
+  function buildUsagePatchBody(gameId, endedAt) {
     const day = usageDayKey(endedAt);
     const gid = normalizeGameId(gameId);
     const inc = { '.sv': { increment: 1 } };
     return {
-      totals: { [counter]: inc },
-      byDay: { [day]: { [counter]: inc } },
-      byGame: { [gid]: { [counter]: inc } }
+      totals: { qualified: inc },
+      byDay: { [day]: { qualified: inc } },
+      byGame: { [gid]: { qualified: inc } }
     };
   }
 
-  async function incrementSessionUsage(isOwner, gameId, endedAt, token) {
+  async function incrementSessionUsage(gameId, endedAt, token) {
     await fetchRest('sessionUsage.json', {
       method: 'PATCH',
-      body: JSON.stringify(buildUsagePatchBody(isOwner, gameId, endedAt)),
+      body: JSON.stringify(buildUsagePatchBody(gameId, endedAt)),
       authToken: token
     });
   }
@@ -278,16 +262,14 @@
     if (!normalized) return;
     const playerCount = Number(hint.playerCount);
     if (!Number.isFinite(playerCount) || playerCount < MIN_QUALIFIED_PLAYERS) return;
-    const hostUid = String(hint.hostUid || cachedHostUid || '');
     const gameId = normalizeGameId(hint.gameId);
     const endedAt = Date.now();
-    const isOwner = ownerHostUidSet().has(hostUid);
     const dedupKey = dedupKeyForRoom(normalized, hint.createdAt, endedAt);
     const authToken = token || cachedHostToken;
     if (!authToken) return;
     const dedupUrl = withAuth(`sessionUsage/dedup/${dedupKey}.json`, authToken);
     const patchUrl = withAuth('sessionUsage.json', authToken);
-    const patchBody = JSON.stringify(buildUsagePatchBody(isOwner, gameId, endedAt));
+    const patchBody = JSON.stringify(buildUsagePatchBody(gameId, endedAt));
     try {
       fetch(dedupUrl, {
         method: 'PUT',
@@ -314,7 +296,6 @@
     let meta = null;
     let playerCount = Number(hint.playerCount);
     let gameId = hint.gameId;
-    let hostUid = hint.hostUid;
 
     try {
       meta = await getMeta(normalized);
@@ -324,7 +305,6 @@
         playerCount = collectLiveList(players).length;
       }
       gameId = gameId || meta.gameId;
-      hostUid = hostUid || meta.hostUid;
     } catch (e) {
       console.warn('session usage meta fetch failed:', e);
       return false;
@@ -334,7 +314,6 @@
 
     const endedAt = Date.now();
     const dedupKey = dedupKeyForRoom(normalized, meta.createdAt, endedAt);
-    const isOwner = ownerHostUidSet().has(String(hostUid || ''));
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
 
@@ -351,7 +330,7 @@
     }
 
     try {
-      await incrementSessionUsage(isOwner, gameId, endedAt, token);
+      await incrementSessionUsage(gameId, endedAt, token);
       return true;
     } catch (e) {
       console.warn('session usage increment failed:', e);

@@ -143,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionUsageCards = document.getElementById('session-usage-cards');
   const sessionUsageByGame = document.getElementById('session-usage-by-game');
   const sessionUsageLoading = document.getElementById('session-usage-loading');
-  const sessionUsageConfigNote = document.getElementById('session-usage-config-note');
   const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
@@ -180,9 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 
-  function hasOwnerHostConfig() {
-    const raw = window.ENV && window.ENV.SESSION_OWNER_HOST_UIDS;
-    return Array.isArray(raw) && raw.some((id) => String(id || '').trim());
+  function qualifiedSessionCount(obj) {
+    if (!obj || typeof obj !== 'object') return 0;
+    if (obj.qualified != null) return sessionUsageCount(obj.qualified);
+    return sessionUsageCount(obj.externalQualified) + sessionUsageCount(obj.ownerQualified);
   }
 
   function clearSessionUsageStats() {
@@ -198,10 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionUsageByGame) {
       sessionUsageByGame.hidden = true;
       sessionUsageByGame.innerHTML = '';
-    }
-    if (sessionUsageConfigNote) {
-      sessionUsageConfigNote.hidden = true;
-      sessionUsageConfigNote.textContent = '';
     }
     if (sessionUsageFold) sessionUsageFold.open = false;
   }
@@ -222,32 +218,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const todayKey = usageDayKeyKst();
     const today = byDay[todayKey] && typeof byDay[todayKey] === 'object' ? byDay[todayKey] : {};
 
-    const externalTotal = sessionUsageCount(totals.externalQualified);
-    const externalToday = sessionUsageCount(today.externalQualified);
-    const ownerTotal = sessionUsageCount(totals.ownerQualified);
-    const ownerToday = sessionUsageCount(today.ownerQualified);
+    const total = qualifiedSessionCount(totals);
+    const todayCount = qualifiedSessionCount(today);
 
     if (sessionUsageTitle) {
-      sessionUsageTitle.textContent = `📊 수업 세션 · 외부 누적 ${externalTotal} · 오늘 ${externalToday}`;
+      sessionUsageTitle.textContent = `📊 수업 세션 · 누적 ${total} · 오늘 ${todayCount}`;
     }
 
     if (sessionUsageCards) {
-      sessionUsageCards.innerHTML = [
-        renderSessionUsageCard('외부 수업 세션 (누적)', externalTotal, externalToday),
-        renderSessionUsageCard('내 수업 세션 (누적)', ownerTotal, ownerToday)
-      ].join('');
+      sessionUsageCards.innerHTML = renderSessionUsageCard('수업 세션 (누적)', total, todayCount);
     }
 
     const gameRows = Object.keys(byGame).sort().map((gameId) => {
       const row = byGame[gameId] || {};
       const label = SESSION_GAME_LABELS[gameId] || gameId;
-      const ext = sessionUsageCount(row.externalQualified);
-      const own = sessionUsageCount(row.ownerQualified);
-      if (!ext && !own) return '';
+      const count = qualifiedSessionCount(row);
+      if (!count) return '';
       return `<tr>
         <td>${escapeHtml(label)}</td>
-        <td>${ext}</td>
-        <td>${own}</td>
+        <td>${count}</td>
       </tr>`;
     }).filter(Boolean);
 
@@ -256,23 +245,13 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionUsageByGame.hidden = false;
         sessionUsageByGame.innerHTML = `<table>
           <thead>
-            <tr><th>게임</th><th>외부</th><th>내</th></tr>
+            <tr><th>게임</th><th>세션 수</th></tr>
           </thead>
           <tbody>${gameRows.join('')}</tbody>
         </table>`;
       } else {
         sessionUsageByGame.hidden = true;
         sessionUsageByGame.innerHTML = '';
-      }
-    }
-
-    if (sessionUsageConfigNote) {
-      if (!hasOwnerHostConfig()) {
-        sessionUsageConfigNote.hidden = false;
-        sessionUsageConfigNote.textContent = 'config.js의 SESSION_OWNER_HOST_UIDS에 진행 창 익명 UID를 넣으면 외부/내 세션을 구분할 수 있습니다.';
-      } else {
-        sessionUsageConfigNote.hidden = true;
-        sessionUsageConfigNote.textContent = '';
       }
     }
   }
