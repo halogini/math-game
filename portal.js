@@ -809,7 +809,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentAdminUser() {
-    return firebaseAuth && firebaseAuth.currentUser ? firebaseAuth.currentUser : null;
+    const user = firebaseAuth && firebaseAuth.currentUser ? firebaseAuth.currentUser : null;
+    if (!user || !user.email) return null;
+    return user;
+  }
+
+  function clearAnonymousAuthIfNeeded() {
+    const user = firebaseAuth && firebaseAuth.currentUser ? firebaseAuth.currentUser : null;
+    if (user && !user.email) {
+      firebaseAuth.signOut().catch(() => { /* ignore */ });
+    }
   }
 
   function applyAdminChrome() {
@@ -875,6 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
       enterAdminMode();
       return;
     }
+    clearAnonymousAuthIfNeeded();
     showAdminGateError('');
     setElHidden(adminGate, false);
     if (adminPassInput) adminPassInput.value = '';
@@ -1284,7 +1294,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (sessionUsageFold) {
     sessionUsageFold.addEventListener('toggle', () => {
-      if (sessionUsageFold.open) loadSessionUsageStats();
+      if (sessionUsageFold.open && portalAdminUnlocked) {
+        sessionUsageLoadingFlag = false;
+        loadSessionUsageStats();
+      }
     });
   }
 
