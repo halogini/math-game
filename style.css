@@ -216,6 +216,43 @@ body {
 }
 
 /* Leaderboard Section */
+.leaderboard-fold {
+  border: none;
+}
+
+.leaderboard-fold-summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.leaderboard-fold-summary::-webkit-details-marker {
+  display: none;
+}
+
+.leaderboard-fold-summary::before {
+  content: '▸ ';
+  color: #64748b;
+  font-weight: 700;
+}
+
+.leaderboard-fold[open] .leaderboard-fold-summary::before {
+  content: '▾ ';
+}
+
+.leaderboard-fold-summary h2 {
+  display: inline;
+  font-family: 'Jua', sans-serif;
+  font-size: 1.35rem;
+  color: #0f172a;
+  margin: 0;
+}
+
+.leaderboard-fold[open] .leaderboard-container {
+  margin-top: 12px;
+}
+
 .leaderboard-container {
   background: #f8fafc;
   border-radius: 20px;
@@ -224,7 +261,8 @@ body {
 }
 
 .leaderboard-mode-note {
-  margin-top: 6px;
+  margin-top: 0;
+  margin-bottom: 6px;
   font-size: 0.85rem;
   color: #64748b;
 }
@@ -335,11 +373,98 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 14px;
+  margin-bottom: 12px;
   padding: 12px;
   background: #fff7ed;
   border: 1px solid #fed7aa;
   border-radius: 12px;
+}
+
+#btn-admin-toggle-mode {
+  font-weight: 800;
+}
+
+.session-usage-fold {
+  margin-bottom: 12px;
+}
+
+.session-usage-body {
+  padding: 0 4px 12px;
+}
+
+.session-usage-note,
+.session-usage-config-note {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.session-usage-config-note {
+  color: #b45309;
+}
+
+.session-usage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.session-usage-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.session-usage-card-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.session-usage-card-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.session-usage-card-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.session-usage-by-game {
+  margin-bottom: 12px;
+}
+
+.session-usage-by-game table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.session-usage-by-game th,
+.session-usage-by-game td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.session-usage-by-game th {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.session-usage-loading {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .admin-search-label {

@@ -44,6 +44,43 @@
           }
         }
       }
+    },
+    "sessionUsage": {
+      ".read": "auth != null && auth.token.email != null",
+      "dedup": {
+        "$key": {
+          ".write": "auth != null && !data.exists()",
+          ".validate": "newData.isBoolean() && newData.val() === true"
+        }
+      },
+      "totals": {
+        "externalQualified": {
+          ".write": "auth != null"
+        },
+        "ownerQualified": {
+          ".write": "auth != null"
+        }
+      },
+      "byDay": {
+        "$day": {
+          "externalQualified": {
+            ".write": "auth != null"
+          },
+          "ownerQualified": {
+            ".write": "auth != null"
+          }
+        }
+      },
+      "byGame": {
+        "$gameId": {
+          "externalQualified": {
+            ".write": "auth != null"
+          },
+          "ownerQualified": {
+            ".write": "auth != null"
+          }
+        }
+      }
     }
   }
 }

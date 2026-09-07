@@ -522,7 +522,9 @@ function leaveHostIfClosing(event) {
   if (event && event.persisted) return;
   autoEndArmed = false;
   closeAllQrWindows();
-  HalomathLive.leaveHostWindow(currentRoomCode, hostCreatedAt, hostUid, hostGameId);
+  HalomathLive.leaveHostWindow(currentRoomCode, hostCreatedAt, hostUid, hostGameId, {
+    playerCount: lastLiveList.length
+  });
 }
 
 window.addEventListener('pagehide', leaveHostIfClosing);

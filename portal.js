@@ -123,6 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderboardTableHeaderDelete = document.getElementById('th-header-delete');
   const leaderboardTbody = document.getElementById('leaderboard-tbody');
   const leaderboardTabs = document.getElementById('leaderboard-tabs');
+  const leaderboardSection = document.getElementById('leaderboard-section');
+  const leaderboardFold = document.getElementById('leaderboard-fold');
   const logoBadge = document.getElementById('logo-badge');
   const adminGate = document.getElementById('admin-gate');
   const adminEmailInput = document.getElementById('admin-email-input');
@@ -136,6 +138,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnAdminExit = document.getElementById('btn-admin-exit');
   const btnAdminExport = document.getElementById('btn-admin-export');
   const btnAdminToggleMode = document.getElementById('btn-admin-toggle-mode');
+  const sessionUsageFold = document.getElementById('session-usage-fold');
+  const sessionUsageTitle = document.getElementById('session-usage-title');
+  const sessionUsageCards = document.getElementById('session-usage-cards');
+  const sessionUsageByGame = document.getElementById('session-usage-by-game');
+  const sessionUsageLoading = document.getElementById('session-usage-loading');
+  const sessionUsageConfigNote = document.getElementById('session-usage-config-note');
+  const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
@@ -147,6 +156,187 @@ document.addEventListener('DOMContentLoaded', () => {
   let leaderboardFetchGen = 0;
   let lastFullList = [];
   let adminQuery = '';
+  let leaderboardEverLoaded = false;
+  let sessionUsageLoadingFlag = false;
+
+  const SESSION_GAME_LABELS = {
+    bingsoo: '팥빙수',
+    bingsoo2: '팥빙수 2탄',
+    'prism-tycoon': '보석 타이쿤',
+    tycoon: '보석 타이쿤'
+  };
+
+  function usageDayKeyKst(nowMs) {
+    const t = Number(nowMs) || Date.now();
+    const kst = new Date(t + 9 * 60 * 60 * 1000);
+    const y = kst.getUTCFullYear();
+    const m = String(kst.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(kst.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function sessionUsageCount(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function hasOwnerHostConfig() {
+    const raw = window.ENV && window.ENV.SESSION_OWNER_HOST_UIDS;
+    return Array.isArray(raw) && raw.some((id) => String(id || '').trim());
+  }
+
+  function clearSessionUsageStats() {
+    if (sessionUsageTitle) sessionUsageTitle.textContent = '📊 수업 세션 통계';
+    if (sessionUsageCards) {
+      sessionUsageCards.innerHTML = '';
+      if (sessionUsageLoading) {
+        sessionUsageLoading.hidden = false;
+        sessionUsageLoading.textContent = '불러오는 중…';
+        sessionUsageCards.appendChild(sessionUsageLoading);
+      }
+    }
+    if (sessionUsageByGame) {
+      sessionUsageByGame.hidden = true;
+      sessionUsageByGame.innerHTML = '';
+    }
+    if (sessionUsageConfigNote) {
+      sessionUsageConfigNote.hidden = true;
+      sessionUsageConfigNote.textContent = '';
+    }
+    if (sessionUsageFold) sessionUsageFold.open = false;
+  }
+
+  function renderSessionUsageCard(label, total, today) {
+    return `<article class="session-usage-card">
+      <span class="session-usage-card-label">${escapeHtml(label)}</span>
+      <span class="session-usage-card-value">${total}</span>
+      <span class="session-usage-card-sub">오늘 ${today}</span>
+    </article>`;
+  }
+
+  function renderSessionUsageStats(data) {
+    const payload = data && typeof data === 'object' ? data : {};
+    const totals = payload.totals && typeof payload.totals === 'object' ? payload.totals : {};
+    const byDay = payload.byDay && typeof payload.byDay === 'object' ? payload.byDay : {};
+    const byGame = payload.byGame && typeof payload.byGame === 'object' ? payload.byGame : {};
+    const todayKey = usageDayKeyKst();
+    const today = byDay[todayKey] && typeof byDay[todayKey] === 'object' ? byDay[todayKey] : {};
+
+    const externalTotal = sessionUsageCount(totals.externalQualified);
+    const externalToday = sessionUsageCount(today.externalQualified);
+    const ownerTotal = sessionUsageCount(totals.ownerQualified);
+    const ownerToday = sessionUsageCount(today.ownerQualified);
+
+    if (sessionUsageTitle) {
+      sessionUsageTitle.textContent = `📊 수업 세션 · 외부 누적 ${externalTotal} · 오늘 ${externalToday}`;
+    }
+
+    if (sessionUsageCards) {
+      sessionUsageCards.innerHTML = [
+        renderSessionUsageCard('외부 수업 세션 (누적)', externalTotal, externalToday),
+        renderSessionUsageCard('내 수업 세션 (누적)', ownerTotal, ownerToday)
+      ].join('');
+    }
+
+    const gameRows = Object.keys(byGame).sort().map((gameId) => {
+      const row = byGame[gameId] || {};
+      const label = SESSION_GAME_LABELS[gameId] || gameId;
+      const ext = sessionUsageCount(row.externalQualified);
+      const own = sessionUsageCount(row.ownerQualified);
+      if (!ext && !own) return '';
+      return `<tr>
+        <td>${escapeHtml(label)}</td>
+        <td>${ext}</td>
+        <td>${own}</td>
+      </tr>`;
+    }).filter(Boolean);
+
+    if (sessionUsageByGame) {
+      if (gameRows.length) {
+        sessionUsageByGame.hidden = false;
+        sessionUsageByGame.innerHTML = `<table>
+          <thead>
+            <tr><th>게임</th><th>외부</th><th>내</th></tr>
+          </thead>
+          <tbody>${gameRows.join('')}</tbody>
+        </table>`;
+      } else {
+        sessionUsageByGame.hidden = true;
+        sessionUsageByGame.innerHTML = '';
+      }
+    }
+
+    if (sessionUsageConfigNote) {
+      if (!hasOwnerHostConfig()) {
+        sessionUsageConfigNote.hidden = false;
+        sessionUsageConfigNote.textContent = 'config.js의 SESSION_OWNER_HOST_UIDS에 진행 창 익명 UID를 넣으면 외부/내 세션을 구분할 수 있습니다.';
+      } else {
+        sessionUsageConfigNote.hidden = true;
+        sessionUsageConfigNote.textContent = '';
+      }
+    }
+  }
+
+  async function loadSessionUsageStats() {
+    if (!portalAdminUnlocked || !firebaseDb || sessionUsageLoadingFlag) return;
+    sessionUsageLoadingFlag = true;
+    if (sessionUsageLoading && sessionUsageCards && sessionUsageCards.contains(sessionUsageLoading)) {
+      sessionUsageLoading.textContent = '불러오는 중…';
+    }
+    try {
+      const snap = await firebaseDb.ref('sessionUsage').once('value');
+      renderSessionUsageStats(snap.val());
+    } catch (err) {
+      console.warn('session usage stats failed:', err);
+      if (sessionUsageCards) {
+        sessionUsageCards.innerHTML = '<p class="session-usage-loading">통계를 불러오지 못했습니다. Firebase 규칙을 Publish했는지 확인해 주세요.</p>';
+      }
+      if (sessionUsageTitle) sessionUsageTitle.textContent = '📊 수업 세션 통계';
+    } finally {
+      sessionUsageLoadingFlag = false;
+    }
+  }
+
+  function isLeaderboardOpen() {
+    return !!(leaderboardFold && leaderboardFold.open);
+  }
+
+  function syncLeaderboardFold(open) {
+    if (!leaderboardFold) return;
+    leaderboardFold.open = !!open;
+  }
+
+  function ensureLeaderboardLoaded() {
+    if (!portalAdminUnlocked || !isLeaderboardOpen()) return;
+    if (!leaderboardEverLoaded) leaderboardEverLoaded = true;
+    listenRealtimeLeaderboard();
+  }
+
+  function onLeaderboardFoldToggle() {
+    if (isLeaderboardOpen()) {
+      ensureLeaderboardLoaded();
+      return;
+    }
+    stopLeaderboardListeners();
+  }
+
+  function refreshLeaderboardForMode() {
+    if (!portalAdminUnlocked) return;
+    if (isLeaderboardOpen()) {
+      listenRealtimeLeaderboard();
+      return;
+    }
+    stopLeaderboardListeners();
+    lastFullList = [];
+    if (adminCount) adminCount.textContent = '';
+  }
+
+  function toggleAdminChannelMode() {
+    if (!portalAdminUnlocked) return;
+    activeMode = activeMode === 'school' ? 'dorms' : 'school';
+    applyAdminChrome();
+    refreshLeaderboardForMode();
+  }
 
   function formatClearTime(ms) {
     const n = Math.max(0, Math.floor(Number(ms) || 0));
@@ -562,18 +752,24 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyAdminChrome() {
     document.body.classList.toggle('admin-mode', portalAdminUnlocked);
     setElHidden(adminToolbar, !portalAdminUnlocked);
+    setElHidden(leaderboardSection, !portalAdminUnlocked);
     if (btnAdminToggleMode) {
       btnAdminToggleMode.textContent = activeMode === 'school' ? '도름 기록 보기' : '학교 기록 보기';
     }
     applyChannelBranding();
     if (leaderboardTableHeaderDelete) setElHidden(leaderboardTableHeaderDelete, !portalAdminUnlocked);
+    if (!portalAdminUnlocked) {
+      syncLeaderboardFold(false);
+      stopLeaderboardListeners();
+    }
   }
 
   function enterAdminMode() {
     portalAdminUnlocked = true;
     applyAdminChrome();
     setElHidden(adminGate, true);
-    listenRealtimeLeaderboard();
+    syncLeaderboardFold(false);
+    loadSessionUsageStats();
   }
 
   function restoreModeFromUrl() {
@@ -593,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
     stripAdminQuery();
     restoreModeFromUrl();
     applyAdminChrome();
-    listenRealtimeLeaderboard();
+    clearSessionUsageStats();
     if (firebaseAuth) {
       firebaseAuth.signOut().catch(() => { /* ignore */ });
     }
@@ -987,11 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnAdminExit) btnAdminExit.addEventListener('click', exitAdminMode);
   if (btnAdminExport) btnAdminExport.addEventListener('click', exportAdminCsv);
   if (btnAdminToggleMode) {
-    btnAdminToggleMode.addEventListener('click', () => {
-      activeMode = activeMode === 'school' ? 'dorms' : 'school';
-      applyAdminChrome();
-      listenRealtimeLeaderboard();
-    });
+    btnAdminToggleMode.addEventListener('click', toggleAdminChannelMode);
   }
   if (adminSearch) {
     adminSearch.addEventListener('input', () => {
@@ -1018,14 +1210,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (leaderboardFold) {
+    leaderboardFold.addEventListener('toggle', onLeaderboardFoldToggle);
+  }
+  if (btnSessionUsageRefresh) {
+    btnSessionUsageRefresh.addEventListener('click', () => {
+      sessionUsageLoadingFlag = false;
+      loadSessionUsageStats();
+    });
+  }
+  if (sessionUsageFold) {
+    sessionUsageFold.addEventListener('toggle', () => {
+      if (sessionUsageFold.open) loadSessionUsageStats();
+    });
+  }
+
   function startPortal() {
     const wantAdmin = (urlParams.get('admin') || '').toLowerCase();
     if (wantAdmin === '1' || wantAdmin === 'true') {
       if (currentAdminUser()) enterAdminMode();
       else openAdminGate();
+    } else {
+      setElHidden(leaderboardSection, true);
     }
     updateMetricHeader();
-    if (!portalAdminUnlocked) listenRealtimeLeaderboard();
   }
 
   if (firebaseAuth) {

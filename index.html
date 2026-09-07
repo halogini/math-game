@@ -120,47 +120,63 @@
         </div>
       </section>
 
-      <!-- Integrated Leaderboard Section -->
-      <section class="leaderboard-section">
-        <div class="leaderboard-container">
-          <div class="section-header">
-            <h2 id="leaderboard-title">🏆 명예의 전당 (Top 20)</h2>
-            <p class="leaderboard-mode-note" id="leaderboard-mode-note"></p>
-          </div>
-          <div class="leaderboard-tabs" id="leaderboard-tabs" role="tablist" aria-label="게임별 명예의 전당">
-            <button type="button" class="lb-tab active" data-game="bingsoo" role="tab" aria-selected="true">🍧 팥빙수</button>
-            <button type="button" class="lb-tab" data-game="bingsoo2" role="tab" aria-selected="false">🍧 팥빙수 2탄</button>
-            <button type="button" class="lb-tab" data-game="congruence" role="tab" aria-selected="false">📐 합동</button>
-            <button type="button" class="lb-tab" data-game="three-chances" role="tab" aria-selected="false">🐱 기회는 세 번</button>
-            <button type="button" class="lb-tab" data-game="prism-tycoon" role="tab" aria-selected="false">🔮 보석 타이쿤</button>
-          </div>
-          <div id="admin-toolbar" class="admin-toolbar hidden" hidden>
-            <label class="admin-search-label">
-              검색
-              <input type="search" id="admin-search" placeholder="이름 또는 학번" maxlength="24" autocomplete="off">
-            </label>
-            <button type="button" class="admin-btn" id="btn-admin-export">CSV 저장</button>
-            <button type="button" class="admin-btn" id="btn-admin-toggle-mode">도름 기록 보기</button>
-            <span class="admin-count" id="admin-count"></span>
-            <button type="button" class="admin-btn admin-btn-exit" id="btn-admin-exit">관리자 종료</button>
-          </div>
-          <div class="table-wrapper">
-            <table class="leaderboard-table">
-              <thead>
-                <tr>
-                  <th>순위</th>
-                  <th id="th-header-name">이름</th>
-                  <th id="th-header-id">학번</th>
-                  <th id="th-header-metric">최고 점수</th>
-                  <th id="th-header-delete" class="hidden" hidden>관리</th>
-                </tr>
-              </thead>
-              <tbody id="leaderboard-tbody">
-                <!-- Dynamically Populated -->
-              </tbody>
-            </table>
-          </div>
+      <!-- Integrated Leaderboard Section (admin only) -->
+      <section class="leaderboard-section" id="leaderboard-section" hidden>
+        <div id="admin-toolbar" class="admin-toolbar hidden" hidden>
+          <button type="button" class="admin-btn" id="btn-admin-toggle-mode">도름 기록 보기</button>
+          <label class="admin-search-label">
+            검색
+            <input type="search" id="admin-search" placeholder="이름 또는 학번" maxlength="24" autocomplete="off">
+          </label>
+          <button type="button" class="admin-btn" id="btn-admin-export">CSV 저장</button>
+          <span class="admin-count" id="admin-count"></span>
+          <button type="button" class="admin-btn admin-btn-exit" id="btn-admin-exit">관리자 종료</button>
         </div>
+        <details class="leaderboard-fold session-usage-fold" id="session-usage-fold">
+          <summary class="leaderboard-fold-summary">
+            <h2 id="session-usage-title">📊 수업 세션 통계</h2>
+          </summary>
+          <div class="session-usage-body">
+            <p class="session-usage-note">3명 이상 참여한 세션이 종료될 때만 집계합니다. 이름·점수는 저장하지 않습니다.</p>
+            <div class="session-usage-cards" id="session-usage-cards">
+              <p class="session-usage-loading" id="session-usage-loading">불러오는 중…</p>
+            </div>
+            <div class="session-usage-by-game" id="session-usage-by-game" hidden></div>
+            <p class="session-usage-config-note" id="session-usage-config-note" hidden></p>
+            <button type="button" class="admin-btn" id="btn-session-usage-refresh">새로고침</button>
+          </div>
+        </details>
+        <details class="leaderboard-fold" id="leaderboard-fold">
+          <summary class="leaderboard-fold-summary">
+            <h2 id="leaderboard-title">🏆 명예의 전당 (Top 20)</h2>
+          </summary>
+          <div class="leaderboard-container">
+            <p class="leaderboard-mode-note" id="leaderboard-mode-note"></p>
+            <div class="leaderboard-tabs" id="leaderboard-tabs" role="tablist" aria-label="게임별 명예의 전당">
+              <button type="button" class="lb-tab active" data-game="bingsoo" role="tab" aria-selected="true">🍧 팥빙수</button>
+              <button type="button" class="lb-tab" data-game="bingsoo2" role="tab" aria-selected="false">🍧 팥빙수 2탄</button>
+              <button type="button" class="lb-tab" data-game="congruence" role="tab" aria-selected="false">📐 합동</button>
+              <button type="button" class="lb-tab" data-game="three-chances" role="tab" aria-selected="false">🐱 기회는 세 번</button>
+              <button type="button" class="lb-tab" data-game="prism-tycoon" role="tab" aria-selected="false">🔮 보석 타이쿤</button>
+            </div>
+            <div class="table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th id="th-header-name">이름</th>
+                    <th id="th-header-id">학번</th>
+                    <th id="th-header-metric">최고 점수</th>
+                    <th id="th-header-delete" class="hidden" hidden>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                  <!-- Dynamically Populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
       </section>
     </main>
 

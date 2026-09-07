@@ -16,5 +16,13 @@ window.ENV = window.ENV || {
     messagingSenderId: "42232060061",
     appId: "1:42232060061:web:ad26f83ca7d1285b3e5c74",
     measurementId: "G-F13LE342GQ"
-  }
+  },
+  /**
+   * 세션 호스트 Firebase Auth UID (익명 계정).
+   * 진행 창에서 한 번 세션을 연 뒤 Firebase 콘솔 > Authentication 에서 UID를 복사해 넣으세요.
+   * 여기에 없는 호스트는 「외부 수업 세션」으로 집계됩니다.
+   */
+  SESSION_OWNER_HOST_UIDS: [
+    // "paste-your-anonymous-host-uid-here"
+  ]
 };
