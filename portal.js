@@ -210,6 +210,17 @@ document.addEventListener('DOMContentLoaded', () => {
     </article>`;
   }
 
+  function showSessionUsageMessage(message) {
+    if (sessionUsageTitle) sessionUsageTitle.textContent = '📊 수업 세션 통계';
+    if (sessionUsageCards) {
+      sessionUsageCards.innerHTML = `<p class="session-usage-loading">${escapeHtml(message)}</p>`;
+    }
+    if (sessionUsageByGame) {
+      sessionUsageByGame.hidden = true;
+      sessionUsageByGame.innerHTML = '';
+    }
+  }
+
   function renderSessionUsageStats(data) {
     const payload = data && typeof data === 'object' ? data : {};
     const totals = payload.totals && typeof payload.totals === 'object' ? payload.totals : {};
@@ -226,7 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (sessionUsageCards) {
-      sessionUsageCards.innerHTML = renderSessionUsageCard('수업 세션 (누적)', total, todayCount);
+      sessionUsageCards.innerHTML = renderSessionUsageCard('수업 세션 (누적)', total, todayCount)
+        + (total === 0 && todayCount === 0
+          ? '<p class="session-usage-loading">아직 집계된 세션이 없습니다. 3명 이상 참여 후 종료하면 숫자가 올라갑니다.</p>'
+          : '');
     }
 
     const gameRows = Object.keys(byGame).sort().map((gameId) => {
@@ -257,20 +271,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadSessionUsageStats() {
-    if (!portalAdminUnlocked || !firebaseDb || sessionUsageLoadingFlag) return;
+    if (!portalAdminUnlocked) return;
+    if (!firebaseDb && !firebaseConfig) {
+      showSessionUsageMessage('통계를 불러올 수 없습니다. Firebase 설정을 확인해 주세요.');
+      return;
+    }
+    if (!currentAdminUser()) {
+      showSessionUsageMessage('관리자 로그인이 필요합니다.');
+      return;
+    }
+    if (sessionUsageLoadingFlag) return;
     sessionUsageLoadingFlag = true;
     if (sessionUsageLoading && sessionUsageCards && sessionUsageCards.contains(sessionUsageLoading)) {
       sessionUsageLoading.textContent = '불러오는 중…';
     }
     try {
-      const snap = await firebaseDb.ref('sessionUsage').once('value');
-      renderSessionUsageStats(snap.val());
+      let data = null;
+      if (firebaseDb) {
+        try {
+          data = await Promise.race([
+            firebaseDb.ref('sessionUsage').once('value').then((snap) => snap.val()),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('SDK_TIMEOUT')), 3500);
+            })
+          ]);
+        } catch (sdkErr) {
+          console.warn('session usage SDK fetch failed; trying REST.', sdkErr);
+          data = await fetchSessionUsageViaRest(5000);
+        }
+      } else {
+        data = await fetchSessionUsageViaRest(5000);
+      }
+      renderSessionUsageStats(data);
     } catch (err) {
       console.warn('session usage stats failed:', err);
-      if (sessionUsageCards) {
-        sessionUsageCards.innerHTML = '<p class="session-usage-loading">통계를 불러오지 못했습니다. Firebase 규칙을 Publish했는지 확인해 주세요.</p>';
+      const code = String((err && err.code) || '');
+      if (code === 'PERMISSION_DENIED') {
+        showSessionUsageMessage('통계를 불러오지 못했습니다. Firebase Realtime Database 규칙에 sessionUsage를 Publish했는지 확인해 주세요.');
+      } else if (code === 'SESSION_USAGE_TIMEOUT' || (err && err.message === 'SDK_TIMEOUT')) {
+        showSessionUsageMessage('통계 응답이 없습니다. 네트워크를 확인한 뒤 새로고침해 주세요.');
+      } else {
+        showSessionUsageMessage('통계를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.');
       }
-      if (sessionUsageTitle) sessionUsageTitle.textContent = '📊 수업 세션 통계';
     } finally {
       sessionUsageLoadingFlag = false;
     }
@@ -470,6 +512,46 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(timeoutId);
       console.warn('Leaderboard REST fetch failed:', err);
       return null;
+    }
+  }
+
+  async function fetchSessionUsageViaRest(timeoutMs = 5000) {
+    const adminUser = currentAdminUser();
+    if (!adminUser) {
+      const err = new Error('ADMIN_AUTH_REQUIRED');
+      err.code = 'ADMIN_AUTH_REQUIRED';
+      throw err;
+    }
+    const idToken = await adminUser.getIdToken();
+    const dbUrl = (firebaseConfig && firebaseConfig.databaseURL) || 'https://math-game-halogini-default-rtdb.firebaseio.com';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${dbUrl}/sessionUsage.json?auth=${encodeURIComponent(idToken)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.status === 401 || res.status === 403) {
+        const err = new Error('PERMISSION_DENIED');
+        err.code = 'PERMISSION_DENIED';
+        throw err;
+      }
+      if (!res.ok) {
+        const err = new Error(`HTTP_${res.status}`);
+        err.code = String(res.status);
+        throw err;
+      }
+      const text = await res.text();
+      if (!text || text === 'null') return null;
+      return JSON.parse(text);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err && err.name === 'AbortError') {
+        const timeoutErr = new Error('SESSION_USAGE_TIMEOUT');
+        timeoutErr.code = 'SESSION_USAGE_TIMEOUT';
+        throw timeoutErr;
+      }
+      throw err;
     }
   }
 
