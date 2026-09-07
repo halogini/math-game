@@ -14,14 +14,45 @@ function liveOptions() {
   return { gameId: liveGameId(), compareMode: LIVE_GAME.compareMode || 'higher' };
 }
 
+function detectLobbyMode() {
+  try {
+    if (typeof HalomathMode !== 'undefined') return HalomathMode.detectActiveMode();
+    const mode = new URLSearchParams(window.location.search).get('mode');
+    if (mode === 'school') return 'school';
+    if (mode === 'dorms' || mode === 'dorems') return 'dorms';
+  } catch (e) { /* ignore */ }
+  return 'dorms';
+}
+
+function modeQuery() {
+  return `mode=${detectLobbyMode() === 'school' ? 'school' : 'dorms'}`;
+}
+
+function soloPlayPath() {
+  const gid = liveGameId();
+  if (gid === 'bingsoo2') return '../bingsoo2/index.html';
+  if (gid === 'prism-tycoon' || gid === 'tycoon') return '../prism-tycoon/index.html';
+  return '../bingsoo/index.html';
+}
+
+function applySoloPlayLink() {
+  const btn = document.getElementById('btn-play-solo');
+  if (!btn) return;
+  btn.href = `${soloPlayPath()}?${modeQuery()}`;
+}
+
 function hostUrl(code) {
-  return new URL(`host.html?room=${encodeURIComponent(code)}`, window.location.href).href;
+  const url = new URL('host.html', window.location.href);
+  url.searchParams.set('room', code);
+  if (detectLobbyMode() === 'school') url.searchParams.set('mode', 'school');
+  return url.href;
 }
 
 function qrPopoutUrl(code) {
   const url = new URL(LIVE_GAME.qrPopoutPath || 'qr-popout.html', window.location.href);
   url.searchParams.set('room', code);
   if (liveGameId() !== 'bingsoo') url.searchParams.set('game', liveGameId());
+  if (detectLobbyMode() === 'school') url.searchParams.set('mode', 'school');
   return url.href;
 }
 
@@ -179,6 +210,7 @@ window.addEventListener('storage', (e) => {
 });
 
 (function initLobby() {
+  applySoloPlayLink();
   if (!window.HalomathLive) {
     setStatus('세션 모듈을 불러오지 못했습니다. Ctrl+Shift+R로 새로고침해 주세요.');
     return;
@@ -189,7 +221,9 @@ window.addEventListener('storage', (e) => {
     hideReopen();
     setStatus('세션이 종료되었습니다.');
     try {
-      window.history.replaceState({}, '', 'index.html');
+      const next = new URL('index.html', window.location.href);
+      if (detectLobbyMode() === 'school') next.searchParams.set('mode', 'school');
+      window.history.replaceState({}, '', next.pathname + next.search);
     } catch (e) { /* ignore */ }
     return;
   }

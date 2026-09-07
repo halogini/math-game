@@ -628,7 +628,14 @@
 
   function lobbyUrl(fromHref) {
     try {
-      return new URL('index.html?ended=1', fromHref || window.location.href).href;
+      const base = fromHref || (typeof window !== 'undefined' ? window.location.href : '');
+      const from = new URL(base);
+      const url = new URL('index.html', from.href);
+      url.searchParams.set('ended', '1');
+      const mode = from.searchParams.get('mode');
+      if (mode === 'school') url.searchParams.set('mode', 'school');
+      else if (mode === 'dorms' || mode === 'dorems') url.searchParams.set('mode', 'dorms');
+      return url.href;
     } catch (e) {
       return 'index.html?ended=1';
     }
