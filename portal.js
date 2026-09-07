@@ -286,28 +286,15 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionUsageLoading.textContent = '불러오는 중…';
     }
     try {
-      let data = null;
-      if (firebaseDb) {
-        try {
-          data = await Promise.race([
-            firebaseDb.ref('sessionUsage').once('value').then((snap) => snap.val()),
-            new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('SDK_TIMEOUT')), 3500);
-            })
-          ]);
-        } catch (sdkErr) {
-          console.warn('session usage SDK fetch failed; trying REST.', sdkErr);
-          data = await fetchSessionUsageViaRest(5000);
-        }
-      } else {
-        data = await fetchSessionUsageViaRest(5000);
-      }
+      let data = await fetchSessionUsageViaRest(5000);
       renderSessionUsageStats(data);
     } catch (err) {
       console.warn('session usage stats failed:', err);
       const code = String((err && err.code) || '');
       if (code === 'PERMISSION_DENIED') {
-        showSessionUsageMessage('통계를 불러오지 못했습니다. Firebase Realtime Database 규칙에 sessionUsage를 Publish했는지 확인해 주세요.');
+        showSessionUsageMessage('통계를 불러오지 못했습니다. Firebase 규칙을 다시 Publish했는지, 관리자 이메일 로그인인지 확인해 주세요.');
+      } else if (code === 'ADMIN_EMAIL_REQUIRED') {
+        showSessionUsageMessage('통계는 이메일로 로그인한 관리자만 볼 수 있습니다. 관리자 종료 후 다시 로그인해 주세요.');
       } else if (code === 'SESSION_USAGE_TIMEOUT' || (err && err.message === 'SDK_TIMEOUT')) {
         showSessionUsageMessage('통계 응답이 없습니다. 네트워크를 확인한 뒤 새로고침해 주세요.');
       } else {
@@ -522,15 +509,20 @@ document.addEventListener('DOMContentLoaded', () => {
       err.code = 'ADMIN_AUTH_REQUIRED';
       throw err;
     }
-    const idToken = await adminUser.getIdToken();
+    if (!adminUser.email) {
+      const err = new Error('ADMIN_EMAIL_REQUIRED');
+      err.code = 'ADMIN_EMAIL_REQUIRED';
+      throw err;
+    }
+    const idToken = await adminUser.getIdToken(true);
     const dbUrl = (firebaseConfig && firebaseConfig.databaseURL) || 'https://math-game-halogini-default-rtdb.firebaseio.com';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(`${dbUrl}/sessionUsage.json?auth=${encodeURIComponent(idToken)}`, {
+
+    async function readUsagePath(path) {
+      const res = await fetch(`${dbUrl}/${path}.json?auth=${encodeURIComponent(idToken)}`, {
         signal: controller.signal
       });
-      clearTimeout(timeoutId);
       if (res.status === 401 || res.status === 403) {
         const err = new Error('PERMISSION_DENIED');
         err.code = 'PERMISSION_DENIED';
@@ -544,6 +536,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const text = await res.text();
       if (!text || text === 'null') return null;
       return JSON.parse(text);
+    }
+
+    try {
+      const [totals, byDay, byGame] = await Promise.all([
+        readUsagePath('sessionUsage/totals'),
+        readUsagePath('sessionUsage/byDay'),
+        readUsagePath('sessionUsage/byGame')
+      ]);
+      clearTimeout(timeoutId);
+      return { totals, byDay, byGame };
     } catch (err) {
       clearTimeout(timeoutId);
       if (err && err.name === 'AbortError') {
