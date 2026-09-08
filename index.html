@@ -137,12 +137,16 @@
             <h2 id="session-usage-title">📊 수업 세션 통계</h2>
           </summary>
           <div class="session-usage-body">
-            <p class="session-usage-note">3명 이상 참여한 세션이 종료될 때만 집계합니다. 이름·점수는 저장하지 않습니다.</p>
+            <p class="session-usage-note">참가자가 3명 이상이 되면 집계됩니다. 이름·점수·인원수는 저장하지 않습니다.</p>
             <div class="session-usage-cards" id="session-usage-cards">
               <p class="session-usage-loading" id="session-usage-loading">불러오는 중…</p>
             </div>
             <div class="session-usage-by-game" id="session-usage-by-game" hidden></div>
-            <button type="button" class="admin-btn" id="btn-session-usage-refresh">새로고침</button>
+            <div class="session-usage-actions">
+              <button type="button" class="admin-btn" id="btn-session-usage-refresh">새로고침</button>
+              <button type="button" class="admin-btn" id="btn-purge-expired-rooms">만료 세션 정리</button>
+            </div>
+            <p class="session-usage-note" id="purge-expired-status" hidden></p>
           </div>
         </details>
         <details class="leaderboard-fold" id="leaderboard-fold">

@@ -144,6 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionUsageByGame = document.getElementById('session-usage-by-game');
   const sessionUsageLoading = document.getElementById('session-usage-loading');
   const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
+  const btnPurgeExpiredRooms = document.getElementById('btn-purge-expired-rooms');
+  const purgeExpiredStatus = document.getElementById('purge-expired-status');
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
@@ -200,6 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionUsageByGame.innerHTML = '';
     }
     if (sessionUsageFold) sessionUsageFold.open = false;
+    if (purgeExpiredStatus) {
+      purgeExpiredStatus.hidden = true;
+      purgeExpiredStatus.textContent = '';
+    }
   }
 
   function renderSessionUsageCard(label, total, today) {
@@ -302,6 +308,167 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } finally {
       sessionUsageLoadingFlag = false;
+    }
+  }
+
+  const LIVE_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+  const MIN_QUALIFIED_PLAYERS = 3;
+  let purgeExpiredRunning = false;
+
+  function setPurgeStatus(message, visible) {
+    if (!purgeExpiredStatus) return;
+    if (!visible) {
+      purgeExpiredStatus.hidden = true;
+      purgeExpiredStatus.textContent = '';
+      return;
+    }
+    purgeExpiredStatus.hidden = false;
+    purgeExpiredStatus.textContent = message || '';
+  }
+
+  function normalizeLiveGameId(gameId) {
+    const id = String(gameId || 'bingsoo').trim().slice(0, 24);
+    return id || 'bingsoo';
+  }
+
+  function collectLivePlayerCount(players) {
+    if (!players || typeof players !== 'object') return 0;
+    let count = 0;
+    Object.keys(players).forEach((key) => {
+      const row = players[key];
+      if (!row || typeof row !== 'object') return;
+      const name = String(row.name || '').trim();
+      if (name) count += 1;
+    });
+    return count;
+  }
+
+  function usageDedupKey(code, createdAt) {
+    const ca = Number(createdAt) || 0;
+    return `${String(code || '').toUpperCase()}_${ca}`.replace(/[.#$\[\]/]/g, '_');
+  }
+
+  async function adminAuthFetch(path, options, idToken, signal) {
+    const dbUrl = (firebaseConfig && firebaseConfig.databaseURL) || 'https://math-game-halogini-default-rtdb.firebaseio.com';
+    const clean = String(path || '').replace(/^\//, '');
+    const url = `${dbUrl}/${clean}.json?auth=${encodeURIComponent(idToken)}`;
+    const res = await fetch(url, {
+      method: (options && options.method) || 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: options && options.body != null ? options.body : undefined,
+      signal
+    });
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      const err = new Error('PERMISSION_DENIED');
+      err.code = 'PERMISSION_DENIED';
+      throw err;
+    }
+    if (!res.ok) {
+      const err = new Error(text || res.statusText);
+      err.code = String(res.status);
+      throw err;
+    }
+    if (!text || text === 'null') return null;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function adminRecordSessionUsage(room, code, idToken, signal) {
+    const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
+    const playerCount = collectLivePlayerCount(room && room.players);
+    if (playerCount < MIN_QUALIFIED_PLAYERS) return false;
+    const createdAt = Number(meta.createdAt) || 0;
+    const gameId = normalizeLiveGameId(meta.gameId);
+    const dedupKey = usageDedupKey(code, createdAt);
+    const endedAt = Date.now();
+    const day = usageDayKeyKst(endedAt);
+    const inc = { '.sv': { increment: 1 } };
+    const patchBody = JSON.stringify({
+      totals: { qualified: inc },
+      byDay: { [day]: { qualified: inc } },
+      byGame: { [gameId]: { qualified: inc } }
+    });
+    try {
+      await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, {
+        method: 'PUT',
+        body: 'true'
+      }, idToken, signal);
+    } catch (e) {
+      if (e && e.code === 'PERMISSION_DENIED') return false;
+      throw e;
+    }
+    await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
+    return true;
+  }
+
+  async function purgeExpiredLiveRooms() {
+    if (!portalAdminUnlocked || purgeExpiredRunning) return;
+    const adminUser = currentAdminUser();
+    if (!adminUser || !adminUser.email) {
+      setPurgeStatus('이메일 관리자 로그인이 필요합니다.', true);
+      return;
+    }
+    if (!window.confirm('만든 지 24시간이 지난 수업 세션을 모두 삭제할까요?\n3명 이상 참여한 세션은 통계에 반영한 뒤 삭제합니다.')) {
+      return;
+    }
+    purgeExpiredRunning = true;
+    if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
+    setPurgeStatus('만료 세션을 확인하는 중…', true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    try {
+      const idToken = await adminUser.getIdToken(true);
+      const rooms = await adminAuthFetch('liveRooms', { method: 'GET' }, idToken, controller.signal);
+      if (!rooms || typeof rooms !== 'object') {
+        setPurgeStatus('만료된 세션이 없습니다.', true);
+        return;
+      }
+      const now = Date.now();
+      const codes = Object.keys(rooms);
+      let expired = 0;
+      let deleted = 0;
+      let counted = 0;
+      let failed = 0;
+      for (let i = 0; i < codes.length; i += 1) {
+        const code = codes[i];
+        const room = rooms[code];
+        const createdAt = room && room.meta ? Number(room.meta.createdAt) : 0;
+        if (!createdAt || (now - createdAt) <= LIVE_ROOM_TTL_MS) continue;
+        expired += 1;
+        setPurgeStatus(`만료 세션 정리 중… ${deleted + failed + 1}/${codes.length} 확인`, true);
+        try {
+          const recorded = await adminRecordSessionUsage(room, code, idToken, controller.signal);
+          if (recorded) counted += 1;
+          await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, controller.signal);
+          deleted += 1;
+        } catch (e) {
+          console.warn('purge expired room failed:', code, e);
+          failed += 1;
+        }
+      }
+      if (!expired) {
+        setPurgeStatus('만료된 세션이 없습니다. (24시간 미만은 유지됩니다)', true);
+      } else {
+        setPurgeStatus(`정리 완료: 삭제 ${deleted}개 · 통계 반영 ${counted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+      }
+      sessionUsageLoadingFlag = false;
+      await loadSessionUsageStats();
+    } catch (err) {
+      console.warn('purge expired rooms failed:', err);
+      const code = String((err && err.code) || '');
+      if (code === 'PERMISSION_DENIED') {
+        setPurgeStatus('권한이 없습니다. liveRooms 규칙을 Publish했는지 확인해 주세요.', true);
+      } else {
+        setPurgeStatus('만료 세션 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.', true);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      purgeExpiredRunning = false;
+      if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = false;
     }
   }
 
@@ -1290,6 +1457,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSessionUsageRefresh.addEventListener('click', () => {
       sessionUsageLoadingFlag = false;
       loadSessionUsageStats();
+    });
+  }
+  if (btnPurgeExpiredRooms) {
+    btnPurgeExpiredRooms.addEventListener('click', () => {
+      purgeExpiredLiveRooms();
     });
   }
   if (sessionUsageFold) {

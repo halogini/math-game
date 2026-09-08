@@ -9,6 +9,7 @@
   const REST_TIMEOUT_MS = 8000;
   const CODE_ATTEMPTS = 12;
   const MIN_QUALIFIED_PLAYERS = 3;
+  const KNOWN_LIVE_GAME_IDS = ['bingsoo', 'bingsoo2', 'prism-tycoon', 'tycoon'];
 
   let cachedHostToken = '';
   let cachedHostUid = '';
@@ -324,7 +325,8 @@
         authToken: token
       });
     } catch (e) {
-      if (e && e.code === 'PERMISSION_DENIED') return false;
+      // Write-once dedup: already recorded for this room+createdAt.
+      if (e && e.code === 'PERMISSION_DENIED') return true;
       console.warn('session usage dedup failed:', e);
       return false;
     }
@@ -374,12 +376,55 @@
     return data && typeof data === 'object' ? data : {};
   }
 
+  async function cleanupInactiveLastRooms() {
+    await ensureHostAuth();
+    const seen = {};
+    for (let i = 0; i < KNOWN_LIVE_GAME_IDS.length; i += 1) {
+      const gid = KNOWN_LIVE_GAME_IDS[i];
+      const code = loadLastRoom(gid);
+      if (!code || seen[code]) continue;
+      seen[code] = true;
+      let active = false;
+      try {
+        active = await roomIsActive(code);
+      } catch (e) {
+        active = false;
+      }
+      if (active) continue;
+      try {
+        await deleteRoom(code, gid);
+      } catch (e) {
+        console.warn('inactive last-room cleanup failed:', code, e);
+        saveLastRoom('', gid);
+      }
+    }
+  }
+
+  async function reclaimExpiredOwnRoom(code, user, token, gameId) {
+    const meta = await getMeta(code);
+    if (!meta) return true;
+    if (!isExpired(meta.createdAt)) return false;
+    if (String(meta.hostUid || '') !== String(user.uid)) return false;
+    try {
+      await tryRecordSessionUsage(code, { gameId: meta.gameId || gameId });
+    } catch (e) {
+      console.warn('session usage on reclaim failed:', e);
+    }
+    await fetchRest(`${roomPath(code)}.json`, { method: 'DELETE', authToken: token });
+    return true;
+  }
+
   async function createRoom(gameId) {
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     cachedHostToken = token;
     cachedHostUid = user.uid;
     const gid = normalizeGameId(gameId);
+    try {
+      await cleanupInactiveLastRooms();
+    } catch (e) {
+      console.warn('cleanupInactiveLastRooms failed:', e);
+    }
     for (let i = 0; i < CODE_ATTEMPTS; i += 1) {
       const code = randomCode();
       let existing = null;
@@ -388,7 +433,15 @@
       } catch (e) {
         existing = null;
       }
-      if (existing) continue;
+      if (existing) {
+        let reclaimed = false;
+        try {
+          reclaimed = await reclaimExpiredOwnRoom(code, user, token, gid);
+        } catch (e) {
+          reclaimed = false;
+        }
+        if (!reclaimed) continue;
+      }
       const now = Date.now();
       try {
         await fetchRest(`${roomPath(code)}/meta.json`, {
@@ -682,6 +735,7 @@
     playerKey,
     roomPath,
     TTL_MS,
+    MIN_QUALIFIED_PLAYERS,
     isExpired,
     isHostClosed,
     ensureHostAuth,
@@ -696,9 +750,11 @@
     fetchRest,
     getMeta,
     getPlayers,
+    cleanupInactiveLastRooms,
     createRoom,
     roomIsActive,
     deleteRoom,
+    tryRecordSessionUsage,
     collectLiveList,
     downloadLiveRanks,
     promptEndRoom,

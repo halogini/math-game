@@ -37,6 +37,7 @@ let hostUid = '';
 let hostGameId = liveGameId();
 let autoEndArmed = true;
 let lastLiveList = [];
+let sessionUsageRecorded = false;
 let pollTimer = null;
 let qrPopoutWindow = null;
 let qrPipWindow = null;
@@ -457,11 +458,29 @@ function extraRankCells(item) {
   return `<td>${err}</td><td>${formatPlayTimeMs(item.playTimeMs)}</td>`;
 }
 
+function maybeRecordQualifiedUsage() {
+  if (sessionUsageRecorded || !currentRoomCode || !window.HalomathLive) return;
+  const minPlayers = HalomathLive.MIN_QUALIFIED_PLAYERS || 3;
+  if (lastLiveList.length < minPlayers) return;
+  sessionUsageRecorded = true;
+  HalomathLive.tryRecordSessionUsage(currentRoomCode, {
+    playerCount: lastLiveList.length,
+    gameId: liveGameId(),
+    createdAt: hostCreatedAt
+  }).then((ok) => {
+    if (ok === false) sessionUsageRecorded = false;
+  }).catch((err) => {
+    console.warn('early session usage record failed:', err);
+    sessionUsageRecorded = false;
+  });
+}
+
 function renderLiveRows(data) {
   const tbody = document.getElementById('live-tbody');
   const countEl = document.getElementById('player-count');
   if (!tbody) return;
   lastLiveList = HalomathLive.collectLiveList(data);
+  maybeRecordQualifiedUsage();
   if (countEl) {
     countEl.textContent = lastLiveList.length
       ? `${lastLiveList.length}명 참여`
@@ -498,6 +517,7 @@ function returnToLobby() {
 
 function bindHost(code) {
   currentRoomCode = code;
+  sessionUsageRecorded = false;
   document.title = `🍧 세션 ${code} | 할로매쓰`;
   const codeEl = document.getElementById('host-code');
   const badgeEl = document.getElementById('host-code-badge');

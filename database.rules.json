@@ -30,9 +30,10 @@
       }
     },
     "liveRooms": {
+      ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
       "$code": {
-        ".read": true,
-        ".write": "!newData.exists() && auth != null && data.child('meta').child('hostUid').val() === auth.uid",
+        ".read": "(data.child('meta').child('createdAt').exists() && now < data.child('meta').child('createdAt').val() + 86400000) || (auth != null && data.child('meta').child('hostUid').val() === auth.uid) || (auth != null && auth.token.email != null && auth.token.email.length > 0)",
+        ".write": "!newData.exists() && auth != null && (data.child('meta').child('hostUid').val() === auth.uid || (auth.token.email != null && auth.token.email.length > 0))",
         "meta": {
           ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || (data.child('hostUid').val() === auth.uid && newData.child('hostUid').val() === data.child('hostUid').val() && newData.child('createdAt').val() === data.child('createdAt').val()))",
           ".validate": "newData.hasChildren(['gameId', 'createdAt', 'hostUid']) && newData.child('gameId').isString() && newData.child('gameId').val().length > 0 && newData.child('gameId').val().length <= 24 && newData.child('createdAt').isNumber() && newData.child('hostUid').isString() && newData.child('hostUid').val().length > 0 && newData.child('hostUid').val().length <= 128 && (!newData.hasChild('hostSeenAt') || newData.child('hostSeenAt').isNumber())"

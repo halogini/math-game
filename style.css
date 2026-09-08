@@ -400,6 +400,13 @@ body {
   line-height: 1.5;
 }
 
+.session-usage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .session-usage-config-note {
   color: #b45309;
 }

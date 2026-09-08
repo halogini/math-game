@@ -130,9 +130,19 @@ document.getElementById('btn-host').addEventListener('click', async () => {
 
   try {
     await HalomathLive.ensureHostAuth();
+    try {
+      await HalomathLive.cleanupInactiveLastRooms();
+    } catch (e) {
+      console.warn('cleanupInactiveLastRooms failed:', e);
+    }
     let existing = HalomathLive.loadLastRoom(liveGameId());
     if (existing && !(await HalomathLive.roomIsActive(existing))) {
-      HalomathLive.saveLastRoom('', liveGameId());
+      try {
+        await HalomathLive.deleteRoom(existing, liveGameId());
+      } catch (e) {
+        console.warn('inactive room delete failed:', e);
+        HalomathLive.saveLastRoom('', liveGameId());
+      }
       hideReopen();
       existing = '';
     }
@@ -229,11 +239,17 @@ window.addEventListener('storage', (e) => {
   }
   const code = HalomathLive.loadLastRoom(liveGameId());
   if (!code) return;
-  HalomathLive.roomIsActive(code).then((active) => {
-    if (active) showReopen(code);
-    else {
-      HalomathLive.saveLastRoom('', liveGameId());
-      hideReopen();
+  HalomathLive.ensureHostAuth().then(() => HalomathLive.roomIsActive(code)).then(async (active) => {
+    if (active) {
+      showReopen(code);
+      return;
     }
+    try {
+      await HalomathLive.deleteRoom(code, liveGameId());
+    } catch (e) {
+      console.warn('inactive lobby room delete failed:', e);
+      HalomathLive.saveLastRoom('', liveGameId());
+    }
+    hideReopen();
   }).catch(() => showReopen(code));
 }());
