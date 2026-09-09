@@ -450,6 +450,10 @@ body {
   margin-bottom: 12px;
 }
 
+.session-usage-by-game + .session-usage-by-game {
+  margin-top: 4px;
+}
+
 .session-usage-by-game table {
   width: 100%;
   border-collapse: collapse;

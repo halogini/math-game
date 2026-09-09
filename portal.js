@@ -146,6 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
   const btnPurgeExpiredRooms = document.getElementById('btn-purge-expired-rooms');
   const purgeExpiredStatus = document.getElementById('purge-expired-status');
+  const playStatsFold = document.getElementById('play-stats-fold');
+  const playStatsTitle = document.getElementById('play-stats-title');
+  const playStatsCards = document.getElementById('play-stats-cards');
+  const playStatsByGame = document.getElementById('play-stats-by-game');
+  const playStatsByChannel = document.getElementById('play-stats-by-channel');
+  const playStatsLoading = document.getElementById('play-stats-loading');
+  const btnPlayStatsRefresh = document.getElementById('btn-play-stats-refresh');
 
   const CONGRUENCE_GAME_IDS = new Set(['congruence', 'triangle', 'congruence_game']);
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
@@ -159,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let adminQuery = '';
   let leaderboardEverLoaded = false;
   let sessionUsageLoadingFlag = false;
+  let playStatsLoadingFlag = false;
 
   const SESSION_GAME_LABELS = {
     bingsoo: '팥빙수',
@@ -167,6 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tycoon: '보석 타이쿤',
     'three-chances': '기회는 세 번',
     congruence: '합동'
+  };
+
+  const PLAY_CHANNEL_LABELS = {
+    arcade: '개별 플레이',
+    live: '수업 중 플레이'
   };
 
   function usageDayKeyKst(nowMs) {
@@ -252,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const gameRows = Object.keys(byGame).sort().map((gameId) => {
+      if (String(gameId).indexOf('play_') === 0) return '';
       const row = byGame[gameId] || {};
       const label = SESSION_GAME_LABELS[gameId] || gameId;
       const count = qualifiedSessionCount(row);
@@ -311,6 +325,362 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       sessionUsageLoadingFlag = false;
     }
+  }
+
+  function playStatsCount(obj) {
+    if (!obj || typeof obj !== 'object') return 0;
+    if (obj.plays != null) return sessionUsageCount(obj.plays);
+    return 0;
+  }
+
+  function normalizePlayGameId(raw) {
+    const id = String(raw || '').trim();
+    if (!id || id === 'bingsoo') return 'bingsoo';
+    if (id === 'bingsoo2' || id === 'bingsoo-2') return 'bingsoo2';
+    if (id === 'prism-tycoon' || id === 'tycoon') return 'prism-tycoon';
+    if (id === 'three-chances' || id === 'three_chances') return 'three-chances';
+    if (id === 'congruence' || id === 'triangle' || id === 'congruence_game') return 'congruence';
+    return id.slice(0, 24) || 'unknown';
+  }
+
+  function emptyPlayFloor() {
+    return { total: 0, byDay: {}, byGame: {}, byChannel: {} };
+  }
+
+  function bumpPlayFloor(floor, gameId, channel, day, n) {
+    const count = Number(n);
+    if (!Number.isFinite(count) || count <= 0) return;
+    floor.total += count;
+    if (channel) floor.byChannel[channel] = (floor.byChannel[channel] || 0) + count;
+    if (gameId) floor.byGame[gameId] = (floor.byGame[gameId] || 0) + count;
+    if (day) floor.byDay[day] = (floor.byDay[day] || 0) + count;
+  }
+
+  function collectPlayFloorFromScores(dataObj) {
+    const floor = emptyPlayFloor();
+    const visit = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((key) => {
+        const item = obj[key];
+        if (!item || typeof item !== 'object') return;
+        if (item.name || item.playerName) {
+          const gameId = normalizePlayGameId(item.gameId || item.game || '');
+          const ts = Number(item.timestamp);
+          const day = Number.isFinite(ts) && ts > 0 ? usageDayKeyKst(ts) : '';
+          bumpPlayFloor(floor, gameId, 'arcade', day, 1);
+          return;
+        }
+        visit(item);
+      });
+    };
+    visit(dataObj);
+    return floor;
+  }
+
+  function collectPlayFloorFromSessions(usage) {
+    const floor = emptyPlayFloor();
+    const minPlayers = typeof MIN_QUALIFIED_PLAYERS === 'number' ? MIN_QUALIFIED_PLAYERS : 3;
+    const totals = usage && usage.totals && typeof usage.totals === 'object' ? usage.totals : {};
+    const byDay = usage && usage.byDay && typeof usage.byDay === 'object' ? usage.byDay : {};
+    const byGame = usage && usage.byGame && typeof usage.byGame === 'object' ? usage.byGame : {};
+
+    const totalSessions = qualifiedSessionCount(totals);
+    floor.total = totalSessions * minPlayers;
+    if (floor.total) floor.byChannel.live = floor.total;
+
+    Object.keys(byDay).forEach((day) => {
+      const sessions = qualifiedSessionCount(byDay[day]);
+      if (sessions) floor.byDay[day] = sessions * minPlayers;
+    });
+
+    Object.keys(byGame).forEach((gameId) => {
+      if (String(gameId).indexOf('play_') === 0) return;
+      const sessions = qualifiedSessionCount(byGame[gameId]);
+      if (!sessions) return;
+      const gid = normalizePlayGameId(gameId);
+      floor.byGame[gid] = (floor.byGame[gid] || 0) + sessions * minPlayers;
+    });
+
+    return floor;
+  }
+
+  function mergePlayFloors(arcadeFloor, liveFloor) {
+    const out = emptyPlayFloor();
+    out.total = (arcadeFloor.total || 0) + (liveFloor.total || 0);
+    ['arcade', 'live'].forEach((ch) => {
+      const n = (arcadeFloor.byChannel[ch] || 0) + (liveFloor.byChannel[ch] || 0);
+      if (n) out.byChannel[ch] = n;
+    });
+    const gameIds = {};
+    Object.keys(arcadeFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
+    Object.keys(liveFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
+    Object.keys(gameIds).forEach((gid) => {
+      out.byGame[gid] = (arcadeFloor.byGame[gid] || 0) + (liveFloor.byGame[gid] || 0);
+    });
+    const days = {};
+    Object.keys(arcadeFloor.byDay || {}).forEach((k) => { days[k] = true; });
+    Object.keys(liveFloor.byDay || {}).forEach((k) => { days[k] = true; });
+    Object.keys(days).forEach((day) => {
+      out.byDay[day] = (arcadeFloor.byDay[day] || 0) + (liveFloor.byDay[day] || 0);
+    });
+    return out;
+  }
+
+  function takePlayStatsMax(parsed, floor) {
+    const totals = { plays: Math.max(playStatsCount(parsed.totals), floor.total || 0) };
+    const byDay = {};
+    const byGame = {};
+    const byChannel = {};
+    const dayKeys = {};
+    Object.keys((parsed && parsed.byDay) || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(floor.byDay || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(dayKeys).forEach((day) => {
+      byDay[day] = {
+        plays: Math.max(
+          playStatsCount(parsed.byDay && parsed.byDay[day]),
+          floor.byDay[day] || 0
+        )
+      };
+    });
+    const gameKeys = {};
+    Object.keys((parsed && parsed.byGame) || {}).forEach((k) => { gameKeys[k] = true; });
+    Object.keys(floor.byGame || {}).forEach((k) => { gameKeys[k] = true; });
+    Object.keys(gameKeys).forEach((gid) => {
+      byGame[gid] = {
+        plays: Math.max(
+          playStatsCount(parsed.byGame && parsed.byGame[gid]),
+          floor.byGame[gid] || 0
+        )
+      };
+    });
+    ['arcade', 'live'].forEach((ch) => {
+      const n = Math.max(
+        playStatsCount(parsed.byChannel && parsed.byChannel[ch]),
+        floor.byChannel[ch] || 0
+      );
+      if (n) byChannel[ch] = { plays: n };
+    });
+    return { totals, byDay, byGame, byChannel };
+  }
+
+  function playStatsNeedsWrite(parsed, merged) {
+    if (playStatsCount(merged.totals) > playStatsCount(parsed.totals)) return true;
+    const checkMap = (a, b) => {
+      const keys = {};
+      Object.keys(a || {}).forEach((k) => { keys[k] = true; });
+      Object.keys(b || {}).forEach((k) => { keys[k] = true; });
+      return Object.keys(keys).some((k) => playStatsCount(b && b[k]) > playStatsCount(a && a[k]));
+    };
+    return checkMap(parsed.byDay, merged.byDay)
+      || checkMap(parsed.byGame, merged.byGame)
+      || checkMap(parsed.byChannel, merged.byChannel);
+  }
+
+  async function writePlayStatsBaseline(merged, idToken) {
+    const patch = {};
+    const total = playStatsCount(merged.totals);
+    if (total > 0) patch['byGame/play_total/qualified'] = total;
+    Object.keys(merged.byDay || {}).forEach((day) => {
+      const n = playStatsCount(merged.byDay[day]);
+      if (n > 0) patch[`byGame/play_day_${day}/qualified`] = n;
+    });
+    Object.keys(merged.byGame || {}).forEach((gid) => {
+      const n = playStatsCount(merged.byGame[gid]);
+      if (n > 0) patch[`byGame/play_game_${gid}/qualified`] = n;
+    });
+    Object.keys(merged.byChannel || {}).forEach((ch) => {
+      const n = playStatsCount(merged.byChannel[ch]);
+      if (n > 0) patch[`byGame/play_ch_${ch}/qualified`] = n;
+    });
+    if (!Object.keys(patch).length) return;
+    await adminAuthFetch('sessionUsage', {
+      method: 'PATCH',
+      body: JSON.stringify(patch)
+    }, idToken);
+  }
+
+  function clearPlayStats() {
+    if (playStatsTitle) playStatsTitle.textContent = '🎮 플레이 통계';
+    if (playStatsCards) {
+      playStatsCards.innerHTML = '';
+      if (playStatsLoading) {
+        playStatsLoading.hidden = false;
+        playStatsLoading.textContent = '불러오는 중…';
+        playStatsCards.appendChild(playStatsLoading);
+      }
+    }
+    if (playStatsByGame) {
+      playStatsByGame.hidden = true;
+      playStatsByGame.innerHTML = '';
+    }
+    if (playStatsByChannel) {
+      playStatsByChannel.hidden = true;
+      playStatsByChannel.innerHTML = '';
+    }
+    if (playStatsFold) playStatsFold.open = false;
+  }
+
+  function showPlayStatsMessage(message) {
+    if (playStatsTitle) playStatsTitle.textContent = '🎮 플레이 통계';
+    if (playStatsCards) {
+      playStatsCards.innerHTML = `<p class="session-usage-loading">${escapeHtml(message)}</p>`;
+    }
+    if (playStatsByGame) {
+      playStatsByGame.hidden = true;
+      playStatsByGame.innerHTML = '';
+    }
+    if (playStatsByChannel) {
+      playStatsByChannel.hidden = true;
+      playStatsByChannel.innerHTML = '';
+    }
+  }
+
+  function renderPlayStats(data) {
+    const payload = data && typeof data === 'object' ? data : {};
+    const totals = payload.totals && typeof payload.totals === 'object' ? payload.totals : {};
+    const byDay = payload.byDay && typeof payload.byDay === 'object' ? payload.byDay : {};
+    const byGame = payload.byGame && typeof payload.byGame === 'object' ? payload.byGame : {};
+    const byChannel = payload.byChannel && typeof payload.byChannel === 'object' ? payload.byChannel : {};
+    const todayKey = usageDayKeyKst();
+    const today = byDay[todayKey] && typeof byDay[todayKey] === 'object' ? byDay[todayKey] : {};
+
+    const total = playStatsCount(totals);
+    const todayCount = playStatsCount(today);
+
+    if (playStatsTitle) {
+      playStatsTitle.textContent = `🎮 플레이 · 누적 ${total} · 오늘 ${todayCount}`;
+    }
+
+    if (playStatsCards) {
+      playStatsCards.innerHTML = renderSessionUsageCard('전체 플레이', total, todayCount)
+        + (total === 0
+          ? '<p class="session-usage-loading">확인된 기록이 없습니다.</p>'
+          : '');
+    }
+
+    const gameRows = Object.keys(byGame).sort().map((gameId) => {
+      const row = byGame[gameId] || {};
+      const label = SESSION_GAME_LABELS[gameId] || gameId;
+      const count = playStatsCount(row);
+      if (!count) return '';
+      return `<tr>
+        <td>${escapeHtml(label)}</td>
+        <td>${count}</td>
+      </tr>`;
+    }).filter(Boolean);
+
+    if (playStatsByGame) {
+      if (gameRows.length) {
+        playStatsByGame.hidden = false;
+        playStatsByGame.innerHTML = `<table>
+          <thead>
+            <tr><th>게임</th><th>플레이 수</th></tr>
+          </thead>
+          <tbody>${gameRows.join('')}</tbody>
+        </table>`;
+      } else {
+        playStatsByGame.hidden = true;
+        playStatsByGame.innerHTML = '';
+      }
+    }
+
+    const channelRows = Object.keys(byChannel).sort().map((channel) => {
+      const count = playStatsCount(byChannel[channel]);
+      if (!count) return '';
+      const label = PLAY_CHANNEL_LABELS[channel] || channel;
+      return `<tr>
+        <td>${escapeHtml(label)}</td>
+        <td>${count}</td>
+      </tr>`;
+    }).filter(Boolean);
+
+    if (playStatsByChannel) {
+      if (channelRows.length) {
+        playStatsByChannel.hidden = false;
+        playStatsByChannel.innerHTML = `<table>
+          <thead>
+            <tr><th>구분</th><th>플레이 수</th></tr>
+          </thead>
+          <tbody>${channelRows.join('')}</tbody>
+        </table>`;
+      } else {
+        playStatsByChannel.hidden = true;
+        playStatsByChannel.innerHTML = '';
+      }
+    }
+  }
+
+  async function loadPlayStats() {
+    if (!portalAdminUnlocked) return;
+    if (!firebaseDb && !firebaseConfig) {
+      showPlayStatsMessage('통계를 불러올 수 없습니다. Firebase 설정을 확인해 주세요.');
+      return;
+    }
+    if (!currentAdminUser()) {
+      showPlayStatsMessage('관리자 로그인이 필요합니다.');
+      return;
+    }
+    if (playStatsLoadingFlag) return;
+    playStatsLoadingFlag = true;
+    if (playStatsLoading && playStatsCards && playStatsCards.contains(playStatsLoading)) {
+      playStatsLoading.textContent = '불러오는 중…';
+    }
+    try {
+      const adminUser = currentAdminUser();
+      const [usage, scoresData] = await Promise.all([
+        fetchSessionUsageViaRest(5000),
+        fetchScoresDataViaRest(8000)
+      ]);
+      const parsed = (window.HalomathPlayStats && typeof window.HalomathPlayStats.parsePlayStatsFromSessionUsage === 'function')
+        ? window.HalomathPlayStats.parsePlayStatsFromSessionUsage(usage)
+        : parsePlayStatsFromUsageFallback(usage);
+      const arcadeFloor = collectPlayFloorFromScores(scoresData);
+      const liveFloor = collectPlayFloorFromSessions(usage);
+      const floor = mergePlayFloors(arcadeFloor, liveFloor);
+      const merged = takePlayStatsMax(parsed, floor);
+      if (playStatsNeedsWrite(parsed, merged)) {
+        try {
+          const idToken = await adminUser.getIdToken(true);
+          await writePlayStatsBaseline(merged, idToken);
+        } catch (writeErr) {
+          console.warn('play stats baseline write failed:', writeErr);
+        }
+      }
+      renderPlayStats(merged);
+    } catch (err) {
+      console.warn('play stats failed:', err);
+      const code = String((err && err.code) || '');
+      if (code === 'PERMISSION_DENIED') {
+        showPlayStatsMessage('통계를 불러오지 못했습니다. 관리자 이메일 로그인인지 확인해 주세요.');
+      } else if (code === 'ADMIN_EMAIL_REQUIRED') {
+        showPlayStatsMessage('통계는 이메일로 로그인한 관리자만 볼 수 있습니다. 관리자 종료 후 다시 로그인해 주세요.');
+      } else if (code === 'SESSION_USAGE_TIMEOUT' || code === 'PLAY_STATS_TIMEOUT') {
+        showPlayStatsMessage('통계 응답이 없습니다. 네트워크를 확인한 뒤 새로고침해 주세요.');
+      } else {
+        showPlayStatsMessage('통계를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.');
+      }
+    } finally {
+      playStatsLoadingFlag = false;
+    }
+  }
+
+  function parsePlayStatsFromUsageFallback(data) {
+    const byGameRaw = data && data.byGame && typeof data.byGame === 'object' ? data.byGame : {};
+    const totals = { plays: 0 };
+    const byDay = {};
+    const byGame = {};
+    const byChannel = {};
+    Object.keys(byGameRaw).forEach((key) => {
+      if (String(key).indexOf('play_') !== 0) return;
+      const n = Number((byGameRaw[key] || {}).qualified);
+      const count = Number.isFinite(n) && n >= 0 ? n : 0;
+      if (!count) return;
+      if (key === 'play_total') totals.plays = count;
+      else if (key.indexOf('play_day_') === 0) byDay[key.slice(9)] = { plays: count };
+      else if (key.indexOf('play_game_') === 0) byGame[key.slice(10)] = { plays: count };
+      else if (key.indexOf('play_ch_') === 0) byChannel[key.slice(8)] = { plays: count };
+    });
+    return { totals, byDay, byGame, byChannel };
   }
 
   const LIVE_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1019,6 +1389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setElHidden(adminGate, true);
     syncLeaderboardFold(false);
     loadSessionUsageStats();
+    loadPlayStats();
   }
 
   function restoreModeFromUrl() {
@@ -1039,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreModeFromUrl();
     applyAdminChrome();
     clearSessionUsageStats();
+    clearPlayStats();
     if (firebaseAuth) {
       firebaseAuth.signOut().catch(() => { /* ignore */ });
     }
@@ -1479,6 +1851,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sessionUsageFold.open && portalAdminUnlocked) {
         sessionUsageLoadingFlag = false;
         loadSessionUsageStats();
+      }
+    });
+  }
+  if (btnPlayStatsRefresh) {
+    btnPlayStatsRefresh.addEventListener('click', () => {
+      playStatsLoadingFlag = false;
+      loadPlayStats();
+    });
+  }
+  if (playStatsFold) {
+    playStatsFold.addEventListener('toggle', () => {
+      if (playStatsFold.open && portalAdminUnlocked) {
+        playStatsLoadingFlag = false;
+        loadPlayStats();
       }
     });
   }

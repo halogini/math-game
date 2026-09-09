@@ -646,9 +646,15 @@
           timestamp: existing.timestamp || 0
         };
         if (!isBetterBingsoo2Record(candidate, previous)) {
+          if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
+            global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
+          }
           return { updated: false, existingScore };
         }
       } else if (existingScore >= numScore) {
+        if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
+          global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
+        }
         return { updated: false, existingScore };
       }
     }
@@ -656,6 +662,9 @@
       method: 'PUT',
       body: JSON.stringify(body)
     });
+    if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
+      global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
+    }
     return { updated: true, existingScore };
   }
 

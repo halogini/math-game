@@ -566,6 +566,10 @@
 
       if (primary && !isBetterRecord(writePayload, primary.val, compareMode)) {
         const existingScore = Number(primary.val.score) || 0;
+        if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
+          const playGameId = (writePayload && writePayload.gameId) || (gameIds && gameIds[0]) || '';
+          global.HalomathPlayStats.recordPlay(playGameId, { channel: 'arcade' });
+        }
         return {
           success: true,
           updated: false,
@@ -602,7 +606,10 @@
 
       }
 
-
+      if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
+        const playGameId = (writePayload && writePayload.gameId) || (gameIds && gameIds[0]) || '';
+        global.HalomathPlayStats.recordPlay(playGameId, { channel: 'arcade' });
+      }
 
       return {
 
