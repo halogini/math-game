@@ -164,7 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
     bingsoo: '팥빙수',
     bingsoo2: '팥빙수 2탄',
     'prism-tycoon': '보석 타이쿤',
-    tycoon: '보석 타이쿤'
+    tycoon: '보석 타이쿤',
+    'three-chances': '기회는 세 번',
+    congruence: '합동'
   };
 
   function usageDayKeyKst(nowMs) {
@@ -388,9 +390,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const day = usageDayKeyKst(endedAt);
     const inc = { '.sv': { increment: 1 } };
     const patchBody = JSON.stringify({
-      totals: { qualified: inc },
-      byDay: { [day]: { qualified: inc } },
-      byGame: { [gameId]: { qualified: inc } }
+      'totals/qualified': inc,
+      [`byDay/${day}/qualified`]: inc,
+      [`byGame/${gameId}/qualified`]: inc
     });
     try {
       await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, {
@@ -412,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setPurgeStatus('이메일 관리자 로그인이 필요합니다.', true);
       return;
     }
-    if (!window.confirm('만든 지 24시간이 지난 수업 세션을 모두 삭제할까요?\n3명 이상 참여한 세션은 통계에 반영한 뒤 삭제합니다.')) {
+    if (!window.confirm('3명 이상 참여한 수업 세션을 통계에 반영하고, 만료되거나 종료된 세션 방을 정리할까요?')) {
       return;
     }
     purgeExpiredRunning = true;
@@ -436,25 +438,33 @@ document.addEventListener('DOMContentLoaded', () => {
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
         const room = rooms[code];
-        const createdAt = room && room.meta ? Number(room.meta.createdAt) : 0;
-        if (!createdAt || (now - createdAt) <= LIVE_ROOM_TTL_MS) continue;
-        expired += 1;
-        setPurgeStatus(`만료 세션 정리 중… ${deleted + failed + 1}/${codes.length} 확인`, true);
+        const meta = room && room.meta ? room.meta : {};
+        const createdAt = Number(meta.createdAt) || 0;
+        const isClosed = meta.hostSeenAt === 0;
+        const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
+
+        // 3명 이상 참여한 세션은 24시간 경과 여부와 무관하게 통계에 반영 (중복 dedup 안전 처리됨)
         try {
           const recorded = await adminRecordSessionUsage(room, code, idToken, controller.signal);
           if (recorded) counted += 1;
-          await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, controller.signal);
-          deleted += 1;
         } catch (e) {
-          console.warn('purge expired room failed:', code, e);
-          failed += 1;
+          console.warn('session usage record failed:', code, e);
+        }
+
+        // 삭제는 24시간이 지났거나 호스트가 이미 종료한 방만 정리
+        if (isExpiredRoom || isClosed) {
+          expired += 1;
+          setPurgeStatus(`세션 정리 중… ${deleted + failed + 1}/${codes.length} 확인`, true);
+          try {
+            await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, controller.signal);
+            deleted += 1;
+          } catch (e) {
+            console.warn('purge room failed:', code, e);
+            failed += 1;
+          }
         }
       }
-      if (!expired) {
-        setPurgeStatus('만료된 세션이 없습니다. (24시간 미만은 유지됩니다)', true);
-      } else {
-        setPurgeStatus(`정리 완료: 삭제 ${deleted}개 · 통계 반영 ${counted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
-      }
+      setPurgeStatus(`정리 완료: 통계 반영 ${counted}개 · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
       sessionUsageLoadingFlag = false;
       await loadSessionUsageStats();
     } catch (err) {

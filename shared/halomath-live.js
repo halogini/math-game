@@ -243,9 +243,9 @@
     const gid = normalizeGameId(gameId);
     const inc = { '.sv': { increment: 1 } };
     return {
-      totals: { qualified: inc },
-      byDay: { [day]: { qualified: inc } },
-      byGame: { [gid]: { qualified: inc } }
+      'totals/qualified': inc,
+      [`byDay/${day}/qualified`]: inc,
+      [`byGame/${gid}/qualified`]: inc
     };
   }
 
