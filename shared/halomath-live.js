@@ -289,6 +289,31 @@
     } catch (e) { /* page is unloading */ }
   }
 
+  function playCountForStats(playerCount) {
+    const n = Math.floor(Number(playerCount) || 0);
+    if (!Number.isFinite(n) || n < 1) return 0;
+    return Math.min(200, n);
+  }
+
+  function recordLivePlayCountKeepalive(code, hint, token) {
+    hint = hint && typeof hint === 'object' ? hint : {};
+    const normalized = normalizeCode(code);
+    if (!normalized) return;
+    const n = playCountForStats(hint.playerCount);
+    if (!n) return;
+    const gameId = normalizeGameId(hint.gameId);
+    const authToken = token || cachedHostToken;
+    if (!authToken) return;
+    const stats = global.HalomathPlayStats;
+    if (!stats || typeof stats.recordPlay !== 'function' || typeof stats.playSessionDedupKey !== 'function') return;
+    stats.recordPlay(gameId, {
+      channel: 'live',
+      token: authToken,
+      count: n,
+      dedupKey: stats.playSessionDedupKey(normalized, hint.createdAt)
+    });
+  }
+
   async function tryRecordSessionUsage(code, hint) {
     hint = hint && typeof hint === 'object' ? hint : {};
     const normalized = normalizeCode(code);
@@ -336,6 +361,64 @@
       return true;
     } catch (e) {
       console.warn('session usage increment failed:', e);
+      return false;
+    }
+  }
+
+  async function tryRecordLivePlayCount(code, hint) {
+    hint = hint && typeof hint === 'object' ? hint : {};
+    const stats = global.HalomathPlayStats;
+    if (!stats || typeof stats.recordPlay !== 'function' || typeof stats.playSessionDedupKey !== 'function') {
+      return false;
+    }
+    const normalized = normalizeCode(code);
+    if (!normalized) return false;
+
+    let meta = null;
+    let playerCount = Number(hint.playerCount);
+    let gameId = hint.gameId;
+
+    try {
+      meta = await getMeta(normalized);
+      if (!meta) return false;
+      if (!Number.isFinite(playerCount) || playerCount < 0) {
+        const players = await getPlayers(normalized);
+        playerCount = collectLiveList(players).length;
+      }
+      gameId = gameId || meta.gameId;
+    } catch (e) {
+      console.warn('live play count meta fetch failed:', e);
+      return false;
+    }
+
+    const n = playCountForStats(playerCount);
+    if (!n) return false;
+
+    const user = await ensureHostAuth();
+    const token = await user.getIdToken();
+    const dedupKey = stats.playSessionDedupKey(normalized, meta.createdAt);
+
+    try {
+      await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(true),
+        authToken: token
+      });
+    } catch (e) {
+      if (e && e.code === 'PERMISSION_DENIED') return true;
+      console.warn('live play count dedup failed:', e);
+      return false;
+    }
+
+    try {
+      await fetchRest('sessionUsage.json', {
+        method: 'PATCH',
+        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', Date.now(), n)),
+        authToken: token
+      });
+      return true;
+    } catch (e) {
+      console.warn('live play count increment failed:', e);
       return false;
     }
   }
@@ -407,6 +490,7 @@
     if (String(meta.hostUid || '') !== String(user.uid)) return false;
     try {
       await tryRecordSessionUsage(code, { gameId: meta.gameId || gameId });
+      await tryRecordLivePlayCount(code, { gameId: meta.gameId || gameId });
     } catch (e) {
       console.warn('session usage on reclaim failed:', e);
     }
@@ -492,6 +576,10 @@
       hostUid: uid,
       gameId: gid
     }), cachedHostToken);
+    recordLivePlayCountKeepalive(normalized, Object.assign({}, usageHint, {
+      createdAt,
+      gameId: gid
+    }), cachedHostToken);
     writeMetaKeepalive(normalized, createdAt, 0, uid, cachedHostToken, gid);
     deleteRoomKeepalive(normalized, cachedHostToken);
     try {
@@ -515,6 +603,7 @@
     const token = await user.getIdToken();
     try {
       await tryRecordSessionUsage(code, { gameId });
+      await tryRecordLivePlayCount(code, { gameId });
     } catch (e) {
       console.warn('session usage record failed:', e);
     }
@@ -646,15 +735,9 @@
           timestamp: existing.timestamp || 0
         };
         if (!isBetterBingsoo2Record(candidate, previous)) {
-          if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
-            global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
-          }
           return { updated: false, existingScore };
         }
       } else if (existingScore >= numScore) {
-        if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
-          global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
-        }
         return { updated: false, existingScore };
       }
     }
@@ -662,9 +745,6 @@
       method: 'PUT',
       body: JSON.stringify(body)
     });
-    if (global.HalomathPlayStats && typeof global.HalomathPlayStats.recordPlay === 'function') {
-      global.HalomathPlayStats.recordPlay(meta.gameId || extras.expectedGameId, { channel: 'live' });
-    }
     return { updated: true, existingScore };
   }
 

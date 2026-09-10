@@ -150,7 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const playStatsTitle = document.getElementById('play-stats-title');
   const playStatsCards = document.getElementById('play-stats-cards');
   const playStatsByGame = document.getElementById('play-stats-by-game');
-  const playStatsByChannel = document.getElementById('play-stats-by-channel');
   const playStatsLoading = document.getElementById('play-stats-loading');
   const btnPlayStatsRefresh = document.getElementById('btn-play-stats-refresh');
 
@@ -175,11 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
     tycoon: '보석 타이쿤',
     'three-chances': '기회는 세 번',
     congruence: '합동'
-  };
-
-  const PLAY_CHANNEL_LABELS = {
-    arcade: '개별 플레이',
-    live: '수업 중 플레이'
   };
 
   function usageDayKeyKst(nowMs) {
@@ -344,14 +338,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function emptyPlayFloor() {
-    return { total: 0, byDay: {}, byGame: {}, byChannel: {} };
+    return { total: 0, byDay: {}, byGame: {} };
   }
 
   function bumpPlayFloor(floor, gameId, channel, day, n) {
     const count = Number(n);
     if (!Number.isFinite(count) || count <= 0) return;
     floor.total += count;
-    if (channel) floor.byChannel[channel] = (floor.byChannel[channel] || 0) + count;
     if (gameId) floor.byGame[gameId] = (floor.byGame[gameId] || 0) + count;
     if (day) floor.byDay[day] = (floor.byDay[day] || 0) + count;
   }
@@ -386,7 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const totalSessions = qualifiedSessionCount(totals);
     floor.total = totalSessions * minPlayers;
-    if (floor.total) floor.byChannel.live = floor.total;
 
     Object.keys(byDay).forEach((day) => {
       const sessions = qualifiedSessionCount(byDay[day]);
@@ -407,10 +399,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function mergePlayFloors(arcadeFloor, liveFloor) {
     const out = emptyPlayFloor();
     out.total = (arcadeFloor.total || 0) + (liveFloor.total || 0);
-    ['arcade', 'live'].forEach((ch) => {
-      const n = (arcadeFloor.byChannel[ch] || 0) + (liveFloor.byChannel[ch] || 0);
-      if (n) out.byChannel[ch] = n;
-    });
     const gameIds = {};
     Object.keys(arcadeFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
     Object.keys(liveFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
@@ -430,7 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const totals = { plays: Math.max(playStatsCount(parsed.totals), floor.total || 0) };
     const byDay = {};
     const byGame = {};
-    const byChannel = {};
     const dayKeys = {};
     Object.keys((parsed && parsed.byDay) || {}).forEach((k) => { dayKeys[k] = true; });
     Object.keys(floor.byDay || {}).forEach((k) => { dayKeys[k] = true; });
@@ -453,14 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         )
       };
     });
-    ['arcade', 'live'].forEach((ch) => {
-      const n = Math.max(
-        playStatsCount(parsed.byChannel && parsed.byChannel[ch]),
-        floor.byChannel[ch] || 0
-      );
-      if (n) byChannel[ch] = { plays: n };
-    });
-    return { totals, byDay, byGame, byChannel };
+    return { totals, byDay, byGame };
   }
 
   function playStatsNeedsWrite(parsed, merged) {
@@ -472,8 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return Object.keys(keys).some((k) => playStatsCount(b && b[k]) > playStatsCount(a && a[k]));
     };
     return checkMap(parsed.byDay, merged.byDay)
-      || checkMap(parsed.byGame, merged.byGame)
-      || checkMap(parsed.byChannel, merged.byChannel);
+      || checkMap(parsed.byGame, merged.byGame);
   }
 
   async function writePlayStatsBaseline(merged, idToken) {
@@ -487,10 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(merged.byGame || {}).forEach((gid) => {
       const n = playStatsCount(merged.byGame[gid]);
       if (n > 0) patch[`byGame/play_game_${gid}/qualified`] = n;
-    });
-    Object.keys(merged.byChannel || {}).forEach((ch) => {
-      const n = playStatsCount(merged.byChannel[ch]);
-      if (n > 0) patch[`byGame/play_ch_${ch}/qualified`] = n;
     });
     if (!Object.keys(patch).length) return;
     await adminAuthFetch('sessionUsage', {
@@ -513,10 +488,6 @@ document.addEventListener('DOMContentLoaded', () => {
       playStatsByGame.hidden = true;
       playStatsByGame.innerHTML = '';
     }
-    if (playStatsByChannel) {
-      playStatsByChannel.hidden = true;
-      playStatsByChannel.innerHTML = '';
-    }
     if (playStatsFold) playStatsFold.open = false;
   }
 
@@ -529,10 +500,6 @@ document.addEventListener('DOMContentLoaded', () => {
       playStatsByGame.hidden = true;
       playStatsByGame.innerHTML = '';
     }
-    if (playStatsByChannel) {
-      playStatsByChannel.hidden = true;
-      playStatsByChannel.innerHTML = '';
-    }
   }
 
   function renderPlayStats(data) {
@@ -540,7 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const totals = payload.totals && typeof payload.totals === 'object' ? payload.totals : {};
     const byDay = payload.byDay && typeof payload.byDay === 'object' ? payload.byDay : {};
     const byGame = payload.byGame && typeof payload.byGame === 'object' ? payload.byGame : {};
-    const byChannel = payload.byChannel && typeof payload.byChannel === 'object' ? payload.byChannel : {};
     const todayKey = usageDayKeyKst();
     const today = byDay[todayKey] && typeof byDay[todayKey] === 'object' ? byDay[todayKey] : {};
 
@@ -581,31 +547,6 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         playStatsByGame.hidden = true;
         playStatsByGame.innerHTML = '';
-      }
-    }
-
-    const channelRows = Object.keys(byChannel).sort().map((channel) => {
-      const count = playStatsCount(byChannel[channel]);
-      if (!count) return '';
-      const label = PLAY_CHANNEL_LABELS[channel] || channel;
-      return `<tr>
-        <td>${escapeHtml(label)}</td>
-        <td>${count}</td>
-      </tr>`;
-    }).filter(Boolean);
-
-    if (playStatsByChannel) {
-      if (channelRows.length) {
-        playStatsByChannel.hidden = false;
-        playStatsByChannel.innerHTML = `<table>
-          <thead>
-            <tr><th>구분</th><th>플레이 수</th></tr>
-          </thead>
-          <tbody>${channelRows.join('')}</tbody>
-        </table>`;
-      } else {
-        playStatsByChannel.hidden = true;
-        playStatsByChannel.innerHTML = '';
       }
     }
   }
@@ -669,7 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const totals = { plays: 0 };
     const byDay = {};
     const byGame = {};
-    const byChannel = {};
     Object.keys(byGameRaw).forEach((key) => {
       if (String(key).indexOf('play_') !== 0) return;
       const n = Number((byGameRaw[key] || {}).qualified);
@@ -678,9 +618,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (key === 'play_total') totals.plays = count;
       else if (key.indexOf('play_day_') === 0) byDay[key.slice(9)] = { plays: count };
       else if (key.indexOf('play_game_') === 0) byGame[key.slice(10)] = { plays: count };
-      else if (key.indexOf('play_ch_') === 0) byChannel[key.slice(8)] = { plays: count };
     });
-    return { totals, byDay, byGame, byChannel };
+    return { totals, byDay, byGame };
   }
 
   const LIVE_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -749,6 +688,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function adminRecordLivePlayCount(room, code, idToken, signal) {
+    if (!window.HalomathPlayStats || typeof HalomathPlayStats.buildPatchBody !== 'function') return 0;
+    if (typeof HalomathPlayStats.playSessionDedupKey !== 'function') return 0;
+    const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
+    const playerCount = collectLivePlayerCount(room && room.players);
+    const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
+    if (!n) return 0;
+    const gameId = normalizeLiveGameId(meta.gameId);
+    const createdAt = Number(meta.createdAt) || 0;
+    const dedupKey = HalomathPlayStats.playSessionDedupKey(code, createdAt);
+    try {
+      await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, {
+        method: 'PUT',
+        body: 'true'
+      }, idToken, signal);
+    } catch (e) {
+      if (e && e.code === 'PERMISSION_DENIED') return 0;
+      throw e;
+    }
+    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', Date.now(), n));
+    await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
+    return n;
+  }
+
   async function adminRecordSessionUsage(room, code, idToken, signal) {
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
@@ -804,6 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let expired = 0;
       let deleted = 0;
       let counted = 0;
+      let playCounted = 0;
       let failed = 0;
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
@@ -820,6 +784,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
           console.warn('session usage record failed:', code, e);
         }
+        try {
+          playCounted += await adminRecordLivePlayCount(room, code, idToken, controller.signal);
+        } catch (e) {
+          console.warn('live play stats record failed:', code, e);
+        }
 
         // 삭제는 24시간이 지났거나 호스트가 이미 종료한 방만 정리
         if (isExpiredRoom || isClosed) {
@@ -834,9 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       }
-      setPurgeStatus(`정리 완료: 통계 반영 ${counted}개 · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+      setPurgeStatus(`정리 완료: 세션 ${counted}개 · 플레이 ${playCounted}명 · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
       sessionUsageLoadingFlag = false;
+      playStatsLoadingFlag = false;
       await loadSessionUsageStats();
+      await loadPlayStats();
     } catch (err) {
       console.warn('purge expired rooms failed:', err);
       const code = String((err && err.code) || '');

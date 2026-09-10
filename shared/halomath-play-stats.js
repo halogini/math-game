@@ -47,14 +47,20 @@
     return PLAY_PREFIX + 'ch_' + normalizeChannel(channel);
   }
 
-  function buildPatchBody(gameId, channel, atMs) {
-    const inc = { '.sv': { increment: 1 } };
+  function playSessionDedupKey(code, createdAt) {
+    const room = String(code || '').toUpperCase().replace(/[.#$\[\]\/]/g, '_');
+    const ca = Number(createdAt) || 0;
+    return (`play_${room}_${ca}`).replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
+  }
+
+  function buildPatchBody(gameId, channel, atMs, n) {
+    const count = Math.max(1, Math.min(200, Math.floor(Number(n) || 1)));
+    const inc = { '.sv': { increment: count } };
     const day = usageDayKey(atMs);
     return {
       [`byGame/${playTotalKey()}/qualified`]: inc,
       [`byGame/${playDayKey(day)}/qualified`]: inc,
-      [`byGame/${playGameKey(gameId)}/qualified`]: inc,
-      [`byGame/${playChannelKey(channel)}/qualified`]: inc
+      [`byGame/${playGameKey(gameId)}/qualified`]: inc
     };
   }
 
@@ -79,34 +85,61 @@
     return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'auth=' + encodeURIComponent(token);
   }
 
+  function patchPlayCounters(gameId, channel, token, n) {
+    if (!token) return;
+    const body = JSON.stringify(buildPatchBody(gameId, channel, Date.now(), n));
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), WRITE_TIMEOUT_MS)
+      : null;
+    try {
+      fetch(withAuth(REST_BASE + '/sessionUsage.json', token), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+        signal: controller ? controller.signal : undefined
+      }).catch(() => { /* ignore */ }).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
+    } catch (e) {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   /**
    * @param {string} gameId
-   * @param {{ channel?: 'arcade'|'live' }} [options]
+   * @param {{ channel?: 'arcade'|'live', token?: string, dedupKey?: string, count?: number }} [options]
    */
   function recordPlay(gameId, options) {
     const channel = options && options.channel;
-    const body = JSON.stringify(buildPatchBody(gameId, channel, Date.now()));
+    const providedToken = options && options.token;
+    const dedupKey = options && options.dedupKey;
+    const count = options && options.count;
 
-    Promise.resolve(cachedToken || ensureAnonAuth()).then((token) => {
+    function afterToken(token) {
       if (!token) return;
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timeoutId = controller
-        ? setTimeout(() => controller.abort(), WRITE_TIMEOUT_MS)
-        : null;
-      try {
-        fetch(withAuth(REST_BASE + '/sessionUsage.json', token), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          keepalive: true,
-          signal: controller ? controller.signal : undefined
-        }).catch(() => { /* ignore */ }).finally(() => {
-          if (timeoutId) clearTimeout(timeoutId);
-        });
-      } catch (e) {
-        if (timeoutId) clearTimeout(timeoutId);
+      cachedToken = token;
+      if (!dedupKey) {
+        patchPlayCounters(gameId, channel, token, count);
+        return;
       }
-    });
+      fetch(withAuth(REST_BASE + '/sessionUsage/dedup/' + encodeURIComponent(dedupKey) + '.json', token), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'true',
+        keepalive: true
+      }).then((res) => {
+        if (!res.ok) return;
+        patchPlayCounters(gameId, channel, token, count);
+      }).catch(() => { /* ignore */ });
+    }
+
+    if (providedToken) {
+      afterToken(providedToken);
+      return;
+    }
+    Promise.resolve(cachedToken || ensureAnonAuth()).then(afterToken);
   }
 
   function parsePlayStatsFromSessionUsage(data) {
@@ -114,7 +147,6 @@
     const totals = { plays: 0 };
     const byDay = {};
     const byGame = {};
-    const byChannel = {};
 
     Object.keys(byGameRaw).forEach((key) => {
       if (!isPlayStatGameKey(key)) return;
@@ -135,20 +167,16 @@
       if (key.indexOf(PLAY_PREFIX + 'game_') === 0) {
         const gid = key.slice((PLAY_PREFIX + 'game_').length);
         byGame[gid] = { plays: count };
-        return;
-      }
-      if (key.indexOf(PLAY_PREFIX + 'ch_') === 0) {
-        const ch = key.slice((PLAY_PREFIX + 'ch_').length);
-        byChannel[ch] = { plays: count };
       }
     });
 
-    return { totals, byDay, byGame, byChannel };
+    return { totals, byDay, byGame };
   }
 
   global.HalomathPlayStats = {
     PLAY_PREFIX,
     recordPlay,
+    playSessionDedupKey,
     usageDayKey,
     normalizeGameId,
     normalizeChannel,
