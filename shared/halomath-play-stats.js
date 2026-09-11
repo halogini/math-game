@@ -53,15 +53,18 @@
     return (`play_${room}_${ca}`).replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
   }
 
-  function buildPatchBody(gameId, channel, atMs, n) {
+  function buildPatchBody(gameId, channel, atMs, n, dedupKey) {
     const count = Math.max(1, Math.min(200, Math.floor(Number(n) || 1)));
     const inc = { '.sv': { increment: count } };
     const day = usageDayKey(atMs);
-    return {
+    const body = {
       [`byGame/${playTotalKey()}/qualified`]: inc,
       [`byGame/${playDayKey(day)}/qualified`]: inc,
       [`byGame/${playGameKey(gameId)}/qualified`]: inc
     };
+    const key = String(dedupKey || '').replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
+    if (key) body[`dedup/${key}`] = true;
+    return body;
   }
 
   async function ensureAnonAuth() {
@@ -85,10 +88,11 @@
     return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'auth=' + encodeURIComponent(token);
   }
 
-  function patchPlayCounters(gameId, channel, token, n) {
+  function patchPlayCounters(gameId, channel, token, n, dedupKey) {
     if (!token) return;
-    const body = JSON.stringify(buildPatchBody(gameId, channel, Date.now(), n));
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const body = JSON.stringify(buildPatchBody(gameId, channel, Date.now(), n, dedupKey));
+    const useAbort = !dedupKey;
+    const controller = useAbort && typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller
       ? setTimeout(() => controller.abort(), WRITE_TIMEOUT_MS)
       : null;
@@ -120,19 +124,7 @@
     function afterToken(token) {
       if (!token) return;
       cachedToken = token;
-      if (!dedupKey) {
-        patchPlayCounters(gameId, channel, token, count);
-        return;
-      }
-      fetch(withAuth(REST_BASE + '/sessionUsage/dedup/' + encodeURIComponent(dedupKey) + '.json', token), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: 'true',
-        keepalive: true
-      }).then((res) => {
-        if (!res.ok) return;
-        patchPlayCounters(gameId, channel, token, count);
-      }).catch(() => { /* ignore */ });
+      patchPlayCounters(gameId, channel, token, count, dedupKey);
     }
 
     if (providedToken) {

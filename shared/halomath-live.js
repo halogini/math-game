@@ -249,14 +249,6 @@
     };
   }
 
-  async function incrementSessionUsage(gameId, endedAt, token) {
-    await fetchRest('sessionUsage.json', {
-      method: 'PATCH',
-      body: JSON.stringify(buildUsagePatchBody(gameId, endedAt)),
-      authToken: token
-    });
-  }
-
   function recordSessionUsageKeepalive(code, hint, token) {
     hint = hint && typeof hint === 'object' ? hint : {};
     const normalized = normalizeCode(code);
@@ -268,23 +260,15 @@
     const dedupKey = dedupKeyForRoom(normalized, hint.createdAt, endedAt);
     const authToken = token || cachedHostToken;
     if (!authToken) return;
-    const dedupUrl = withAuth(`sessionUsage/dedup/${dedupKey}.json`, authToken);
-    const patchUrl = withAuth('sessionUsage.json', authToken);
-    const patchBody = JSON.stringify(buildUsagePatchBody(gameId, endedAt));
+    const patchBody = Object.assign({
+      [`dedup/${dedupKey}`]: true
+    }, buildUsagePatchBody(gameId, endedAt));
     try {
-      fetch(dedupUrl, {
-        method: 'PUT',
+      fetch(withAuth('sessionUsage.json', authToken), {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: 'true',
+        body: JSON.stringify(patchBody),
         keepalive: true
-      }).then((res) => {
-        if (!res.ok) return;
-        fetch(patchUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: patchBody,
-          keepalive: true
-        });
       }).catch(() => { /* page is unloading */ });
     } catch (e) { /* page is unloading */ }
   }
@@ -342,24 +326,20 @@
     const dedupKey = dedupKeyForRoom(normalized, meta.createdAt, endedAt);
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
+    const patchBody = Object.assign({
+      [`dedup/${dedupKey}`]: true
+    }, buildUsagePatchBody(gameId, endedAt));
 
     try {
-      await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, {
-        method: 'PUT',
-        body: JSON.stringify(true),
+      await fetchRest('sessionUsage.json', {
+        method: 'PATCH',
+        body: JSON.stringify(patchBody),
         authToken: token
       });
+      return true;
     } catch (e) {
       // Write-once dedup: already recorded for this room+createdAt.
       if (e && e.code === 'PERMISSION_DENIED') return true;
-      console.warn('session usage dedup failed:', e);
-      return false;
-    }
-
-    try {
-      await incrementSessionUsage(gameId, endedAt, token);
-      return true;
-    } catch (e) {
       console.warn('session usage increment failed:', e);
       return false;
     }
@@ -399,25 +379,14 @@
     const dedupKey = stats.playSessionDedupKey(normalized, meta.createdAt);
 
     try {
-      await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, {
-        method: 'PUT',
-        body: JSON.stringify(true),
-        authToken: token
-      });
-    } catch (e) {
-      if (e && e.code === 'PERMISSION_DENIED') return true;
-      console.warn('live play count dedup failed:', e);
-      return false;
-    }
-
-    try {
       await fetchRest('sessionUsage.json', {
         method: 'PATCH',
-        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', Date.now(), n)),
+        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', Date.now(), n, dedupKey)),
         authToken: token
       });
       return true;
     } catch (e) {
+      if (e && e.code === 'PERMISSION_DENIED') return true;
       console.warn('live play count increment failed:', e);
       return false;
     }

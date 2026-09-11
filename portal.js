@@ -698,18 +698,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameId = normalizeLiveGameId(meta.gameId);
     const createdAt = Number(meta.createdAt) || 0;
     const dedupKey = HalomathPlayStats.playSessionDedupKey(code, createdAt);
+    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', Date.now(), n, dedupKey));
     try {
-      await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, {
-        method: 'PUT',
-        body: 'true'
-      }, idToken, signal);
+      await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
+      return n;
     } catch (e) {
       if (e && e.code === 'PERMISSION_DENIED') return 0;
       throw e;
     }
-    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', Date.now(), n));
-    await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
-    return n;
   }
 
   async function adminRecordSessionUsage(room, code, idToken, signal) {
@@ -723,21 +719,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const day = usageDayKeyKst(endedAt);
     const inc = { '.sv': { increment: 1 } };
     const patchBody = JSON.stringify({
+      [`dedup/${dedupKey}`]: true,
       'totals/qualified': inc,
       [`byDay/${day}/qualified`]: inc,
       [`byGame/${gameId}/qualified`]: inc
     });
     try {
-      await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, {
-        method: 'PUT',
-        body: 'true'
-      }, idToken, signal);
+      await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
+      return true;
     } catch (e) {
       if (e && e.code === 'PERMISSION_DENIED') return false;
       throw e;
     }
-    await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
-    return true;
   }
 
   async function purgeExpiredLiveRooms() {
