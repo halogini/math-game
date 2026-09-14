@@ -256,13 +256,14 @@
     const playerCount = Number(hint.playerCount);
     if (!Number.isFinite(playerCount) || playerCount < MIN_QUALIFIED_PLAYERS) return;
     const gameId = normalizeGameId(hint.gameId);
-    const endedAt = Date.now();
-    const dedupKey = dedupKeyForRoom(normalized, hint.createdAt, endedAt);
+    const createdAt = Number(hint.createdAt) || 0;
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
+    const dedupKey = dedupKeyForRoom(normalized, createdAt, targetAt);
     const authToken = token || cachedHostToken;
     if (!authToken) return;
     const patchBody = Object.assign({
       [`dedup/${dedupKey}`]: true
-    }, buildUsagePatchBody(gameId, endedAt));
+    }, buildUsagePatchBody(gameId, targetAt));
     try {
       fetch(withAuth('sessionUsage.json', authToken), {
         method: 'PATCH',
@@ -290,11 +291,14 @@
     if (!authToken) return;
     const stats = global.HalomathPlayStats;
     if (!stats || typeof stats.recordPlay !== 'function' || typeof stats.playSessionDedupKey !== 'function') return;
+    const createdAt = Number(hint.createdAt) || 0;
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
     stats.recordPlay(gameId, {
       channel: 'live',
       token: authToken,
       count: n,
-      dedupKey: stats.playSessionDedupKey(normalized, hint.createdAt)
+      dedupKey: stats.playSessionDedupKey(normalized, createdAt),
+      atMs: targetAt
     });
   }
 
@@ -322,13 +326,14 @@
 
     if (playerCount < MIN_QUALIFIED_PLAYERS) return false;
 
-    const endedAt = Date.now();
-    const dedupKey = dedupKeyForRoom(normalized, meta.createdAt, endedAt);
+    const createdAt = Number(meta.createdAt) || Number(hint.createdAt) || 0;
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
+    const dedupKey = dedupKeyForRoom(normalized, createdAt, targetAt);
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     const patchBody = Object.assign({
       [`dedup/${dedupKey}`]: true
-    }, buildUsagePatchBody(gameId, endedAt));
+    }, buildUsagePatchBody(gameId, targetAt));
 
     try {
       await fetchRest('sessionUsage.json', {
@@ -376,12 +381,14 @@
 
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
-    const dedupKey = stats.playSessionDedupKey(normalized, meta.createdAt);
+    const createdAt = Number(meta.createdAt) || Number(hint.createdAt) || 0;
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
+    const dedupKey = stats.playSessionDedupKey(normalized, createdAt);
 
     try {
       await fetchRest('sessionUsage.json', {
         method: 'PATCH',
-        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', Date.now(), n, dedupKey)),
+        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey)),
         authToken: token
       });
       return true;

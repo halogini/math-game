@@ -88,9 +88,9 @@
     return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'auth=' + encodeURIComponent(token);
   }
 
-  function patchPlayCounters(gameId, channel, token, n, dedupKey) {
+  function patchPlayCounters(gameId, channel, token, n, dedupKey, atMs) {
     if (!token) return;
-    const body = JSON.stringify(buildPatchBody(gameId, channel, Date.now(), n, dedupKey));
+    const body = JSON.stringify(buildPatchBody(gameId, channel, Number(atMs) || Date.now(), n, dedupKey));
     const useAbort = !dedupKey;
     const controller = useAbort && typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller
@@ -113,18 +113,19 @@
 
   /**
    * @param {string} gameId
-   * @param {{ channel?: 'arcade'|'live', token?: string, dedupKey?: string, count?: number }} [options]
+   * @param {{ channel?: 'arcade'|'live', token?: string, dedupKey?: string, count?: number, atMs?: number }} [options]
    */
   function recordPlay(gameId, options) {
     const channel = options && options.channel;
     const providedToken = options && options.token;
     const dedupKey = options && options.dedupKey;
     const count = options && options.count;
+    const atMs = options && options.atMs;
 
     function afterToken(token) {
       if (!token) return;
       cachedToken = token;
-      patchPlayCounters(gameId, channel, token, count, dedupKey);
+      patchPlayCounters(gameId, channel, token, count, dedupKey, atMs);
     }
 
     if (providedToken) {

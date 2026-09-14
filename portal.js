@@ -698,7 +698,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameId = normalizeLiveGameId(meta.gameId);
     const createdAt = Number(meta.createdAt) || 0;
     const dedupKey = HalomathPlayStats.playSessionDedupKey(code, createdAt);
-    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', Date.now(), n, dedupKey));
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
+    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey));
     try {
       await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
       return n;
@@ -715,8 +716,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const createdAt = Number(meta.createdAt) || 0;
     const gameId = normalizeLiveGameId(meta.gameId);
     const dedupKey = usageDedupKey(code, createdAt);
-    const endedAt = Date.now();
-    const day = usageDayKeyKst(endedAt);
+    const targetAt = createdAt > 0 ? createdAt : Date.now();
+    const day = usageDayKeyKst(targetAt);
     const inc = { '.sv': { increment: 1 } };
     const patchBody = JSON.stringify({
       [`dedup/${dedupKey}`]: true,
