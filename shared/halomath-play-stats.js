@@ -47,21 +47,38 @@
     return PLAY_PREFIX + 'ch_' + normalizeChannel(channel);
   }
 
+  function playDayChannelKey(day, channel) {
+    return PLAY_PREFIX + 'dch_' + String(day || '') + '_' + normalizeChannel(channel);
+  }
+
   function playSessionDedupKey(code, createdAt) {
     const room = String(code || '').toUpperCase().replace(/[.#$\[\]\/]/g, '_');
     const ca = Number(createdAt) || 0;
     return (`play_${room}_${ca}`).replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
   }
 
-  function buildPatchBody(gameId, channel, atMs, n, dedupKey) {
+  function roomPlayLedgerKey(code, createdAt) {
+    const room = String(code || '').toUpperCase().replace(/[.#$\[\]\/]/g, '_');
+    const ca = Number(createdAt) || 0;
+    return (`${room}_${ca}`).replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
+  }
+
+  function buildIncrementPatchBody(gameId, channel, atMs, n) {
     const count = Math.max(1, Math.min(200, Math.floor(Number(n) || 1)));
     const inc = { '.sv': { increment: count } };
     const day = usageDayKey(atMs);
-    const body = {
+    const ch = normalizeChannel(channel);
+    return {
       [`byGame/${playTotalKey()}/qualified`]: inc,
       [`byGame/${playDayKey(day)}/qualified`]: inc,
-      [`byGame/${playGameKey(gameId)}/qualified`]: inc
+      [`byGame/${playGameKey(gameId)}/qualified`]: inc,
+      [`byGame/${playChannelKey(ch)}/qualified`]: inc,
+      [`byGame/${playDayChannelKey(day, ch)}/qualified`]: inc
     };
+  }
+
+  function buildPatchBody(gameId, channel, atMs, n, dedupKey) {
+    const body = buildIncrementPatchBody(gameId, channel, atMs, n);
     const key = String(dedupKey || '').replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
     if (key) body[`dedup/${key}`] = true;
     return body;
@@ -140,6 +157,8 @@
     const totals = { plays: 0 };
     const byDay = {};
     const byGame = {};
+    const byDayArcade = {};
+    const byDayLive = {};
 
     Object.keys(byGameRaw).forEach((key) => {
       if (!isPlayStatGameKey(key)) return;
@@ -150,6 +169,14 @@
 
       if (key === playTotalKey()) {
         totals.plays = count;
+        return;
+      }
+      if (key.indexOf(PLAY_PREFIX + 'dch_') === 0) {
+        const rest = key.slice((PLAY_PREFIX + 'dch_').length);
+        const m = /^(\d{4}-\d{2}-\d{2})_(arcade|live)$/.exec(rest);
+        if (!m) return;
+        const bucket = m[2] === 'live' ? byDayLive : byDayArcade;
+        bucket[m[1]] = { plays: count };
         return;
       }
       if (key.indexOf(PLAY_PREFIX + 'day_') === 0) {
@@ -163,18 +190,20 @@
       }
     });
 
-    return { totals, byDay, byGame };
+    return { totals, byDay, byGame, byDayArcade, byDayLive };
   }
 
   global.HalomathPlayStats = {
     PLAY_PREFIX,
     recordPlay,
     playSessionDedupKey,
+    roomPlayLedgerKey,
     usageDayKey,
     normalizeGameId,
     normalizeChannel,
     isPlayStatGameKey,
     buildPatchBody,
+    buildIncrementPatchBody,
     parsePlayStatsFromSessionUsage
   };
 })(typeof window !== 'undefined' ? window : global);

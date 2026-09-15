@@ -341,13 +341,13 @@
         body: JSON.stringify(patchBody),
         authToken: token
       });
-      return true;
     } catch (e) {
       // Write-once dedup: already recorded for this room+createdAt.
       if (e && e.code === 'PERMISSION_DENIED') return true;
       console.warn('session usage increment failed:', e);
       return false;
     }
+    return true;
   }
 
   async function tryRecordLivePlayCount(code, hint) {
@@ -385,12 +385,26 @@
     const targetAt = createdAt > 0 ? createdAt : Date.now();
     const dedupKey = stats.playSessionDedupKey(normalized, createdAt);
 
+    const ledgerKey = stats.roomPlayLedgerKey
+      ? stats.roomPlayLedgerKey(normalized, createdAt)
+      : '';
     try {
       await fetchRest('sessionUsage.json', {
         method: 'PATCH',
         body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey)),
         authToken: token
       });
+      if (ledgerKey) {
+        try {
+          await fetchRest(`sessionUsage/roomPlays/${ledgerKey}.json`, {
+            method: 'PUT',
+            body: JSON.stringify(n),
+            authToken: token
+          });
+        } catch (ledgerErr) {
+          console.warn('room play ledger write failed:', ledgerErr);
+        }
+      }
       return true;
     } catch (e) {
       if (e && e.code === 'PERMISSION_DENIED') return true;

@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionUsageFold = document.getElementById('session-usage-fold');
   const sessionUsageTitle = document.getElementById('session-usage-title');
   const sessionUsageCards = document.getElementById('session-usage-cards');
+  const sessionUsageByDay = document.getElementById('session-usage-by-day');
   const sessionUsageByGame = document.getElementById('session-usage-by-game');
   const sessionUsageLoading = document.getElementById('session-usage-loading');
   const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
@@ -149,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const playStatsFold = document.getElementById('play-stats-fold');
   const playStatsTitle = document.getElementById('play-stats-title');
   const playStatsCards = document.getElementById('play-stats-cards');
+  const playStatsByDay = document.getElementById('play-stats-by-day');
   const playStatsByGame = document.getElementById('play-stats-by-game');
   const playStatsLoading = document.getElementById('play-stats-loading');
   const btnPlayStatsRefresh = document.getElementById('btn-play-stats-refresh');
@@ -185,6 +187,201 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${m}-${d}`;
   }
 
+  function formatUsageDayLabel(dayKey, todayKey) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dayKey || ''));
+    if (!m) return String(dayKey || '');
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const weekday = weekdays[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()];
+    const label = `${m[1]}-${m[2]}-${m[3]} (${weekday})`;
+    return dayKey === todayKey ? `${label} · 오늘` : label;
+  }
+
+  function hideUsageTable(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.innerHTML = '';
+    if (el._usageChartClick) {
+      el.removeEventListener('click', el._usageChartClick);
+      el._usageChartClick = null;
+    }
+  }
+
+  const usageChartState = new WeakMap();
+
+  function buildUsageDaySeries(byDay, countFn) {
+    return Object.keys(byDay || {})
+      .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))
+      .map((day) => ({ day, count: countFn(byDay[day]) }))
+      .filter((row) => row.count > 0)
+      .sort((a, b) => a.day.localeCompare(b.day));
+  }
+
+  function formatUsageMonthLabel(monthKey) {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(monthKey || ''));
+    if (!m) return String(monthKey || '');
+    return `${m[1]}년 ${Number(m[2])}월`;
+  }
+
+  function daysInCalendarMonth(monthKey) {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(monthKey || ''));
+    if (!m) return 31;
+    return new Date(Date.UTC(Number(m[1]), Number(m[2]), 0)).getUTCDate();
+  }
+
+  function defaultUsageChartMonth(daySeries) {
+    if (!daySeries.length) return usageDayKeyKst().slice(0, 7);
+    return daySeries[daySeries.length - 1].day.slice(0, 7);
+  }
+
+  function buildUsageMonthSeries(daySeries) {
+    const months = {};
+    daySeries.forEach((row) => {
+      const mk = row.day.slice(0, 7);
+      months[mk] = (months[mk] || 0) + row.count;
+    });
+    return Object.keys(months).sort().map((monthKey) => ({
+      monthKey,
+      count: months[monthKey],
+      label: formatUsageMonthLabel(monthKey)
+    }));
+  }
+
+  function renderUsageHBarRows(bars, maxVal) {
+    const max = Math.max(maxVal, 1);
+    return bars.map((bar) => {
+      const pct = Math.max(bar.value > 0 ? 6 : 0, Math.round((bar.value / max) * 100));
+      const todayCls = bar.today ? ' usage-bar-fill-today' : '';
+      const title = escapeHtml(bar.title || `${bar.label}: ${bar.value}`);
+      return `<div class="usage-bar-row" title="${title}">
+        <span class="usage-bar-label">${escapeHtml(bar.label)}</span>
+        <div class="usage-bar-track"><div class="usage-bar-fill${todayCls}" style="width:${pct}%"></div></div>
+        <span class="usage-bar-value">${bar.value}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderUsageColumnChart(monthKey, dayMap, todayKey) {
+    const totalDays = daysInCalendarMonth(monthKey);
+    const counts = [];
+    for (let d = 1; d <= totalDays; d += 1) {
+      const day = `${monthKey}-${String(d).padStart(2, '0')}`;
+      counts.push(dayMap[day] || 0);
+    }
+    const max = Math.max(...counts, 1);
+    const gridCols = `repeat(${totalDays}, minmax(0, 1fr))`;
+    const bars = counts.map((val, idx) => {
+      const day = `${monthKey}-${String(idx + 1).padStart(2, '0')}`;
+      const h = val > 0 ? Math.max(10, Math.round((val / max) * 100)) : 0;
+      const todayCls = day === todayKey ? ' usage-column-today' : '';
+      return `<div class="usage-column${todayCls}" title="${escapeHtml(formatUsageDayLabel(day, todayKey))}: ${val}">
+        <div class="usage-column-track"><div class="usage-column-fill" style="height:${h}%"></div></div>
+      </div>`;
+    }).join('');
+    const labels = counts.map((val, idx) => {
+      const day = `${monthKey}-${String(idx + 1).padStart(2, '0')}`;
+      const showLabel = idx === 0 || (idx + 1) % 5 === 0 || idx + 1 === totalDays;
+      const todayCls = day === todayKey ? ' usage-column-label-today' : '';
+      return `<span class="usage-column-day${todayCls}">${showLabel ? idx + 1 : '\u00a0'}</span>`;
+    }).join('');
+    return `<div class="usage-column-chart-wrap" role="img" aria-label="${escapeHtml(formatUsageMonthLabel(monthKey))} 일별 차트">
+      <div class="usage-column-chart" style="grid-template-columns:${gridCols}">${bars}</div>
+      <div class="usage-column-labels" style="grid-template-columns:${gridCols}">${labels}</div>
+    </div>`;
+  }
+
+  function renderUsageDayCharts(container, byDay, countFn, countHeader) {
+    if (!container) return;
+    const daySeries = buildUsageDaySeries(byDay, countFn);
+    if (!daySeries.length) {
+      hideUsageTable(container);
+      return;
+    }
+
+    const todayKey = usageDayKeyKst();
+    const todayMonth = todayKey.slice(0, 7);
+    const monthSeries = buildUsageMonthSeries(daySeries);
+    const monthKeys = monthSeries.map((row) => row.monthKey);
+    let state = usageChartState.get(container);
+    if (!state) state = {};
+    if (!state.selectedMonth || monthKeys.indexOf(state.selectedMonth) < 0) {
+      state.selectedMonth = defaultUsageChartMonth(daySeries);
+    }
+    state.byDay = byDay;
+    state.countFn = countFn;
+    state.countHeader = countHeader;
+    usageChartState.set(container, state);
+
+    const selectedMonth = state.selectedMonth;
+    const monthIdx = monthKeys.indexOf(selectedMonth);
+    const monthTotal = (monthSeries.find((row) => row.monthKey === selectedMonth) || {}).count || 0;
+    const monthMax = Math.max(...monthSeries.map((row) => row.count), 1);
+    const dayMap = {};
+    daySeries.forEach((row) => { dayMap[row.day] = row.count; });
+
+    const monthBars = monthSeries.map((row) => ({
+      label: row.label,
+      value: row.count,
+      today: row.monthKey === todayMonth,
+      title: `${row.label}: ${row.count}`
+    }));
+
+    const dayRows = daySeries
+      .filter((row) => row.day.indexOf(selectedMonth) === 0)
+      .slice()
+      .reverse()
+      .map((row) => {
+        const todayAttr = row.day === todayKey ? ' class="session-usage-day-today"' : '';
+        return `<tr${todayAttr}>
+          <td>${escapeHtml(formatUsageDayLabel(row.day, todayKey))}</td>
+          <td>${row.count}</td>
+        </tr>`;
+      });
+
+    const prevDisabled = monthIdx <= 0 ? ' disabled' : '';
+    const nextDisabled = monthIdx < 0 || monthIdx >= monthKeys.length - 1 ? ' disabled' : '';
+
+    container.hidden = false;
+    container.className = 'session-usage-by-game session-usage-charts';
+    container.innerHTML = `
+      <section class="usage-chart-panel">
+        <h3 class="usage-chart-heading">월별 ${escapeHtml(countHeader)}</h3>
+        <div class="usage-bar-chart">${renderUsageHBarRows(monthBars, monthMax)}</div>
+      </section>
+      <section class="usage-chart-panel">
+        <div class="usage-chart-nav">
+          <button type="button" class="admin-btn usage-chart-nav-btn" data-chart-nav="prev"${prevDisabled} aria-label="이전 달">◀</button>
+          <span class="usage-chart-nav-label">${escapeHtml(formatUsageMonthLabel(selectedMonth))} · 합계 ${monthTotal}</span>
+          <button type="button" class="admin-btn usage-chart-nav-btn" data-chart-nav="next"${nextDisabled} aria-label="다음 달">▶</button>
+        </div>
+        <h3 class="usage-chart-heading">일별 ${escapeHtml(countHeader)}</h3>
+        ${renderUsageColumnChart(selectedMonth, dayMap, todayKey)}
+        ${dayRows.length ? `<table class="usage-month-table">
+          <thead><tr><th>날짜</th><th>${escapeHtml(countHeader)}</th></tr></thead>
+          <tbody>${dayRows.join('')}</tbody>
+        </table>` : '<p class="session-usage-loading">이 달에 집계된 날짜가 없습니다.</p>'}
+      </section>`;
+
+    if (!container._usageChartClick) {
+      container._usageChartClick = (event) => {
+        const btn = event.target.closest('[data-chart-nav]');
+        if (!btn || btn.disabled || !container.contains(btn)) return;
+        const chartState = usageChartState.get(container);
+        if (!chartState || !chartState.byDay || !chartState.countFn) return;
+        const series = buildUsageDaySeries(chartState.byDay, chartState.countFn);
+        const keys = buildUsageMonthSeries(series).map((row) => row.monthKey);
+        const curIdx = keys.indexOf(chartState.selectedMonth);
+        if (curIdx < 0) return;
+        const dir = btn.getAttribute('data-chart-nav');
+        const nextIdx = dir === 'prev' ? curIdx - 1 : curIdx + 1;
+        if (nextIdx < 0 || nextIdx >= keys.length) return;
+        chartState.selectedMonth = keys[nextIdx];
+        usageChartState.set(container, chartState);
+        renderUsageDayCharts(container, chartState.byDay, chartState.countFn, chartState.countHeader);
+      };
+      container.addEventListener('click', container._usageChartClick);
+    }
+  }
+
   function sessionUsageCount(value) {
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? n : 0;
@@ -206,10 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionUsageCards.appendChild(sessionUsageLoading);
       }
     }
-    if (sessionUsageByGame) {
-      sessionUsageByGame.hidden = true;
-      sessionUsageByGame.innerHTML = '';
-    }
+    hideUsageTable(sessionUsageByDay);
+    hideUsageTable(sessionUsageByGame);
     if (sessionUsageFold) sessionUsageFold.open = false;
     if (purgeExpiredStatus) {
       purgeExpiredStatus.hidden = true;
@@ -230,10 +425,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionUsageCards) {
       sessionUsageCards.innerHTML = `<p class="session-usage-loading">${escapeHtml(message)}</p>`;
     }
-    if (sessionUsageByGame) {
-      sessionUsageByGame.hidden = true;
-      sessionUsageByGame.innerHTML = '';
-    }
+    hideUsageTable(sessionUsageByDay);
+    hideUsageTable(sessionUsageByGame);
   }
 
   function renderSessionUsageStats(data) {
@@ -258,6 +451,8 @@ document.addEventListener('DOMContentLoaded', () => {
           : '');
     }
 
+    renderUsageDayCharts(sessionUsageByDay, byDay, qualifiedSessionCount, '세션 수');
+
     const gameRows = Object.keys(byGame).sort().map((gameId) => {
       if (String(gameId).indexOf('play_') === 0) return '';
       const row = byGame[gameId] || {};
@@ -274,14 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gameRows.length) {
         sessionUsageByGame.hidden = false;
         sessionUsageByGame.innerHTML = `<table>
+          <caption>게임별</caption>
           <thead>
             <tr><th>게임</th><th>세션 수</th></tr>
           </thead>
           <tbody>${gameRows.join('')}</tbody>
         </table>`;
       } else {
-        sessionUsageByGame.hidden = true;
-        sessionUsageByGame.innerHTML = '';
+        hideUsageTable(sessionUsageByGame);
       }
     }
   }
@@ -396,54 +591,79 @@ document.addEventListener('DOMContentLoaded', () => {
     return floor;
   }
 
-  function mergePlayFloors(arcadeFloor, liveFloor) {
-    const out = emptyPlayFloor();
-    out.total = (arcadeFloor.total || 0) + (liveFloor.total || 0);
-    const gameIds = {};
-    Object.keys(arcadeFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
-    Object.keys(liveFloor.byGame || {}).forEach((k) => { gameIds[k] = true; });
-    Object.keys(gameIds).forEach((gid) => {
-      out.byGame[gid] = (arcadeFloor.byGame[gid] || 0) + (liveFloor.byGame[gid] || 0);
-    });
-    const days = {};
-    Object.keys(arcadeFloor.byDay || {}).forEach((k) => { days[k] = true; });
-    Object.keys(liveFloor.byDay || {}).forEach((k) => { days[k] = true; });
-    Object.keys(days).forEach((day) => {
-      out.byDay[day] = (arcadeFloor.byDay[day] || 0) + (liveFloor.byDay[day] || 0);
-    });
-    return out;
-  }
+  function takePlayStatsMax(parsed, arcadeFloor, liveFloor) {
+    const parsedSafe = parsed && typeof parsed === 'object' ? parsed : {};
+    const arcade = arcadeFloor && typeof arcadeFloor === 'object' ? arcadeFloor : emptyPlayFloor();
+    const live = liveFloor && typeof liveFloor === 'object' ? liveFloor : emptyPlayFloor();
 
-  function takePlayStatsMax(parsed, floor) {
-    const totals = { plays: Math.max(playStatsCount(parsed.totals), floor.total || 0) };
-    const byDay = {};
-    const byGame = {};
+    function dayCount(map, day) {
+      return playStatsCount(map && map[day]);
+    }
+
+    function combinedDayPlays(day) {
+      const recorded = dayCount(parsedSafe.byDay, day);
+      const recArcade = dayCount(parsedSafe.byDayArcade, day);
+      const recLive = dayCount(parsedSafe.byDayLive, day);
+      const scoreN = arcade.byDay[day] || 0;
+      const sessionN = live.byDay[day] || 0;
+      const liveN = Math.max(recLive, sessionN);
+      if (recLive > 0) {
+        const arcadeN = Math.max(recArcade, scoreN, Math.max(0, recorded - recLive));
+        return arcadeN + liveN;
+      }
+      // Older combined counters mixed arcade + live. Add the session floor only
+      // when that day's recorded plays still look like arcade-only.
+      if (sessionN > 0 && recorded >= scoreN + sessionN) {
+        return Math.max(recorded, scoreN + sessionN);
+      }
+      return Math.max(recorded, scoreN) + sessionN;
+    }
+
     const dayKeys = {};
-    Object.keys((parsed && parsed.byDay) || {}).forEach((k) => { dayKeys[k] = true; });
-    Object.keys(floor.byDay || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(parsedSafe.byDay || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(parsedSafe.byDayArcade || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(parsedSafe.byDayLive || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(arcade.byDay || {}).forEach((k) => { dayKeys[k] = true; });
+    Object.keys(live.byDay || {}).forEach((k) => { dayKeys[k] = true; });
+
+    const byDay = {};
     Object.keys(dayKeys).forEach((day) => {
-      byDay[day] = {
-        plays: Math.max(
-          playStatsCount(parsed.byDay && parsed.byDay[day]),
-          floor.byDay[day] || 0
-        )
-      };
+      const n = combinedDayPlays(day);
+      if (n) byDay[day] = { plays: n };
     });
+
+    const recordedTotal = playStatsCount(parsedSafe.totals);
+    const recLiveTotal = Object.keys(parsedSafe.byDayLive || {}).reduce((sum, day) => {
+      return sum + dayCount(parsedSafe.byDayLive, day);
+    }, 0);
+    const liveTotal = live.total || 0;
+    const arcadeTotal = arcade.total || 0;
+    let total;
+    if (recLiveTotal > 0) {
+      total = Math.max(recordedTotal, arcadeTotal + Math.max(recLiveTotal, liveTotal));
+    } else if (liveTotal > 0 && recordedTotal >= arcadeTotal + liveTotal) {
+      total = Math.max(recordedTotal, arcadeTotal + liveTotal);
+    } else {
+      total = Math.max(recordedTotal, arcadeTotal) + liveTotal;
+    }
+
+    const byGame = {};
     const gameKeys = {};
-    Object.keys((parsed && parsed.byGame) || {}).forEach((k) => { gameKeys[k] = true; });
-    Object.keys(floor.byGame || {}).forEach((k) => { gameKeys[k] = true; });
+    Object.keys(parsedSafe.byGame || {}).forEach((k) => { gameKeys[k] = true; });
+    Object.keys(arcade.byGame || {}).forEach((k) => { gameKeys[k] = true; });
+    Object.keys(live.byGame || {}).forEach((k) => { gameKeys[k] = true; });
     Object.keys(gameKeys).forEach((gid) => {
-      byGame[gid] = {
-        plays: Math.max(
-          playStatsCount(parsed.byGame && parsed.byGame[gid]),
-          floor.byGame[gid] || 0
-        )
-      };
+      const n = Math.max(
+        playStatsCount(parsedSafe.byGame && parsedSafe.byGame[gid]),
+        (arcade.byGame[gid] || 0) + (live.byGame[gid] || 0)
+      );
+      if (n) byGame[gid] = { plays: n };
     });
-    return { totals, byDay, byGame };
+
+    return { totals: { plays: total }, byDay, byGame };
   }
 
-  function playStatsNeedsWrite(parsed, merged) {
+  function playStatsNeedsWrite(parsed, merged, liveFloor) {
     if (playStatsCount(merged.totals) > playStatsCount(parsed.totals)) return true;
     const checkMap = (a, b) => {
       const keys = {};
@@ -451,17 +671,25 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(b || {}).forEach((k) => { keys[k] = true; });
       return Object.keys(keys).some((k) => playStatsCount(b && b[k]) > playStatsCount(a && a[k]));
     };
-    return checkMap(parsed.byDay, merged.byDay)
-      || checkMap(parsed.byGame, merged.byGame);
+    if (checkMap(parsed.byDay, merged.byDay) || checkMap(parsed.byGame, merged.byGame)) return true;
+    const liveDays = (liveFloor && liveFloor.byDay) || {};
+    return Object.keys(liveDays).some((day) => {
+      const liveN = liveDays[day] || 0;
+      const recLive = playStatsCount(parsed.byDayLive && parsed.byDayLive[day]);
+      return liveN > recLive;
+    });
   }
 
-  async function writePlayStatsBaseline(merged, idToken) {
+  async function writePlayStatsBaseline(merged, liveFloor, parsed, idToken) {
     const patch = {};
     const total = playStatsCount(merged.totals);
     if (total > 0) patch['byGame/play_total/qualified'] = total;
     Object.keys(merged.byDay || {}).forEach((day) => {
       const n = playStatsCount(merged.byDay[day]);
       if (n > 0) patch[`byGame/play_day_${day}/qualified`] = n;
+      const liveN = (liveFloor && liveFloor.byDay && liveFloor.byDay[day]) || 0;
+      const recLive = playStatsCount(parsed && parsed.byDayLive && parsed.byDayLive[day]);
+      if (liveN > recLive) patch[`byGame/play_dch_${day}_live/qualified`] = liveN;
     });
     Object.keys(merged.byGame || {}).forEach((gid) => {
       const n = playStatsCount(merged.byGame[gid]);
@@ -484,10 +712,8 @@ document.addEventListener('DOMContentLoaded', () => {
         playStatsCards.appendChild(playStatsLoading);
       }
     }
-    if (playStatsByGame) {
-      playStatsByGame.hidden = true;
-      playStatsByGame.innerHTML = '';
-    }
+    hideUsageTable(playStatsByDay);
+    hideUsageTable(playStatsByGame);
     if (playStatsFold) playStatsFold.open = false;
   }
 
@@ -496,10 +722,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (playStatsCards) {
       playStatsCards.innerHTML = `<p class="session-usage-loading">${escapeHtml(message)}</p>`;
     }
-    if (playStatsByGame) {
-      playStatsByGame.hidden = true;
-      playStatsByGame.innerHTML = '';
-    }
+    hideUsageTable(playStatsByDay);
+    hideUsageTable(playStatsByGame);
   }
 
   function renderPlayStats(data) {
@@ -524,6 +748,8 @@ document.addEventListener('DOMContentLoaded', () => {
           : '');
     }
 
+    renderUsageDayCharts(playStatsByDay, byDay, playStatsCount, '플레이 수');
+
     const gameRows = Object.keys(byGame).sort().map((gameId) => {
       const row = byGame[gameId] || {};
       const label = SESSION_GAME_LABELS[gameId] || gameId;
@@ -539,14 +765,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gameRows.length) {
         playStatsByGame.hidden = false;
         playStatsByGame.innerHTML = `<table>
+          <caption>게임별</caption>
           <thead>
             <tr><th>게임</th><th>플레이 수</th></tr>
           </thead>
           <tbody>${gameRows.join('')}</tbody>
         </table>`;
       } else {
-        playStatsByGame.hidden = true;
-        playStatsByGame.innerHTML = '';
+        hideUsageTable(playStatsByGame);
       }
     }
   }
@@ -577,12 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : parsePlayStatsFromUsageFallback(usage);
       const arcadeFloor = collectPlayFloorFromScores(scoresData);
       const liveFloor = collectPlayFloorFromSessions(usage);
-      const floor = mergePlayFloors(arcadeFloor, liveFloor);
-      const merged = takePlayStatsMax(parsed, floor);
-      if (playStatsNeedsWrite(parsed, merged)) {
+      const merged = takePlayStatsMax(parsed, arcadeFloor, liveFloor);
+      if (playStatsNeedsWrite(parsed, merged, liveFloor)) {
         try {
           const idToken = await adminUser.getIdToken(true);
-          await writePlayStatsBaseline(merged, idToken);
+          await writePlayStatsBaseline(merged, liveFloor, parsed, idToken);
         } catch (writeErr) {
           console.warn('play stats baseline write failed:', writeErr);
         }
@@ -610,16 +835,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const totals = { plays: 0 };
     const byDay = {};
     const byGame = {};
+    const byDayArcade = {};
+    const byDayLive = {};
     Object.keys(byGameRaw).forEach((key) => {
       if (String(key).indexOf('play_') !== 0) return;
       const n = Number((byGameRaw[key] || {}).qualified);
       const count = Number.isFinite(n) && n >= 0 ? n : 0;
       if (!count) return;
       if (key === 'play_total') totals.plays = count;
-      else if (key.indexOf('play_day_') === 0) byDay[key.slice(9)] = { plays: count };
+      else if (key.indexOf('play_dch_') === 0) {
+        const rest = key.slice(9);
+        const m = /^(\d{4}-\d{2}-\d{2})_(arcade|live)$/.exec(rest);
+        if (!m) return;
+        const bucket = m[2] === 'live' ? byDayLive : byDayArcade;
+        bucket[m[1]] = { plays: count };
+      } else if (key.indexOf('play_day_') === 0) byDay[key.slice(9)] = { plays: count };
       else if (key.indexOf('play_game_') === 0) byGame[key.slice(10)] = { plays: count };
     });
-    return { totals, byDay, byGame };
+    return { totals, byDay, byGame, byDayArcade, byDayLive };
   }
 
   const LIVE_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -689,24 +922,57 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function adminRecordLivePlayCount(room, code, idToken, signal) {
-    if (!window.HalomathPlayStats || typeof HalomathPlayStats.buildPatchBody !== 'function') return 0;
-    if (typeof HalomathPlayStats.playSessionDedupKey !== 'function') return 0;
+    const stats = window.HalomathPlayStats;
+    if (!stats || typeof stats.buildPatchBody !== 'function' || typeof stats.buildIncrementPatchBody !== 'function') return 0;
+    if (typeof stats.playSessionDedupKey !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') return 0;
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
     const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
     if (!n) return 0;
     const gameId = normalizeLiveGameId(meta.gameId);
     const createdAt = Number(meta.createdAt) || 0;
-    const dedupKey = HalomathPlayStats.playSessionDedupKey(code, createdAt);
     const targetAt = createdAt > 0 ? createdAt : Date.now();
-    const patchBody = JSON.stringify(HalomathPlayStats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey));
+    const dedupKey = stats.playSessionDedupKey(code, createdAt);
+    const ledgerKey = stats.roomPlayLedgerKey(code, createdAt);
+    let prev = 0;
     try {
-      await adminAuthFetch('sessionUsage', { method: 'PATCH', body: patchBody }, idToken, signal);
-      return n;
+      const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
+      prev = Number(prevRaw);
+      if (!Number.isFinite(prev) || prev < 0) prev = 0;
     } catch (e) {
-      if (e && e.code === 'PERMISSION_DENIED') return 0;
-      throw e;
+      prev = 0;
     }
+    if (n <= prev) return 0;
+
+    async function writeLedger(total) {
+      await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, {
+        method: 'PUT',
+        body: JSON.stringify(total)
+      }, idToken, signal);
+    }
+
+    if (prev === 0) {
+      try {
+        await adminAuthFetch('sessionUsage', {
+          method: 'PATCH',
+          body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey))
+        }, idToken, signal);
+        await writeLedger(n);
+        return n;
+      } catch (e) {
+        if (!e || e.code !== 'PERMISSION_DENIED') throw e;
+        prev = MIN_QUALIFIED_PLAYERS;
+      }
+    }
+
+    if (n <= prev) return 0;
+    const delta = n - prev;
+    await adminAuthFetch('sessionUsage', {
+      method: 'PATCH',
+      body: JSON.stringify(stats.buildIncrementPatchBody(gameId, 'live', targetAt, delta))
+    }, idToken, signal);
+    await writeLedger(n);
+    return delta;
   }
 
   async function adminRecordSessionUsage(room, code, idToken, signal) {
@@ -797,7 +1063,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       }
-      setPurgeStatus(`정리 완료: 세션 ${counted}개 · 플레이 ${playCounted}명 · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+      const playNote = playCounted > 0
+        ? `플레이 +${playCounted}명 반영`
+        : (codes.length ? '플레이 변화 없음(이미 반영됨 또는 인원 0)' : '');
+      setPurgeStatus(`정리 완료: 세션 신규 ${counted}개 · ${playNote} · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
       sessionUsageLoadingFlag = false;
       playStatsLoadingFlag = false;
       await loadSessionUsageStats();

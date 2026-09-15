@@ -75,6 +75,13 @@
             ".write": "auth != null"
           }
         }
+      },
+      "roomPlays": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
+        "$key": {
+          ".write": "auth != null",
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 200 && (!data.exists() || newData.val() >= data.val())"
+        }
       }
     }
   }

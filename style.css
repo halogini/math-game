@@ -460,6 +460,15 @@ body {
   font-size: 0.85rem;
 }
 
+.session-usage-by-game caption {
+  caption-side: top;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
 .session-usage-by-game th,
 .session-usage-by-game td {
   padding: 8px 10px;
@@ -467,9 +476,208 @@ body {
   text-align: left;
 }
 
+.session-usage-by-game th:last-child,
+.session-usage-by-game td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .session-usage-by-game th {
   color: #64748b;
   font-weight: 700;
+}
+
+.session-usage-charts {
+  display: grid;
+  gap: 16px;
+}
+
+.usage-chart-panel {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.usage-chart-heading {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.usage-chart-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.usage-chart-nav-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: center;
+  flex: 1;
+}
+
+.usage-chart-nav-btn {
+  min-width: 36px;
+  padding: 6px 10px;
+}
+
+.usage-chart-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.usage-bar-chart {
+  display: grid;
+  gap: 8px;
+}
+
+.usage-bar-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 40px;
+  gap: 8px;
+  align-items: center;
+}
+
+.usage-bar-label {
+  font-size: 0.78rem;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.usage-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #0284c7);
+}
+
+.usage-bar-fill-today {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.usage-bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-column-chart-wrap {
+  margin-bottom: 10px;
+  padding: 8px 4px 4px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+.usage-column-chart {
+  display: grid;
+  gap: 2px;
+  align-items: end;
+  height: 140px;
+}
+
+.usage-column {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+
+.usage-column-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 100%;
+}
+
+.usage-column-fill {
+  width: 100%;
+  min-height: 0;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #7dd3fc, #0284c7);
+}
+
+.usage-column-today .usage-column-fill {
+  background: linear-gradient(180deg, #fde68a, #f59e0b);
+}
+
+.usage-column-labels {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  min-height: 14px;
+}
+
+.usage-column-day {
+  text-align: center;
+  font-size: 0.62rem;
+  color: #94a3b8;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-column-label-today {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.usage-month-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  max-height: 200px;
+  display: block;
+  overflow-y: auto;
+}
+
+.usage-month-table thead,
+.usage-month-table tbody {
+  display: table;
+  width: 100%;
+}
+
+.usage-month-table th,
+.usage-month-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.usage-month-table th:last-child,
+.usage-month-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-usage-charts tr.session-usage-day-today td {
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .usage-bar-row {
+    grid-template-columns: 60px 1fr 32px;
+    gap: 6px;
+  }
+
+  .usage-column-chart {
+    height: 110px;
+  }
 }
 
 .session-usage-loading {
