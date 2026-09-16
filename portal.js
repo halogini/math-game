@@ -839,6 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) { /* ignore */ }
     });
   }
+
+  function setPurgeStatus(message, visible) {
     if (!purgeExpiredStatus) return;
     if (!visible) {
       purgeExpiredStatus.hidden = true;
