@@ -840,20 +840,48 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${String(code || '').toUpperCase()}_${ca}`.replace(/[.#$\[\]/]/g, '_');
   }
 
+  function qualifiedCount(raw) {
+    const n = Number(raw && raw.qualified);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  async function readLivePlayDay(day, idToken, signal) {
+    try {
+      const raw = await adminAuthFetch(`sessionUsage/byGame/play_dch_${day}_live`, { method: 'GET' }, idToken, signal);
+      return qualifiedCount(raw);
+    } catch (e) {
+      return 0;
+    }
+  }
+
   async function previewRoomSync(room, code, idToken, signal) {
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
     const createdAt = Number(meta.createdAt) || 0;
-    const preview = { playerCount, sessionNew: false, playDelta: 0 };
+    const day = createdAt ? usageDayKeyKst(createdAt) : '';
+    const preview = {
+      playerCount,
+      createdAt,
+      day,
+      sessionNew: false,
+      sessionUnknown: false,
+      playLedger: 0,
+      playDelta: 0,
+      resetLedger: false
+    };
 
-    if (playerCount < MIN_QUALIFIED_PLAYERS || !createdAt) return preview;
+    if (playerCount < MIN_QUALIFIED_PLAYERS) return preview;
+    if (!createdAt) {
+      preview.sessionUnknown = true;
+      return preview;
+    }
 
     const dedupKey = usageDedupKey(code, createdAt);
     try {
       const isDeduped = await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, { method: 'GET' }, idToken, signal);
       preview.sessionNew = !isDeduped;
     } catch (e) {
-      preview.sessionNew = false;
+      preview.sessionUnknown = true;
     }
 
     const stats = window.HalomathPlayStats;
@@ -868,19 +896,31 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       prev = 0;
     }
+    preview.playLedger = prev;
     if (n > prev) preview.playDelta = n - prev;
     return preview;
   }
 
   function formatRoomSyncDetail(code, preview) {
     const parts = [`${code}(${preview.playerCount}명)`];
-    if (preview.sessionNew) parts.push('세션+1');
-    if (preview.playDelta > 0) parts.push(`플레이+${preview.playDelta}`);
-    if (!preview.sessionNew && preview.playDelta <= 0 && preview.playerCount >= MIN_QUALIFIED_PLAYERS) {
-      parts.push('이미 반영됨');
-    }
     if (preview.playerCount > 0 && preview.playerCount < MIN_QUALIFIED_PLAYERS) {
       parts.push('인원 부족');
+      return parts.join(', ');
+    }
+    if (!preview.createdAt) {
+      parts.push('생성시각 없음');
+      return parts.join(', ');
+    }
+    if (preview.sessionNew) parts.push('세션+1');
+    else if (preview.sessionUnknown) parts.push('세션 여부 미확인');
+    else parts.push('세션 집계됨');
+
+    if (preview.resetLedger) {
+      parts.push(`플레이 원장 ${preview.playLedger}명→통계 부족, 현재 ${preview.playerCount}명 다시 더함`);
+    } else if (preview.playDelta > 0) {
+      parts.push(`플레이 원장 ${preview.playLedger}명→+${preview.playDelta}`);
+    } else {
+      parts.push(`플레이 원장 ${preview.playLedger}명`);
     }
     return parts.join(', ');
   }
@@ -914,7 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function adminRecordLivePlayCount(room, code, idToken, signal) {
+  async function adminRecordLivePlayCount(room, code, idToken, signal, options) {
     const stats = window.HalomathPlayStats;
     if (!stats || typeof stats.buildLivePlayPatchBody !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') {
       throw new Error('PLAY_STATS_MODULE_MISSING');
@@ -934,6 +974,10 @@ document.addEventListener('DOMContentLoaded', () => {
       prev = Number(prevRaw);
       if (!Number.isFinite(prev) || prev < 0) prev = 0;
     } catch (e) {
+      prev = 0;
+    }
+    if (options && options.resetLedger && prev > 0) {
+      await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'DELETE' }, idToken, signal);
       prev = 0;
     }
     const patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
@@ -1008,6 +1052,9 @@ document.addEventListener('DOMContentLoaded', () => {
       let activeRoomsDetails = [];
       let previewSessionNew = 0;
       let previewPlayDelta = 0;
+      const roomPreviews = {};
+      const dayRoomSum = {};
+      let qualifiedRoomSum = 0;
       
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
@@ -1017,19 +1064,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const isClosed = meta.hostSeenAt === 0;
         const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
         const preview = await previewRoomSync(room, code, idToken, controller.signal);
-        const detailStr = formatRoomSyncDetail(code, preview);
-
-        if (preview.sessionNew) previewSessionNew += 1;
-        previewPlayDelta += preview.playDelta;
+        roomPreviews[code] = preview;
+        if (preview.playerCount >= MIN_QUALIFIED_PLAYERS) {
+          qualifiedRoomSum += preview.playerCount;
+          if (preview.day) dayRoomSum[preview.day] = (dayRoomSum[preview.day] || 0) + preview.playerCount;
+        }
         
         if (isExpiredRoom || isClosed) {
           expiredRooms.push(code);
-          expiredRoomsDetails.push(detailStr);
         } else {
           activeRooms.push(code);
-          activeRoomsDetails.push(detailStr);
         }
       }
+
+      const todayKey = usageDayKeyKst(now);
+      const yesterdayKey = usageDayKeyKst(now - 24 * 60 * 60 * 1000);
+      const liveToday = await readLivePlayDay(todayKey, idToken, controller.signal);
+      const liveYesterday = await readLivePlayDay(yesterdayKey, idToken, controller.signal);
+      const liveByDay = {};
+      const dayKeys = Object.keys(dayRoomSum);
+      if (dayKeys.indexOf(todayKey) < 0) dayKeys.push(todayKey);
+      if (dayKeys.indexOf(yesterdayKey) < 0) dayKeys.push(yesterdayKey);
+      liveByDay[todayKey] = liveToday;
+      liveByDay[yesterdayKey] = liveYesterday;
+      for (let i = 0; i < dayKeys.length; i += 1) {
+        const day = dayKeys[i];
+        if (liveByDay[day] == null) liveByDay[day] = await readLivePlayDay(day, idToken, controller.signal);
+      }
+
+      codes.forEach((code) => {
+        const preview = roomPreviews[code];
+        if (!preview || preview.playerCount < MIN_QUALIFIED_PLAYERS || !preview.day) return;
+        const dayLive = liveByDay[preview.day] || 0;
+        const dayRooms = dayRoomSum[preview.day] || 0;
+        if (dayRooms > dayLive && preview.playDelta <= 0) {
+          preview.resetLedger = true;
+          preview.playDelta = preview.playerCount;
+        }
+      });
+
+      previewSessionNew = 0;
+      previewPlayDelta = 0;
+      expiredRoomsDetails = [];
+      activeRoomsDetails = [];
+      const expiredSet = {};
+      expiredRooms.forEach((code) => { expiredSet[code] = true; });
+      codes.forEach((code) => {
+        const preview = roomPreviews[code];
+        const detailStr = formatRoomSyncDetail(code, preview);
+        if (preview.sessionNew) previewSessionNew += 1;
+        previewPlayDelta += preview.playDelta || 0;
+        if (expiredSet[code]) expiredRoomsDetails.push(detailStr);
+        else activeRoomsDetails.push(detailStr);
+      });
 
       // 2. dedup 찌꺼기 데이터 가져오기
       setPurgeStatus('오래된 찌꺼기 데이터(dedup)를 분석하는 중…', true);
@@ -1059,7 +1146,12 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const confirmMsg = `[분석 완료]\n\n` +
-        `📊 통계 반영 예정:\n` +
+        `📊 DB 수업 플레이 vs 지금 방 인원\n` +
+        `- 오늘 수업 플레이 통계: ${liveToday}명\n` +
+        `- 어제 수업 플레이 통계: ${liveYesterday}명\n` +
+        `- 지금 3명 이상 방 인원 합: ${qualifiedRoomSum}명\n` +
+        `${qualifiedRoomSum > liveToday + liveYesterday ? '- 통계가 방 인원보다 적습니다. 확인하면 원장을 지우고 현재 인원을 다시 더합니다.\n' : ''}\n` +
+        `이번 실행 반영 예정:\n` +
         `- 세션 신규: ${previewSessionNew}개\n` +
         `- 플레이 추가: ${previewPlayDelta}명\n\n` +
         `🗑️ 삭제 예정 대상:\n` +
@@ -1098,7 +1190,9 @@ document.addEventListener('DOMContentLoaded', () => {
           console.warn('session usage record failed:', code, e);
         }
         try {
-          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal);
+          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal, {
+            resetLedger: !!(roomPreviews[code] && roomPreviews[code].resetLedger)
+          });
         } catch (e) {
           playFailed += 1;
           console.warn('live play stats record failed:', code, e);
