@@ -77,6 +77,16 @@
     };
   }
 
+  function buildLivePlayPatchBody(gameId, channel, atMs, n, ledgerKey, prev) {
+    const total = Math.max(1, Math.min(200, Math.floor(Number(n) || 1)));
+    const previous = Math.max(0, Math.floor(Number(prev) || 0));
+    if (total <= previous) return null;
+    const body = buildIncrementPatchBody(gameId, channel, atMs, total - previous);
+    const key = String(ledgerKey || '').replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
+    if (key) body[`roomPlays/${key}`] = total;
+    return body;
+  }
+
   function buildPatchBody(gameId, channel, atMs, n, dedupKey) {
     const body = buildIncrementPatchBody(gameId, channel, atMs, n);
     const key = String(dedupKey || '').replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
@@ -204,6 +214,7 @@
     isPlayStatGameKey,
     buildPatchBody,
     buildIncrementPatchBody,
+    buildLivePlayPatchBody,
     parsePlayStatsFromSessionUsage
   };
 })(typeof window !== 'undefined' ? window : global);

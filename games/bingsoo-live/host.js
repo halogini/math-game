@@ -459,18 +459,24 @@ function extraRankCells(item) {
 }
 
 function maybeRecordQualifiedUsage() {
-  if (sessionUsageRecorded || !currentRoomCode || !window.HalomathLive) return;
+  if (!currentRoomCode || !window.HalomathLive) return;
   const minPlayers = HalomathLive.MIN_QUALIFIED_PLAYERS || 3;
   if (lastLiveList.length < minPlayers) return;
-  HalomathLive.tryRecordSessionUsage(currentRoomCode, {
+  const hint = {
     playerCount: lastLiveList.length,
     gameId: liveGameId(),
     createdAt: hostCreatedAt
-  }).then((ok) => {
-    if (ok === true) sessionUsageRecorded = true;
-    else console.warn('session usage not recorded yet for', currentRoomCode, 'players=', lastLiveList.length);
-  }).catch((err) => {
-    console.warn('early session usage record failed:', err);
+  };
+  if (!sessionUsageRecorded) {
+    HalomathLive.tryRecordSessionUsage(currentRoomCode, hint).then((ok) => {
+      if (ok === true) sessionUsageRecorded = true;
+      else console.warn('session usage not recorded yet for', currentRoomCode, 'players=', lastLiveList.length);
+    }).catch((err) => {
+      console.warn('early session usage record failed:', err);
+    });
+  }
+  HalomathLive.tryRecordLivePlayCount(currentRoomCode, hint).catch((err) => {
+    console.warn('live play count record failed:', err);
   });
 }
 

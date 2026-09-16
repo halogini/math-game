@@ -916,8 +916,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function adminRecordLivePlayCount(room, code, idToken, signal) {
     const stats = window.HalomathPlayStats;
-    if (!stats || typeof stats.buildPatchBody !== 'function' || typeof stats.buildIncrementPatchBody !== 'function') return 0;
-    if (typeof stats.playSessionDedupKey !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') return 0;
+    if (!stats || typeof stats.buildLivePlayPatchBody !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') {
+      throw new Error('PLAY_STATS_MODULE_MISSING');
+    }
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
     if (playerCount < MIN_QUALIFIED_PLAYERS) return 0;
@@ -926,7 +927,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameId = normalizeLiveGameId(meta.gameId);
     const createdAt = Number(meta.createdAt) || 0;
     const targetAt = createdAt > 0 ? createdAt : Date.now();
-    const dedupKey = stats.playSessionDedupKey(code, createdAt);
     const ledgerKey = stats.roomPlayLedgerKey(code, createdAt);
     let prev = 0;
     try {
@@ -936,37 +936,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       prev = 0;
     }
-    if (n <= prev) return 0;
-
-    async function writeLedger(total) {
-      await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, {
-        method: 'PUT',
-        body: JSON.stringify(total)
-      }, idToken, signal);
-    }
-
-    if (prev === 0) {
-      try {
-        await adminAuthFetch('sessionUsage', {
-          method: 'PATCH',
-          body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey))
-        }, idToken, signal);
-        await writeLedger(n);
-        return n;
-      } catch (e) {
-        if (!e || e.code !== 'PERMISSION_DENIED') throw e;
-        prev = MIN_QUALIFIED_PLAYERS;
-      }
-    }
-
-    if (n <= prev) return 0;
-    const delta = n - prev;
+    const patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
+    if (!patchBody) return 0;
     await adminAuthFetch('sessionUsage', {
       method: 'PATCH',
-      body: JSON.stringify(stats.buildIncrementPatchBody(gameId, 'live', targetAt, delta))
+      body: JSON.stringify(patchBody)
     }, idToken, signal);
-    await writeLedger(n);
-    return delta;
+    return n - prev;
   }
 
   async function adminRecordSessionUsage(room, code, idToken, signal) {
@@ -1108,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let deletedRoomsCount = 0;
       let counted = 0;
       let playCounted = 0;
+      let playFailed = 0;
       let failed = 0;
 
       for (let i = 0; i < codes.length; i += 1) {
@@ -1123,6 +1100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal);
         } catch (e) {
+          playFailed += 1;
           console.warn('live play stats record failed:', code, e);
         }
 
@@ -1161,7 +1139,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const playNote = playCounted > 0
         ? `플레이 +${playCounted}명 반영`
-        : (codes.length ? '플레이 변화 없음' : '');
+        : (playFailed > 0
+          ? `플레이 반영 실패 ${playFailed}개(규칙 Publish 확인)`
+          : (codes.length ? '플레이 변화 없음' : ''));
       
       setPurgeStatus(`정리 완료: 세션 신규 ${counted}개 · ${playNote} · 방 삭제 ${deletedRoomsCount}개 · 찌꺼기 삭제 ${deletedDedupCount}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
       

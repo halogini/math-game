@@ -81,7 +81,7 @@
         ".read": "auth != null",
         "$key": {
           ".write": "auth != null",
-          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 200 && (!data.exists() || newData.val() >= data.val())"
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 200 && (!data.exists() || newData.val() > data.val())"
         }
       }
     }
