@@ -902,27 +902,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function formatRoomSyncDetail(code, preview) {
-    const parts = [`${code}(${preview.playerCount}명)`];
-    if (preview.playerCount > 0 && preview.playerCount < MIN_QUALIFIED_PLAYERS) {
-      parts.push('인원 부족');
-      return parts.join(', ');
+    const n = preview.playerCount;
+    if (n > 0 && n < MIN_QUALIFIED_PLAYERS) {
+      return `${code} ${n}명 — 3명 미만이라 통계에 넣지 않음`;
     }
     if (!preview.createdAt) {
-      parts.push('생성시각 없음');
-      return parts.join(', ');
+      return `${code} ${n}명 — 방 정보가 불완전함`;
     }
-    if (preview.sessionNew) parts.push('세션+1');
-    else if (preview.sessionUnknown) parts.push('세션 여부 미확인');
-    else parts.push('세션 집계됨');
-
-    if (preview.resetLedger) {
-      parts.push(`플레이 원장 ${preview.playLedger}명→통계 부족, 현재 ${preview.playerCount}명 다시 더함`);
-    } else if (preview.playDelta > 0) {
-      parts.push(`플레이 원장 ${preview.playLedger}명→+${preview.playDelta}`);
-    } else {
-      parts.push(`플레이 원장 ${preview.playLedger}명`);
-    }
-    return parts.join(', ');
+    const sessionBit = preview.sessionNew
+      ? '수업 횟수에 새로 넣음'
+      : (preview.sessionUnknown ? '수업 횟수는 확인 못 함' : '수업 횟수는 이미 들어 있음');
+    const playBit = (preview.resetLedger || preview.playDelta > 0)
+      ? `참가 인원 +${preview.playDelta}명`
+      : '참가 인원은 이미 들어 있음';
+    return `${code} ${n}명 — ${sessionBit}, ${playBit}`;
   }
 
   async function adminAuthFetch(path, options, idToken, signal) {
@@ -1037,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     purgeExpiredRunning = true;
     if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
-    setPurgeStatus('정리 대상을 분석하는 중…', true);
+    setPurgeStatus('지금 방과 통계를 비교하는 중…', true);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -1123,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // 2. dedup 찌꺼기 데이터 가져오기
-      setPurgeStatus('오래된 찌꺼기 데이터(dedup)를 분석하는 중…', true);
+      setPurgeStatus('오래된 내부 기록을 확인하는 중…', true);
       const dedupData = await adminAuthFetch('sessionUsage/dedup', { method: 'GET' }, idToken, controller.signal) || {};
       const dedupKeys = Object.keys(dedupData);
       
@@ -1145,25 +1138,36 @@ document.addEventListener('DOMContentLoaded', () => {
       // 2단계: 최종 확인
       const formatRoomList = (list) => {
         if (list.length === 0) return '없음';
-        if (list.length <= 15) return list.join(', ');
-        return `${list.slice(0, 15).join(', ')} 외 ${list.length - 15}개`;
+        if (list.length <= 8) return list.join('\n  ');
+        return `${list.slice(0, 8).join('\n  ')}\n  외 ${list.length - 8}개`;
       };
 
-      const confirmMsg = `[분석 완료]\n\n` +
-        `📊 DB 수업 플레이 vs 지금 방 인원\n` +
-        `- 오늘 수업 플레이 통계: ${liveToday}명\n` +
-        `- 어제 수업 플레이 통계: ${liveYesterday}명\n` +
-        `- 지금 3명 이상 방 인원 합: ${qualifiedRoomSum}명\n` +
-        `${qualifiedRoomSum > liveToday + liveYesterday ? '- 통계가 방 인원보다 적습니다. 확인하면 원장을 지우고 현재 인원을 다시 더합니다.\n' : ''}\n` +
-        `이번 실행 반영 예정:\n` +
-        `- 세션 신규: ${previewSessionNew}개\n` +
-        `- 플레이 추가: ${previewPlayDelta}명\n\n` +
-        `🗑️ 삭제 예정 대상:\n` +
-        `- 종료/만료된 방 (${expiredRooms.length}개): ${formatRoomList(expiredRoomsDetails)}\n` +
-        `- 2일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +
-        `✅ 유지 대상:\n` +
-        `- 진행 중인 방 (${activeRooms.length}개): ${formatRoomList(activeRoomsDetails)}\n\n` +
-        `이대로 삭제 및 통계 동기화를 진행하시겠습니까?`;
+      const statsGap = qualifiedRoomSum > liveToday + liveYesterday;
+      const confirmMsg = [
+        '확인을 누르면 아래 내용이 적용됩니다. 취소를 누르면 아무 것도 바뀌지 않습니다.',
+        '',
+        '[통계에 넣을 것]',
+        `- 수업 횟수: ${previewSessionNew}번 추가`,
+        `- 참가 인원: ${previewPlayDelta}명 추가`,
+        '',
+        '[지금 숫자 비교]',
+        `- 오늘 통계의 수업 참가 인원: ${liveToday}명`,
+        `- 어제 통계의 수업 참가 인원: ${liveYesterday}명`,
+        `- 지금 방 안에 실제로 있는 사람(3명 이상인 방): ${qualifiedRoomSum}명`,
+        statsGap
+          ? '- 통계가 실제 인원보다 적습니다. 확인을 누르면 부족한 인원을 통계에 넣습니다.'
+          : '- 통계와 실제 인원이 크게 어긋나 보이지 않습니다.',
+        '',
+        '[지울 것]',
+        `- 이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만. 수업 중인 방은 안 지움)`,
+        ...(expiredRooms.length ? [`  ${formatRoomList(expiredRoomsDetails)}`] : []),
+        `- 이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (화면에 보이는 통계 숫자는 그대로)`,
+        '',
+        '[그대로 둘 방 — 수업 진행 중]',
+        activeRooms.length ? `  ${formatRoomList(activeRoomsDetails)}` : '  없음',
+        '',
+        '이대로 진행할까요?'
+      ].join('\n');
 
       if (!window.confirm(confirmMsg)) {
         setPurgeStatus('정리가 취소되었습니다.', true);
@@ -1173,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 실제 삭제 및 동기화 진행
-      setPurgeStatus('세션 동기화 및 삭제를 진행 중입니다…', true);
+      setPurgeStatus('통계에 반영하고 끝난 방을 정리하는 중…', true);
       const execController = new AbortController();
       const execTimeoutId = setTimeout(() => execController.abort(), 120000);
 
@@ -1203,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (expiredRooms.includes(code)) {
-          setPurgeStatus(`세션 정리 중… 방 삭제 ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
+          setPurgeStatus(`끝난 방을 지우는 중… ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
           try {
             await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
             deletedRoomsCount += 1;
@@ -1216,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let deletedDedupCount = 0;
       if (oldDedupKeys.length > 0) {
-        setPurgeStatus(`오래된 찌꺼기 데이터 삭제 중… (0/${oldDedupKeys.length})`, true);
+        setPurgeStatus(`오래된 내부 기록을 지우는 중… (${oldDedupKeys.length}개)`, true);
         const dedupPatch = {};
         oldDedupKeys.forEach(k => {
           dedupPatch[k] = null; // null 값을 보내면 Firebase에서 해당 키가 삭제됨
@@ -1236,12 +1240,12 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(execTimeoutId);
 
       const playNote = playCounted > 0
-        ? `플레이 +${playCounted}명 반영`
+        ? `참가 인원 ${playCounted}명 추가`
         : (playFailed > 0
-          ? `플레이 반영 실패 ${playFailed}개(규칙 Publish 확인)`
-          : (codes.length ? '플레이 변화 없음' : ''));
+          ? `참가 인원 반영 실패 ${playFailed}건`
+          : '참가 인원 변화 없음');
       
-      setPurgeStatus(`정리 완료: 세션 신규 ${counted}개 · ${playNote} · 방 삭제 ${deletedRoomsCount}개 · 찌꺼기 삭제 ${deletedDedupCount}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+      setPurgeStatus(`완료: 수업 횟수 ${counted}번 추가 · ${playNote} · 끝난 방 ${deletedRoomsCount}개 삭제 · 오래된 기록 ${deletedDedupCount}개 삭제${failed ? ` · 실패 ${failed}건` : ''}`, true);
       
       sessionUsageLoadingFlag = false;
       playStatsLoadingFlag = false;
@@ -1251,9 +1255,9 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('purge expired rooms failed:', err);
       const code = String((err && err.code) || '');
       if (code === 'PERMISSION_DENIED') {
-        setPurgeStatus('권한이 없습니다. liveRooms 규칙을 Publish했는지 확인해 주세요.', true);
+        setPurgeStatus('권한이 없습니다. 관리자 이메일로 로그인했는지 확인해 주세요.', true);
       } else {
-        setPurgeStatus('만료 세션 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.', true);
+        setPurgeStatus('정리에 실패했습니다. 잠시 후 다시 시도해 주세요.', true);
       }
     } finally {
       purgeExpiredRunning = false;
