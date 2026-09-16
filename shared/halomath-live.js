@@ -309,6 +309,14 @@
     const dedupKey = dedupKeyForRoom(normalized, createdAt, targetAt);
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
+    
+    try {
+      const isDeduped = await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, { authToken: token });
+      if (isDeduped) return false;
+    } catch (e) {
+      // ignore
+    }
+
     const patchBody = Object.assign({
       [`dedup/${dedupKey}`]: true
     }, buildUsagePatchBody(gameId, targetAt));
