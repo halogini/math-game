@@ -407,6 +407,59 @@ body {
   margin-top: 4px;
 }
 
+.purge-confirm {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.purge-confirm-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.purge-confirm-body {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.purge-confirm-body h4 {
+  margin: 14px 0 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.purge-confirm-body h4:first-child {
+  margin-top: 0;
+}
+
+.purge-confirm-body ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.purge-confirm-body li {
+  margin: 2px 0;
+}
+
+.purge-confirm-note {
+  margin: 8px 0 0;
+}
+
+.purge-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .session-usage-config-note {
   color: #b45309;
 }

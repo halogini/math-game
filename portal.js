@@ -147,6 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSessionUsageRefresh = document.getElementById('btn-session-usage-refresh');
   const btnPurgeExpiredRooms = document.getElementById('btn-purge-expired-rooms');
   const purgeExpiredStatus = document.getElementById('purge-expired-status');
+  const purgeConfirm = document.getElementById('purge-confirm');
+  const purgeConfirmBody = document.getElementById('purge-confirm-body');
+  const btnPurgeConfirmOk = document.getElementById('btn-purge-confirm-ok');
+  const btnPurgeConfirmCancel = document.getElementById('btn-purge-confirm-cancel');
   const playStatsFold = document.getElementById('play-stats-fold');
   const playStatsTitle = document.getElementById('play-stats-title');
   const playStatsCards = document.getElementById('play-stats-cards');
@@ -807,7 +811,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const MIN_QUALIFIED_PLAYERS = 3;
   let purgeExpiredRunning = false;
 
-  function setPurgeStatus(message, visible) {
+  function hidePurgeConfirm() {
+    if (purgeConfirm) purgeConfirm.hidden = true;
+    if (purgeConfirmBody) purgeConfirmBody.innerHTML = '';
+  }
+
+  function askPurgeConfirm(html) {
+    return new Promise((resolve) => {
+      if (!purgeConfirm || !purgeConfirmBody || !btnPurgeConfirmOk || !btnPurgeConfirmCancel) {
+        resolve(window.confirm('이대로 진행할까요?'));
+        return;
+      }
+      purgeConfirm.hidden = false;
+      purgeConfirmBody.innerHTML = html;
+      const finish = (ok) => {
+        btnPurgeConfirmOk.removeEventListener('click', onOk);
+        btnPurgeConfirmCancel.removeEventListener('click', onCancel);
+        hidePurgeConfirm();
+        resolve(ok);
+      };
+      const onOk = () => finish(true);
+      const onCancel = () => finish(false);
+      btnPurgeConfirmOk.addEventListener('click', onOk);
+      btnPurgeConfirmCancel.addEventListener('click', onCancel);
+      try {
+        purgeConfirm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) { /* ignore */ }
+    });
+  }
     if (!purgeExpiredStatus) return;
     if (!visible) {
       purgeExpiredStatus.hidden = true;
@@ -1030,6 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     purgeExpiredRunning = true;
     if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
+    hidePurgeConfirm();
     setPurgeStatus('지금 방과 통계를 비교하는 중…', true);
     
     const controller = new AbortController();
@@ -1136,41 +1168,43 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(timeoutId); // 사용자 응답 대기를 위해 타임아웃 해제
 
       // 2단계: 최종 확인
-      const formatRoomList = (list) => {
-        if (list.length === 0) return '없음';
-        if (list.length <= 8) return list.join('\n  ');
-        return `${list.slice(0, 8).join('\n  ')}\n  외 ${list.length - 8}개`;
+      const statsGap = qualifiedRoomSum > liveToday + liveYesterday;
+      const roomItems = (list) => {
+        if (!list.length) return '<p class="purge-confirm-note">없음</p>';
+        const shown = list.slice(0, 12);
+        const extra = list.length > 12 ? `<li>외 ${list.length - 12}개</li>` : '';
+        return `<ul>${shown.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}${extra}</ul>`;
       };
 
-      const statsGap = qualifiedRoomSum > liveToday + liveYesterday;
-      const confirmMsg = [
-        '확인을 누르면 아래 내용이 적용됩니다. 취소를 누르면 아무 것도 바뀌지 않습니다.',
-        '',
-        '[통계에 넣을 것]',
-        `- 수업 횟수: ${previewSessionNew}번 추가`,
-        `- 참가 인원: ${previewPlayDelta}명 추가`,
-        '',
-        '[지금 숫자 비교]',
-        `- 오늘 통계의 수업 참가 인원: ${liveToday}명`,
-        `- 어제 통계의 수업 참가 인원: ${liveYesterday}명`,
-        `- 지금 방 안에 실제로 있는 사람(3명 이상인 방): ${qualifiedRoomSum}명`,
-        statsGap
-          ? '- 통계가 실제 인원보다 적습니다. 확인을 누르면 부족한 인원을 통계에 넣습니다.'
-          : '- 통계와 실제 인원이 크게 어긋나 보이지 않습니다.',
-        '',
-        '[지울 것]',
-        `- 이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만. 수업 중인 방은 안 지움)`,
-        ...(expiredRooms.length ? [`  ${formatRoomList(expiredRoomsDetails)}`] : []),
-        `- 이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (화면에 보이는 통계 숫자는 그대로)`,
-        '',
-        '[그대로 둘 방 — 수업 진행 중]',
-        activeRooms.length ? `  ${formatRoomList(activeRoomsDetails)}` : '  없음',
-        '',
-        '이대로 진행할까요?'
-      ].join('\n');
+      const confirmHtml = `
+        <p>취소를 누르면 아무 것도 바뀌지 않습니다.</p>
+        <h4>통계에 넣을 것</h4>
+        <ul>
+          <li>수업 횟수: <strong>${previewSessionNew}번</strong> 추가</li>
+          <li>참가 인원: <strong>${previewPlayDelta}명</strong> 추가</li>
+        </ul>
+        <h4>지금 숫자 비교</h4>
+        <ul>
+          <li>오늘 통계의 수업 참가 인원: ${liveToday}명</li>
+          <li>어제 통계의 수업 참가 인원: ${liveYesterday}명</li>
+          <li>지금 방 안에 실제로 있는 사람(3명 이상인 방): ${qualifiedRoomSum}명</li>
+        </ul>
+        <p class="purge-confirm-note">${statsGap
+          ? '통계가 실제 인원보다 적습니다. 진행을 누르면 부족한 인원을 통계에 넣습니다.'
+          : '통계와 실제 인원이 크게 어긋나 보이지 않습니다.'}</p>
+        <h4>지울 것</h4>
+        <ul>
+          <li>이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만. 수업 중인 방은 안 지움)</li>
+          <li>이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (화면에 보이는 통계 숫자는 그대로)</li>
+        </ul>
+        ${expiredRooms.length ? `<h4>끝난 방</h4>${roomItems(expiredRoomsDetails)}` : ''}
+        <h4>그대로 둘 방 — 수업 진행 중</h4>
+        ${roomItems(activeRoomsDetails)}
+      `;
 
-      if (!window.confirm(confirmMsg)) {
-        setPurgeStatus('정리가 취소되었습니다.', true);
+      const confirmed = await askPurgeConfirm(confirmHtml);
+      if (!confirmed) {
+        setPurgeStatus('취소했습니다. 통계와 방은 그대로입니다.', true);
         purgeExpiredRunning = false;
         if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = false;
         return;

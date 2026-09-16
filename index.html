@@ -147,6 +147,14 @@
               <button type="button" class="admin-btn" id="btn-session-usage-refresh">새로고침</button>
               <button type="button" class="admin-btn" id="btn-purge-expired-rooms">통계에 반영하고 끝난 방 정리</button>
             </div>
+            <div class="purge-confirm" id="purge-confirm" hidden>
+              <h3 class="purge-confirm-title">진행하기 전에 확인</h3>
+              <div class="purge-confirm-body" id="purge-confirm-body"></div>
+              <div class="purge-confirm-actions">
+                <button type="button" class="admin-btn admin-btn-primary" id="btn-purge-confirm-ok">진행</button>
+                <button type="button" class="admin-btn" id="btn-purge-confirm-cancel">취소</button>
+              </div>
+            </div>
             <p class="session-usage-note" id="purge-expired-status" hidden></p>
           </div>
         </details>
