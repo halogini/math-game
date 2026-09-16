@@ -48,10 +48,10 @@
     },
     "sessionUsage": {
       "dedup": {
-        ".read": false,
+        ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
         "$key": {
-          ".write": "auth != null && !data.exists()",
-          ".validate": "newData.isBoolean() && newData.val() === true"
+          ".write": "auth != null && (!data.exists() || (auth.token.email != null && auth.token.email.length > 0))",
+          ".validate": "!newData.exists() || (newData.isBoolean() && newData.val() === true)"
         }
       },
       "totals": {
