@@ -930,6 +930,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const createdAt = Number(meta.createdAt) || 0;
     const gameId = normalizeLiveGameId(meta.gameId);
     const dedupKey = usageDedupKey(code, createdAt);
+    
+    // 1. 이미 집계된 방인지 먼저 확인 (중복 집계 원천 차단)
+    try {
+      const isDeduped = await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, { method: 'GET' }, idToken, signal);
+      if (isDeduped) return false;
+    } catch (e) {
+      // 무시하고 아래 PATCH 시도
+    }
+
     const targetAt = createdAt > 0 ? createdAt : Date.now();
     const day = usageDayKeyKst(targetAt);
     const inc = { '.sv': { increment: 1 } };
