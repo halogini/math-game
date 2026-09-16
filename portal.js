@@ -565,36 +565,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return floor;
   }
 
-  function collectPlayFloorFromSessions(usage) {
-    const floor = emptyPlayFloor();
-    const minPlayers = typeof MIN_QUALIFIED_PLAYERS === 'number' ? MIN_QUALIFIED_PLAYERS : 3;
-    const totals = usage && usage.totals && typeof usage.totals === 'object' ? usage.totals : {};
-    const byDay = usage && usage.byDay && typeof usage.byDay === 'object' ? usage.byDay : {};
-    const byGame = usage && usage.byGame && typeof usage.byGame === 'object' ? usage.byGame : {};
-
-    const totalSessions = qualifiedSessionCount(totals);
-    floor.total = totalSessions * minPlayers;
-
-    Object.keys(byDay).forEach((day) => {
-      const sessions = qualifiedSessionCount(byDay[day]);
-      if (sessions) floor.byDay[day] = sessions * minPlayers;
-    });
-
-    Object.keys(byGame).forEach((gameId) => {
-      if (String(gameId).indexOf('play_') === 0) return;
-      const sessions = qualifiedSessionCount(byGame[gameId]);
-      if (!sessions) return;
-      const gid = normalizePlayGameId(gameId);
-      floor.byGame[gid] = (floor.byGame[gid] || 0) + sessions * minPlayers;
-    });
-
-    return floor;
-  }
-
-  function takePlayStatsMax(parsed, arcadeFloor, liveFloor) {
+  function takePlayStatsMax(parsed, arcadeFloor) {
     const parsedSafe = parsed && typeof parsed === 'object' ? parsed : {};
     const arcade = arcadeFloor && typeof arcadeFloor === 'object' ? arcadeFloor : emptyPlayFloor();
-    const live = liveFloor && typeof liveFloor === 'object' ? liveFloor : emptyPlayFloor();
 
     function dayCount(map, day) {
       return playStatsCount(map && map[day]);
@@ -605,18 +578,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const recArcade = dayCount(parsedSafe.byDayArcade, day);
       const recLive = dayCount(parsedSafe.byDayLive, day);
       const scoreN = arcade.byDay[day] || 0;
-      const sessionN = live.byDay[day] || 0;
-      const liveN = Math.max(recLive, sessionN);
       if (recLive > 0) {
         const arcadeN = Math.max(recArcade, scoreN, Math.max(0, recorded - recLive));
-        return arcadeN + liveN;
+        return arcadeN + recLive;
       }
-      // Older combined counters mixed arcade + live. Add the session floor only
-      // when that day's recorded plays still look like arcade-only.
-      if (sessionN > 0 && recorded >= scoreN + sessionN) {
-        return Math.max(recorded, scoreN + sessionN);
-      }
-      return Math.max(recorded, scoreN) + sessionN;
+      return Math.max(recorded, scoreN, recArcade);
     }
 
     const dayKeys = {};
@@ -624,7 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(parsedSafe.byDayArcade || {}).forEach((k) => { dayKeys[k] = true; });
     Object.keys(parsedSafe.byDayLive || {}).forEach((k) => { dayKeys[k] = true; });
     Object.keys(arcade.byDay || {}).forEach((k) => { dayKeys[k] = true; });
-    Object.keys(live.byDay || {}).forEach((k) => { dayKeys[k] = true; });
 
     const byDay = {};
     Object.keys(dayKeys).forEach((day) => {
@@ -636,26 +601,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const recLiveTotal = Object.keys(parsedSafe.byDayLive || {}).reduce((sum, day) => {
       return sum + dayCount(parsedSafe.byDayLive, day);
     }, 0);
-    const liveTotal = live.total || 0;
     const arcadeTotal = arcade.total || 0;
-    let total;
-    if (recLiveTotal > 0) {
-      total = Math.max(recordedTotal, arcadeTotal + Math.max(recLiveTotal, liveTotal));
-    } else if (liveTotal > 0 && recordedTotal >= arcadeTotal + liveTotal) {
-      total = Math.max(recordedTotal, arcadeTotal + liveTotal);
-    } else {
-      total = Math.max(recordedTotal, arcadeTotal) + liveTotal;
-    }
+    const total = recLiveTotal > 0
+      ? Math.max(recordedTotal, arcadeTotal + recLiveTotal)
+      : Math.max(recordedTotal, arcadeTotal);
 
     const byGame = {};
     const gameKeys = {};
     Object.keys(parsedSafe.byGame || {}).forEach((k) => { gameKeys[k] = true; });
     Object.keys(arcade.byGame || {}).forEach((k) => { gameKeys[k] = true; });
-    Object.keys(live.byGame || {}).forEach((k) => { gameKeys[k] = true; });
     Object.keys(gameKeys).forEach((gid) => {
       const n = Math.max(
         playStatsCount(parsedSafe.byGame && parsedSafe.byGame[gid]),
-        (arcade.byGame[gid] || 0) + (live.byGame[gid] || 0)
+        arcade.byGame[gid] || 0
       );
       if (n) byGame[gid] = { plays: n };
     });
@@ -663,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return { totals: { plays: total }, byDay, byGame };
   }
 
-  function playStatsNeedsWrite(parsed, merged, liveFloor) {
+  function playStatsNeedsWrite(parsed, merged) {
     if (playStatsCount(merged.totals) > playStatsCount(parsed.totals)) return true;
     const checkMap = (a, b) => {
       const keys = {};
@@ -671,25 +629,16 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(b || {}).forEach((k) => { keys[k] = true; });
       return Object.keys(keys).some((k) => playStatsCount(b && b[k]) > playStatsCount(a && a[k]));
     };
-    if (checkMap(parsed.byDay, merged.byDay) || checkMap(parsed.byGame, merged.byGame)) return true;
-    const liveDays = (liveFloor && liveFloor.byDay) || {};
-    return Object.keys(liveDays).some((day) => {
-      const liveN = liveDays[day] || 0;
-      const recLive = playStatsCount(parsed.byDayLive && parsed.byDayLive[day]);
-      return liveN > recLive;
-    });
+    return checkMap(parsed.byDay, merged.byDay) || checkMap(parsed.byGame, merged.byGame);
   }
 
-  async function writePlayStatsBaseline(merged, liveFloor, parsed, idToken) {
+  async function writePlayStatsBaseline(merged, idToken) {
     const patch = {};
     const total = playStatsCount(merged.totals);
     if (total > 0) patch['byGame/play_total/qualified'] = total;
     Object.keys(merged.byDay || {}).forEach((day) => {
       const n = playStatsCount(merged.byDay[day]);
       if (n > 0) patch[`byGame/play_day_${day}/qualified`] = n;
-      const liveN = (liveFloor && liveFloor.byDay && liveFloor.byDay[day]) || 0;
-      const recLive = playStatsCount(parsed && parsed.byDayLive && parsed.byDayLive[day]);
-      if (liveN > recLive) patch[`byGame/play_dch_${day}_live/qualified`] = liveN;
     });
     Object.keys(merged.byGame || {}).forEach((gid) => {
       const n = playStatsCount(merged.byGame[gid]);
@@ -802,12 +751,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ? window.HalomathPlayStats.parsePlayStatsFromSessionUsage(usage)
         : parsePlayStatsFromUsageFallback(usage);
       const arcadeFloor = collectPlayFloorFromScores(scoresData);
-      const liveFloor = collectPlayFloorFromSessions(usage);
-      const merged = takePlayStatsMax(parsed, arcadeFloor, liveFloor);
-      if (playStatsNeedsWrite(parsed, merged, liveFloor)) {
+      const merged = takePlayStatsMax(parsed, arcadeFloor);
+      if (playStatsNeedsWrite(parsed, merged)) {
         try {
           const idToken = await adminUser.getIdToken(true);
-          await writePlayStatsBaseline(merged, liveFloor, parsed, idToken);
+          await writePlayStatsBaseline(merged, idToken);
         } catch (writeErr) {
           console.warn('play stats baseline write failed:', writeErr);
         }

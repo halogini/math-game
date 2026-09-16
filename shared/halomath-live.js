@@ -280,28 +280,6 @@
     return Math.min(200, n);
   }
 
-  function recordLivePlayCountKeepalive(code, hint, token) {
-    hint = hint && typeof hint === 'object' ? hint : {};
-    const normalized = normalizeCode(code);
-    if (!normalized) return;
-    const n = playCountForStats(hint.playerCount);
-    if (!n) return;
-    const gameId = normalizeGameId(hint.gameId);
-    const authToken = token || cachedHostToken;
-    if (!authToken) return;
-    const stats = global.HalomathPlayStats;
-    if (!stats || typeof stats.recordPlay !== 'function' || typeof stats.playSessionDedupKey !== 'function') return;
-    const createdAt = Number(hint.createdAt) || 0;
-    const targetAt = createdAt > 0 ? createdAt : Date.now();
-    stats.recordPlay(gameId, {
-      channel: 'live',
-      token: authToken,
-      count: n,
-      dedupKey: stats.playSessionDedupKey(normalized, createdAt),
-      atMs: targetAt
-    });
-  }
-
   async function tryRecordSessionUsage(code, hint) {
     hint = hint && typeof hint === 'object' ? hint : {};
     const normalized = normalizeCode(code);
@@ -353,7 +331,8 @@
   async function tryRecordLivePlayCount(code, hint) {
     hint = hint && typeof hint === 'object' ? hint : {};
     const stats = global.HalomathPlayStats;
-    if (!stats || typeof stats.recordPlay !== 'function' || typeof stats.playSessionDedupKey !== 'function') {
+    if (!stats || typeof stats.buildPatchBody !== 'function' || typeof stats.buildIncrementPatchBody !== 'function'
+      || typeof stats.playSessionDedupKey !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') {
       return false;
     }
     const normalized = normalizeCode(code);
@@ -388,22 +367,61 @@
     const ledgerKey = stats.roomPlayLedgerKey
       ? stats.roomPlayLedgerKey(normalized, createdAt)
       : '';
-    try {
-      await fetchRest('sessionUsage.json', {
-        method: 'PATCH',
-        body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey)),
+    let prev = 0;
+    if (ledgerKey) {
+      try {
+        const prevRaw = await fetchRest(`sessionUsage/roomPlays/${ledgerKey}.json`, { authToken: token });
+        prev = Number(prevRaw);
+        if (!Number.isFinite(prev) || prev < 0) prev = 0;
+      } catch (e) {
+        prev = 0;
+      }
+    }
+    if (n <= prev) return true;
+
+    async function writeLedger(total) {
+      if (!ledgerKey) return;
+      await fetchRest(`sessionUsage/roomPlays/${ledgerKey}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(total),
         authToken: token
       });
-      if (ledgerKey) {
+    }
+
+    if (prev === 0) {
+      try {
+        await fetchRest('sessionUsage.json', {
+          method: 'PATCH',
+          body: JSON.stringify(stats.buildPatchBody(gameId, 'live', targetAt, n, dedupKey)),
+          authToken: token
+        });
         try {
-          await fetchRest(`sessionUsage/roomPlays/${ledgerKey}.json`, {
-            method: 'PUT',
-            body: JSON.stringify(n),
-            authToken: token
-          });
+          await writeLedger(n);
         } catch (ledgerErr) {
           console.warn('room play ledger write failed:', ledgerErr);
         }
+        return true;
+      } catch (e) {
+        if (!e || e.code !== 'PERMISSION_DENIED') {
+          console.warn('live play count increment failed:', e);
+          return false;
+        }
+        prev = MIN_QUALIFIED_PLAYERS;
+      }
+    }
+
+    if (n <= prev) return true;
+    const delta = n - prev;
+    try {
+      await fetchRest('sessionUsage.json', {
+        method: 'PATCH',
+        body: JSON.stringify(stats.buildIncrementPatchBody(gameId, 'live', targetAt, delta)),
+        authToken: token
+      });
+      try {
+        await writeLedger(n);
+      } catch (ledgerErr) {
+        console.warn('room play ledger write failed:', ledgerErr);
       }
       return true;
     } catch (e) {
@@ -566,12 +584,13 @@
       hostUid: uid,
       gameId: gid
     }), cachedHostToken);
-    recordLivePlayCountKeepalive(normalized, Object.assign({}, usageHint, {
-      createdAt,
-      gameId: gid
-    }), cachedHostToken);
+    
+    // We no longer call recordLivePlayCountKeepalive here because it cannot safely
+    // read the roomPlays ledger synchronously. Instead, we mark the room as closed
+    // (hostSeenAt = 0) and let the Admin Sync process the final play count delta
+    // and delete the room.
     writeMetaKeepalive(normalized, createdAt, 0, uid, cachedHostToken, gid);
-    deleteRoomKeepalive(normalized, cachedHostToken);
+    
     try {
       if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
         window.opener.postMessage({ type: 'halomath-live-ended', code: normalized, gameId: gid }, '*');
@@ -588,12 +607,13 @@
     }
   }
 
-  async function deleteRoom(code, gameId) {
+  async function deleteRoom(code, gameId, hint) {
+    hint = hint && typeof hint === 'object' ? hint : {};
     const user = await ensureHostAuth();
     const token = await user.getIdToken();
     try {
-      await tryRecordSessionUsage(code, { gameId });
-      await tryRecordLivePlayCount(code, { gameId });
+      await tryRecordSessionUsage(code, Object.assign({ gameId }, hint));
+      await tryRecordLivePlayCount(code, Object.assign({ gameId }, hint));
     } catch (e) {
       console.warn('session usage record failed:', e);
     }

@@ -615,7 +615,7 @@ document.getElementById('btn-end-session').addEventListener('click', async (even
   if (btn) btn.disabled = true;
   closeAllQrWindows();
   returnToLobby();
-  HalomathLive.deleteRoom(code, liveGameId()).catch((err) => console.warn('live room delete failed:', err));
+  HalomathLive.deleteRoom(code, liveGameId(), { playerCount: lastLiveList.length }).catch((err) => console.warn('live room delete failed:', err));
 });
 
 document.getElementById('btn-save-ranks').addEventListener('click', () => {
