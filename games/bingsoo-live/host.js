@@ -462,16 +462,15 @@ function maybeRecordQualifiedUsage() {
   if (sessionUsageRecorded || !currentRoomCode || !window.HalomathLive) return;
   const minPlayers = HalomathLive.MIN_QUALIFIED_PLAYERS || 3;
   if (lastLiveList.length < minPlayers) return;
-  sessionUsageRecorded = true;
   HalomathLive.tryRecordSessionUsage(currentRoomCode, {
     playerCount: lastLiveList.length,
     gameId: liveGameId(),
     createdAt: hostCreatedAt
   }).then((ok) => {
-    if (ok === false) sessionUsageRecorded = false;
+    if (ok === true) sessionUsageRecorded = true;
+    else console.warn('session usage not recorded yet for', currentRoomCode, 'players=', lastLiveList.length);
   }).catch((err) => {
     console.warn('early session usage record failed:', err);
-    sessionUsageRecorded = false;
   });
 }
 

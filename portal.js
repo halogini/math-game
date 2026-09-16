@@ -840,6 +840,51 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${String(code || '').toUpperCase()}_${ca}`.replace(/[.#$\[\]/]/g, '_');
   }
 
+  async function previewRoomSync(room, code, idToken, signal) {
+    const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
+    const playerCount = collectLivePlayerCount(room && room.players);
+    const createdAt = Number(meta.createdAt) || 0;
+    const preview = { playerCount, sessionNew: false, playDelta: 0 };
+
+    if (playerCount < MIN_QUALIFIED_PLAYERS || !createdAt) return preview;
+
+    const dedupKey = usageDedupKey(code, createdAt);
+    try {
+      const isDeduped = await adminAuthFetch(`sessionUsage/dedup/${dedupKey}`, { method: 'GET' }, idToken, signal);
+      preview.sessionNew = !isDeduped;
+    } catch (e) {
+      preview.sessionNew = false;
+    }
+
+    const stats = window.HalomathPlayStats;
+    if (!stats || typeof stats.roomPlayLedgerKey !== 'function') return preview;
+    const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
+    const ledgerKey = stats.roomPlayLedgerKey(code, createdAt);
+    let prev = 0;
+    try {
+      const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
+      prev = Number(prevRaw);
+      if (!Number.isFinite(prev) || prev < 0) prev = 0;
+    } catch (e) {
+      prev = 0;
+    }
+    if (n > prev) preview.playDelta = n - prev;
+    return preview;
+  }
+
+  function formatRoomSyncDetail(code, preview) {
+    const parts = [`${code}(${preview.playerCount}명)`];
+    if (preview.sessionNew) parts.push('세션+1');
+    if (preview.playDelta > 0) parts.push(`플레이+${preview.playDelta}`);
+    if (!preview.sessionNew && preview.playDelta <= 0 && preview.playerCount >= MIN_QUALIFIED_PLAYERS) {
+      parts.push('이미 반영됨');
+    }
+    if (preview.playerCount > 0 && preview.playerCount < MIN_QUALIFIED_PLAYERS) {
+      parts.push('인원 부족');
+    }
+    return parts.join(', ');
+  }
+
   async function adminAuthFetch(path, options, idToken, signal) {
     const dbUrl = (firebaseConfig && firebaseConfig.databaseURL) || 'https://math-game-halogini-default-rtdb.firebaseio.com';
     const clean = String(path || '').replace(/^\//, '');
@@ -985,16 +1030,21 @@ document.addEventListener('DOMContentLoaded', () => {
       let activeRooms = [];
       let expiredRoomsDetails = [];
       let activeRoomsDetails = [];
+      let previewSessionNew = 0;
+      let previewPlayDelta = 0;
       
-      codes.forEach(code => {
+      for (let i = 0; i < codes.length; i += 1) {
+        const code = codes[i];
         const room = rooms[code];
         const meta = room && room.meta ? room.meta : {};
         const createdAt = Number(meta.createdAt) || 0;
         const isClosed = meta.hostSeenAt === 0;
         const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
-        
-        const playerCount = collectLivePlayerCount(room && room.players);
-        const detailStr = `${code}(${playerCount}명)`;
+        const preview = await previewRoomSync(room, code, idToken, controller.signal);
+        const detailStr = formatRoomSyncDetail(code, preview);
+
+        if (preview.sessionNew) previewSessionNew += 1;
+        previewPlayDelta += preview.playDelta;
         
         if (isExpiredRoom || isClosed) {
           expiredRooms.push(code);
@@ -1003,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
           activeRooms.push(code);
           activeRoomsDetails.push(detailStr);
         }
-      });
+      }
 
       // 2. dedup 찌꺼기 데이터 가져오기
       setPurgeStatus('오래된 찌꺼기 데이터(dedup)를 분석하는 중…', true);
@@ -1033,6 +1083,9 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const confirmMsg = `[분석 완료]\n\n` +
+        `📊 통계 반영 예정:\n` +
+        `- 세션 신규: ${previewSessionNew}개\n` +
+        `- 플레이 추가: ${previewPlayDelta}명\n\n` +
         `🗑️ 삭제 예정 대상:\n` +
         `- 종료/만료된 방 (${expiredRooms.length}개): ${formatRoomList(expiredRoomsDetails)}\n` +
         `- 2일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +

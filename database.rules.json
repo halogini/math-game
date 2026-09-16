@@ -49,7 +49,7 @@
     "sessionUsage": {
       ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
       "dedup": {
-        ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
+        ".read": "auth != null",
         "$key": {
           ".write": "auth != null && (!data.exists() || (!newData.exists() && auth.token.email != null && auth.token.email.length > 0))",
           ".validate": "!newData.exists() || (newData.isBoolean() && newData.val() === true)"
@@ -78,7 +78,7 @@
         }
       },
       "roomPlays": {
-        ".read": "auth != null && auth.token.email != null && auth.token.email.length > 0",
+        ".read": "auth != null",
         "$key": {
           ".write": "auth != null",
           ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 200 && (!data.exists() || newData.val() >= data.val())"

@@ -312,9 +312,9 @@
     
     try {
       const isDeduped = await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, { authToken: token });
-      if (isDeduped) return false;
+      if (isDeduped) return true;
     } catch (e) {
-      // ignore
+      // Read may be denied on older rules; fall through to PATCH attempt.
     }
 
     const patchBody = Object.assign({
@@ -327,13 +327,19 @@
         body: JSON.stringify(patchBody),
         authToken: token
       });
+      return true;
     } catch (e) {
-      // Write-once dedup: already recorded for this room+createdAt.
-      if (e && e.code === 'PERMISSION_DENIED') return true;
+      if (e && e.code === 'PERMISSION_DENIED') {
+        try {
+          const already = await fetchRest(`sessionUsage/dedup/${dedupKey}.json`, { authToken: token });
+          if (already) return true;
+        } catch (readErr) {
+          // ignore
+        }
+      }
       console.warn('session usage increment failed:', e);
       return false;
     }
-    return true;
   }
 
   async function tryRecordLivePlayCount(code, hint) {
