@@ -955,66 +955,145 @@ document.addEventListener('DOMContentLoaded', () => {
       setPurgeStatus('이메일 관리자 로그인이 필요합니다.', true);
       return;
     }
-    if (!window.confirm('3명 이상 참여한 수업 세션을 통계에 반영하고, 만료되거나 종료된 세션 방을 정리할까요?')) {
+    
+    // 1단계: 분석 전 확인
+    if (!window.confirm('세션 동기화 및 정리를 위해 현재 데이터를 분석합니다.\n(이 단계에서는 아무것도 삭제되지 않습니다.)\n\n진행하시겠습니까?')) {
       return;
     }
+    
     purgeExpiredRunning = true;
     if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
-    setPurgeStatus('만료 세션을 확인하는 중…', true);
+    setPurgeStatus('정리 대상을 분석하는 중…', true);
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
     try {
       const idToken = await adminUser.getIdToken(true);
-      const rooms = await adminAuthFetch('liveRooms', { method: 'GET' }, idToken, controller.signal);
-      if (!rooms || typeof rooms !== 'object') {
-        setPurgeStatus('만료된 세션이 없습니다.', true);
-        return;
-      }
+      
+      // 1. liveRooms 데이터 가져오기
+      const rooms = await adminAuthFetch('liveRooms', { method: 'GET' }, idToken, controller.signal) || {};
       const now = Date.now();
       const codes = Object.keys(rooms);
-      let expired = 0;
-      let deleted = 0;
-      let counted = 0;
-      let playCounted = 0;
-      let failed = 0;
-      for (let i = 0; i < codes.length; i += 1) {
-        const code = codes[i];
+      
+      let expiredRooms = [];
+      let activeRooms = [];
+      
+      codes.forEach(code => {
         const room = rooms[code];
         const meta = room && room.meta ? room.meta : {};
         const createdAt = Number(meta.createdAt) || 0;
         const isClosed = meta.hostSeenAt === 0;
         const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
+        
+        if (isExpiredRoom || isClosed) {
+          expiredRooms.push(code);
+        } else {
+          activeRooms.push(code);
+        }
+      });
 
-        // 3명 이상 참여한 세션은 24시간 경과 여부와 무관하게 통계에 반영 (중복 dedup 안전 처리됨)
+      // 2. dedup 찌꺼기 데이터 가져오기
+      setPurgeStatus('오래된 찌꺼기 데이터(dedup)를 분석하는 중…', true);
+      const dedupData = await adminAuthFetch('sessionUsage/dedup', { method: 'GET' }, idToken, controller.signal) || {};
+      const dedupKeys = Object.keys(dedupData);
+      
+      let oldDedupKeys = [];
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      
+      dedupKeys.forEach(key => {
+        const match = key.match(/_(\d{13})$/);
+        if (match) {
+          const ts = Number(match[1]);
+          if (now - ts > THIRTY_DAYS_MS) {
+            oldDedupKeys.push(key);
+          }
+        }
+      });
+
+      clearTimeout(timeoutId); // 사용자 응답 대기를 위해 타임아웃 해제
+
+      // 2단계: 최종 확인
+      const confirmMsg = `[분석 완료]\n\n` +
+        `🗑️ 삭제 예정 대상:\n` +
+        `- 종료되거나 24시간이 지난 방: ${expiredRooms.length}개\n` +
+        `- 30일이 지난 중복 방지(dedup) 찌꺼기 데이터: ${oldDedupKeys.length}개\n\n` +
+        `✅ 유지 대상:\n` +
+        `- 현재 진행 중인 방: ${activeRooms.length}개\n\n` +
+        `이대로 삭제 및 통계 동기화를 진행하시겠습니까? (최종 확인)`;
+
+      if (!window.confirm(confirmMsg)) {
+        setPurgeStatus('정리가 취소되었습니다.', true);
+        purgeExpiredRunning = false;
+        if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = false;
+        return;
+      }
+
+      // 실제 삭제 및 동기화 진행
+      setPurgeStatus('세션 동기화 및 삭제를 진행 중입니다…', true);
+      const execController = new AbortController();
+      const execTimeoutId = setTimeout(() => execController.abort(), 120000);
+
+      let deletedRoomsCount = 0;
+      let counted = 0;
+      let playCounted = 0;
+      let failed = 0;
+
+      for (let i = 0; i < codes.length; i += 1) {
+        const code = codes[i];
+        const room = rooms[code];
+        
         try {
-          const recorded = await adminRecordSessionUsage(room, code, idToken, controller.signal);
+          const recorded = await adminRecordSessionUsage(room, code, idToken, execController.signal);
           if (recorded) counted += 1;
         } catch (e) {
           console.warn('session usage record failed:', code, e);
         }
         try {
-          playCounted += await adminRecordLivePlayCount(room, code, idToken, controller.signal);
+          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal);
         } catch (e) {
           console.warn('live play stats record failed:', code, e);
         }
 
-        // 삭제는 24시간이 지났거나 호스트가 이미 종료한 방만 정리
-        if (isExpiredRoom || isClosed) {
-          expired += 1;
-          setPurgeStatus(`세션 정리 중… ${deleted + failed + 1}/${codes.length} 확인`, true);
+        if (expiredRooms.includes(code)) {
+          setPurgeStatus(`세션 정리 중… 방 삭제 ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
           try {
-            await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, controller.signal);
-            deleted += 1;
+            await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
+            deletedRoomsCount += 1;
           } catch (e) {
             console.warn('purge room failed:', code, e);
             failed += 1;
           }
         }
       }
+
+      let deletedDedupCount = 0;
+      if (oldDedupKeys.length > 0) {
+        setPurgeStatus(`오래된 찌꺼기 데이터 삭제 중… (0/${oldDedupKeys.length})`, true);
+        const dedupPatch = {};
+        oldDedupKeys.forEach(k => {
+          dedupPatch[k] = null; // null 값을 보내면 Firebase에서 해당 키가 삭제됨
+        });
+        
+        try {
+          await adminAuthFetch('sessionUsage/dedup', {
+            method: 'PATCH',
+            body: JSON.stringify(dedupPatch)
+          }, idToken, execController.signal);
+          deletedDedupCount = oldDedupKeys.length;
+        } catch (e) {
+          console.warn('purge dedup failed:', e);
+        }
+      }
+
+      clearTimeout(execTimeoutId);
+
       const playNote = playCounted > 0
         ? `플레이 +${playCounted}명 반영`
-        : (codes.length ? '플레이 변화 없음(이미 반영됨 또는 인원 0)' : '');
-      setPurgeStatus(`정리 완료: 세션 신규 ${counted}개 · ${playNote} · 방 삭제 ${deleted}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+        : (codes.length ? '플레이 변화 없음' : '');
+      
+      setPurgeStatus(`정리 완료: 세션 신규 ${counted}개 · ${playNote} · 방 삭제 ${deletedRoomsCount}개 · 찌꺼기 삭제 ${deletedDedupCount}개${failed ? ` · 실패 ${failed}개` : ''}`, true);
+      
       sessionUsageLoadingFlag = false;
       playStatsLoadingFlag = false;
       await loadSessionUsageStats();
@@ -1028,7 +1107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setPurgeStatus('만료 세션 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.', true);
       }
     } finally {
-      clearTimeout(timeoutId);
       purgeExpiredRunning = false;
       if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = false;
     }
