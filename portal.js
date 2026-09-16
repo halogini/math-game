@@ -873,6 +873,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${String(code || '').toUpperCase()}_${ca}`.replace(/[.#$\[\]/]/g, '_');
   }
 
+  function roomPlayLedgerKey(code, createdAt) {
+    const stats = window.HalomathPlayStats;
+    if (stats && typeof stats.roomPlayLedgerKey === 'function') {
+      return stats.roomPlayLedgerKey(code, createdAt);
+    }
+    const room = String(code || '').toUpperCase().replace(/[.#$\[\]/]/g, '_');
+    const ca = Number(createdAt) || 0;
+    return `${room}_${ca}`.replace(/[.#$\[\]/]/g, '_').slice(0, 200);
+  }
+
   function qualifiedCount(raw) {
     const n = Number(raw && raw.qualified);
     return Number.isFinite(n) && n > 0 ? n : 0;
@@ -887,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function previewRoomSync(room, code, idToken, signal) {
+  async function previewRoomSync(room, code, idToken, signal, roomPlaysMap) {
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
     const createdAt = Number(meta.createdAt) || 0;
@@ -900,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionUnknown: false,
       playLedger: 0,
       playDelta: 0,
-      resetLedger: false
+      ledgerKey: ''
     };
 
     if (playerCount < MIN_QUALIFIED_PLAYERS) return preview;
@@ -917,38 +927,131 @@ document.addEventListener('DOMContentLoaded', () => {
       preview.sessionUnknown = true;
     }
 
-    const stats = window.HalomathPlayStats;
-    if (!stats || typeof stats.roomPlayLedgerKey !== 'function') return preview;
     const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
-    const ledgerKey = stats.roomPlayLedgerKey(code, createdAt);
+    const ledgerKey = roomPlayLedgerKey(code, createdAt);
+    preview.ledgerKey = ledgerKey;
     let prev = 0;
-    try {
-      const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
-      prev = Number(prevRaw);
-      if (!Number.isFinite(prev) || prev < 0) prev = 0;
-    } catch (e) {
-      prev = 0;
+    if (roomPlaysMap && Object.prototype.hasOwnProperty.call(roomPlaysMap, ledgerKey)) {
+      prev = Number(roomPlaysMap[ledgerKey]);
+    } else {
+      try {
+        const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
+        prev = Number(prevRaw);
+      } catch (e) {
+        prev = 0;
+      }
     }
+    if (!Number.isFinite(prev) || prev < 0) prev = 0;
     preview.playLedger = prev;
     if (n > prev) preview.playDelta = n - prev;
     return preview;
   }
 
+  function dayKeyToApproxMs(dayKey) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dayKey || ''));
+    if (!m) return Date.now();
+    // KST noon → UTC ms
+    return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 3, 0, 0);
+  }
+
+  function buildDayLedgerRepairPlan(roomPreviews, liveByDay) {
+    const byDay = {};
+    Object.keys(roomPreviews || {}).forEach((code) => {
+      const preview = roomPreviews[code];
+      if (!preview || !preview.day || preview.playerCount < MIN_QUALIFIED_PLAYERS) return;
+      if (!byDay[preview.day]) {
+        byDay[preview.day] = {
+          ledgerSum: 0,
+          afterDeltaLedgerSum: 0,
+          playDeltaSum: 0,
+          headSum: 0,
+          codes: []
+        };
+      }
+      const row = byDay[preview.day];
+      const ledger = preview.playLedger || 0;
+      const delta = preview.playDelta || 0;
+      const head = Math.max(0, Math.min(200, Math.floor(preview.playerCount || 0)));
+      row.ledgerSum += ledger;
+      row.afterDeltaLedgerSum += ledger + delta;
+      row.playDeltaSum += delta;
+      row.headSum += head;
+      row.codes.push(code);
+    });
+
+    const repairs = [];
+    let repairTotal = 0;
+    let suppressedRoomDelta = 0;
+    Object.keys(byDay).sort().forEach((day) => {
+      const row = byDay[day];
+      const liveStat = Number(liveByDay[day]) || 0;
+      // 메모가 비어 있으면 방별 n−0을 넣으면 기존 통계와 겹칠 수 있음 → 인원 합 기준으로만 모자란 분 보정
+      if (row.ledgerSum <= 0 && row.headSum > 0) {
+        const repair = Math.max(0, row.headSum - liveStat);
+        row.codes.forEach((code) => {
+          const preview = roomPreviews[code];
+          if (!preview) return;
+          suppressedRoomDelta += preview.playDelta || 0;
+          preview.playDelta = 0;
+          preview.headcountRepairOnly = true;
+        });
+        if (repair > 0) {
+          repairs.push({
+            day,
+            repair,
+            liveStat,
+            ledgerSum: 0,
+            afterDeltaLedgerSum: row.headSum,
+            mode: 'headcount'
+          });
+          repairTotal += repair;
+        }
+        return;
+      }
+
+      const expectedLiveAfterRoomDeltas = liveStat + row.playDeltaSum;
+      const repair = Math.max(0, row.afterDeltaLedgerSum - expectedLiveAfterRoomDeltas);
+      if (repair > 0) {
+        repairs.push({
+          day,
+          repair,
+          liveStat,
+          ledgerSum: row.ledgerSum,
+          afterDeltaLedgerSum: row.afterDeltaLedgerSum,
+          mode: 'ledger'
+        });
+        repairTotal += repair;
+      }
+    });
+    return { repairs, repairTotal, suppressedRoomDelta };
+  }
+
   function formatRoomSyncDetail(code, preview) {
     const n = preview.playerCount;
     if (n > 0 && n < MIN_QUALIFIED_PLAYERS) {
-      return `${code} ${n}명 — 3명 미만이라 통계에 넣지 않음`;
+      return `${code} · ${n}명 · 3명 미만 → 통계에 안 넣음`;
     }
     if (!preview.createdAt) {
-      return `${code} ${n}명 — 방 정보가 불완전함`;
+      return `${code} · ${n}명 · 방 정보 부족 → 건너뜀`;
     }
     const sessionBit = preview.sessionNew
-      ? '수업 횟수에 새로 넣음'
-      : (preview.sessionUnknown ? '수업 횟수는 확인 못 함' : '수업 횟수는 이미 들어 있음');
-    const playBit = (preview.resetLedger || preview.playDelta > 0)
-      ? `참가 인원 +${preview.playDelta}명`
-      : '참가 인원은 이미 들어 있음';
-    return `${code} ${n}명 — ${sessionBit}, ${playBit}`;
+      ? '수업 횟수 +1'
+      : (preview.sessionUnknown ? '수업 횟수 확인 못 함' : '수업 횟수 이미 반영');
+    let playBit;
+    if (preview.headcountRepairOnly) {
+      playBit = preview.playLedger > 0
+        ? `참가 인원 메모 ${preview.playLedger}명 · 방별 추가 없음(날짜 맞춤으로 처리)`
+        : '참가 인원 메모 없음 · 방별 추가 없음(날짜 맞춤으로 처리)';
+    } else if (preview.playDelta > 0) {
+      playBit = preview.playLedger > 0
+        ? `참가 인원 메모 ${preview.playLedger}명 → 지금 ${n}명이라 +${preview.playDelta}`
+        : `참가 인원 +${preview.playDelta}`;
+    } else if (preview.playLedger > 0) {
+      playBit = `참가 인원 메모 ${preview.playLedger}명 · 추가 없음`;
+    } else {
+      playBit = '참가 인원 메모 없음 · 방별 추가 없음';
+    }
+    return `${code} · ${n}명 · ${sessionBit} · ${playBit}`;
   }
 
   async function adminAuthFetch(path, options, idToken, signal) {
@@ -980,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function adminRecordLivePlayCount(room, code, idToken, signal, options) {
+  async function adminRecordLivePlayCount(room, code, idToken, signal) {
     const stats = window.HalomathPlayStats;
     if (!stats || typeof stats.buildLivePlayPatchBody !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') {
       throw new Error('PLAY_STATS_MODULE_MISSING');
@@ -1001,14 +1104,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!Number.isFinite(prev) || prev < 0) prev = 0;
     } catch (e) {
       prev = 0;
-    }
-    if (options && options.resetLedger && prev > 0) {
-      // 원장만 높고 통계는 비어 있는 경우: 규칙 변경 없이 현재 인원만 더한다.
-      await adminAuthFetch('sessionUsage', {
-        method: 'PATCH',
-        body: JSON.stringify(stats.buildIncrementPatchBody(gameId, 'live', targetAt, n))
-      }, idToken, signal);
-      return n;
     }
     const patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
     if (!patchBody) return 0;
@@ -1064,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     purgeExpiredRunning = true;
     if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
     hidePurgeConfirm();
-    setPurgeStatus('지금 방과 통계를 비교하는 중…', true);
+    setPurgeStatus('지금 방 상태를 확인하는 중…', true);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -1084,8 +1179,15 @@ document.addEventListener('DOMContentLoaded', () => {
       let previewSessionNew = 0;
       let previewPlayDelta = 0;
       const roomPreviews = {};
-      const dayRoomSum = {};
       let qualifiedRoomSum = 0;
+      let ledgerSum = 0;
+
+      let roomPlaysMap = {};
+      try {
+        roomPlaysMap = await adminAuthFetch('sessionUsage/roomPlays', { method: 'GET' }, idToken, controller.signal) || {};
+      } catch (e) {
+        roomPlaysMap = {};
+      }
       
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
@@ -1094,11 +1196,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const createdAt = Number(meta.createdAt) || 0;
         const isClosed = meta.hostSeenAt === 0;
         const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
-        const preview = await previewRoomSync(room, code, idToken, controller.signal);
+        const preview = await previewRoomSync(room, code, idToken, controller.signal, roomPlaysMap);
         roomPreviews[code] = preview;
         if (preview.playerCount >= MIN_QUALIFIED_PLAYERS) {
           qualifiedRoomSum += preview.playerCount;
-          if (preview.day) dayRoomSum[preview.day] = (dayRoomSum[preview.day] || 0) + preview.playerCount;
+          ledgerSum += preview.playLedger || 0;
         }
         
         if (isExpiredRoom || isClosed) {
@@ -1112,32 +1214,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const yesterdayKey = usageDayKeyKst(now - 24 * 60 * 60 * 1000);
       const liveToday = await readLivePlayDay(todayKey, idToken, controller.signal);
       const liveYesterday = await readLivePlayDay(yesterdayKey, idToken, controller.signal);
+
       const liveByDay = {};
-      const dayKeys = Object.keys(dayRoomSum);
-      if (dayKeys.indexOf(todayKey) < 0) dayKeys.push(todayKey);
-      if (dayKeys.indexOf(yesterdayKey) < 0) dayKeys.push(yesterdayKey);
       liveByDay[todayKey] = liveToday;
       liveByDay[yesterdayKey] = liveYesterday;
+      const daysNeeded = {};
+      codes.forEach((code) => {
+        const day = roomPreviews[code] && roomPreviews[code].day;
+        if (day) daysNeeded[day] = true;
+      });
+      const dayKeys = Object.keys(daysNeeded);
       for (let i = 0; i < dayKeys.length; i += 1) {
         const day = dayKeys[i];
-        if (liveByDay[day] == null) liveByDay[day] = await readLivePlayDay(day, idToken, controller.signal);
+        if (liveByDay[day] == null) {
+          liveByDay[day] = await readLivePlayDay(day, idToken, controller.signal);
+        }
       }
 
-      codes.forEach((code) => {
-        const preview = roomPreviews[code];
-        if (!preview || preview.playerCount < MIN_QUALIFIED_PLAYERS || !preview.day) return;
-        const dayLive = liveByDay[preview.day] || 0;
-        const dayRooms = dayRoomSum[preview.day] || 0;
-        if (dayRooms > dayLive && preview.playDelta <= 0) {
-          preview.resetLedger = true;
-          preview.playDelta = preview.playerCount;
-        }
-      });
+      // 방 상세 문구 전에 맞춤 계획을 세워, 메모 없음 날의 방별 n−0 추가를 막는다
+      const dayRepairPlan = buildDayLedgerRepairPlan(roomPreviews, liveByDay);
+      const previewPlayRepair = dayRepairPlan.repairTotal || 0;
 
-      previewSessionNew = 0;
-      previewPlayDelta = 0;
-      expiredRoomsDetails = [];
-      activeRoomsDetails = [];
       const expiredSet = {};
       expiredRooms.forEach((code) => { expiredSet[code] = true; });
       codes.forEach((code) => {
@@ -1149,7 +1246,14 @@ document.addEventListener('DOMContentLoaded', () => {
         else activeRoomsDetails.push(detailStr);
       });
 
-      // 2. dedup 찌꺼기 데이터 가져오기
+      const repairDayLines = (dayRepairPlan.repairs || []).map((r) => {
+        if (r.mode === 'headcount') {
+          return `${r.day}: 통계 ${r.liveStat}명 · 지금 방 인원 합 ${r.afterDeltaLedgerSum}명 → 모자란 ${r.repair}명 맞춤(메모 없음)`;
+        }
+        return `${r.day}: 통계 ${r.liveStat}명 · 메모 합(방별 반영 후) ${r.afterDeltaLedgerSum}명 → +${r.repair}`;
+      });
+
+      // 2. 오래된 중복 방지 메모 정리 대상
       setPurgeStatus('오래된 내부 기록을 확인하는 중…', true);
       const dedupData = await adminAuthFetch('sessionUsage/dedup', { method: 'GET' }, idToken, controller.signal) || {};
       const dedupKeys = Object.keys(dedupData);
@@ -1170,7 +1274,6 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(timeoutId); // 사용자 응답 대기를 위해 타임아웃 해제
 
       // 2단계: 최종 확인
-      const statsGap = qualifiedRoomSum > liveToday + liveYesterday;
       const roomItems = (list) => {
         if (!list.length) return '<p class="purge-confirm-note">없음</p>';
         const shown = list.slice(0, 12);
@@ -1178,29 +1281,41 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<ul>${shown.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}${extra}</ul>`;
       };
 
+      const repairListHtml = previewPlayRepair > 0
+        ? `<ul>${repairDayLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
+           <p class="purge-confirm-note">메모가 있으면 메모 기준으로, 메모가 비어 있으면 지금 방 인원 합 기준으로, 통계보다 모자란 차이만 더합니다. 통계가 더 많아도 줄이지 않습니다.</p>`
+        : '<p class="purge-confirm-note">맞출 모자란 인원이 없습니다. 이 항목은 추가하지 않습니다.</p>';
+
+      const ledgerWarn = (ledgerSum <= 0 && qualifiedRoomSum > 0)
+        ? `<p class="purge-confirm-note">참가 인원 메모가 비어 있습니다. 방별로 전부 다시 넣지 않고, 위 맞춤 숫자만 반영한 뒤 메모를 지금 인원으로 적어 둡니다.</p>`
+        : '';
+
       const confirmHtml = `
         <p>취소를 누르면 아무 것도 바뀌지 않습니다.</p>
-        <h4>통계에 넣을 것</h4>
+        <h4>이번에 통계에 넣을 것</h4>
         <ul>
           <li>수업 횟수: <strong>${previewSessionNew}번</strong> 추가</li>
-          <li>참가 인원: <strong>${previewPlayDelta}명</strong> 추가</li>
+          <li>수업 참가 인원(방별): <strong>${previewPlayDelta}명</strong> 추가<br>
+            <span class="purge-confirm-note">각 방 메모와 지금 방 인원을 비교한 차이만 더합니다. 개별 플레이 통계는 건드리지 않습니다.</span>
+          </li>
+          <li>수업 참가 인원(메모·통계 맞춤): <strong>${previewPlayRepair}명</strong> 추가</li>
         </ul>
-        <h4>지금 숫자 비교</h4>
+        ${repairListHtml}
+        ${ledgerWarn}
+        <h4>참고 숫자</h4>
         <ul>
-          <li>오늘 통계의 수업 참가 인원: ${liveToday}명</li>
-          <li>어제 통계의 수업 참가 인원: ${liveYesterday}명</li>
-          <li>지금 방 안에 실제로 있는 사람(3명 이상인 방): ${qualifiedRoomSum}명</li>
+          <li>오늘 수업 참가 인원 통계: ${liveToday}명</li>
+          <li>어제 수업 참가 인원 통계: ${liveYesterday}명</li>
+          <li>지금 3명 이상인 방의 인원 합: ${qualifiedRoomSum}명</li>
+          <li>그 방들에 대해 메모에 적힌 인원 합: ${ledgerSum}명</li>
         </ul>
-        <p class="purge-confirm-note">${statsGap
-          ? '통계가 실제 인원보다 적습니다. 진행을 누르면 부족한 인원을 통계에 넣습니다.'
-          : '통계와 실제 인원이 크게 어긋나 보이지 않습니다.'}</p>
         <h4>지울 것</h4>
         <ul>
-          <li>이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만. 수업 중인 방은 안 지움)</li>
-          <li>이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (화면에 보이는 통계 숫자는 그대로)</li>
+          <li>이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만)</li>
+          <li>이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (통계 숫자는 그대로)</li>
         </ul>
         ${expiredRooms.length ? `<h4>끝난 방</h4>${roomItems(expiredRoomsDetails)}` : ''}
-        <h4>그대로 둘 방 — 수업 진행 중</h4>
+        <h4>수업 진행 중이라 방은 남김</h4>
         ${roomItems(activeRoomsDetails)}
       `;
 
@@ -1220,12 +1335,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let deletedRoomsCount = 0;
       let counted = 0;
       let playCounted = 0;
+      let playRepaired = 0;
       let playFailed = 0;
       let failed = 0;
 
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
         const room = rooms[code];
+        const preview = roomPreviews[code];
         
         try {
           const recorded = await adminRecordSessionUsage(room, code, idToken, execController.signal);
@@ -1233,24 +1350,77 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
           console.warn('session usage record failed:', code, e);
         }
+        // 메모 없음(날짜 맞춤) 방은 방별 n−0 추가를 하지 않음
+        if (preview && preview.headcountRepairOnly) continue;
         try {
-          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal, {
-            resetLedger: !!(roomPreviews[code] && roomPreviews[code].resetLedger)
-          });
+          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal);
         } catch (e) {
           playFailed += 1;
           console.warn('live play stats record failed:', code, e);
         }
+      }
 
-        if (expiredRooms.includes(code)) {
-          setPurgeStatus(`끝난 방을 지우는 중… ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
+      // 방별 차이 반영 후, 메모/인원 합이 그날 통계보다 크면 모자란 분만 다시 넣음
+      if (previewPlayRepair > 0) {
+        const stats = window.HalomathPlayStats;
+        setPurgeStatus('메모와 통계가 어긋난 분을 맞추는 중…', true);
+        for (let i = 0; i < dayRepairPlan.repairs.length; i += 1) {
+          const row = dayRepairPlan.repairs[i];
           try {
-            await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
-            deletedRoomsCount += 1;
+            let body = null;
+            if (stats && typeof stats.buildLiveDayRepairPatchBody === 'function') {
+              body = stats.buildLiveDayRepairPatchBody(dayKeyToApproxMs(row.day), row.repair);
+            }
+            if (!body) {
+              const inc = { '.sv': { increment: Math.max(1, Math.min(5000, Math.floor(row.repair))) } };
+              const day = row.day;
+              body = {
+                [`byGame/play_total/qualified`]: inc,
+                [`byGame/play_day_${day}/qualified`]: inc,
+                [`byGame/play_ch_live/qualified`]: inc,
+                [`byGame/play_dch_${day}_live/qualified`]: inc
+              };
+            }
+            await adminAuthFetch('sessionUsage', {
+              method: 'PATCH',
+              body: JSON.stringify(body)
+            }, idToken, execController.signal);
+            playRepaired += row.repair;
           } catch (e) {
-            console.warn('purge room failed:', code, e);
-            failed += 1;
+            playFailed += 1;
+            console.warn('live day repair failed:', row.day, e);
           }
+        }
+      }
+
+      // 메모가 비어 있던 방은 통계만 맞춘 뒤, 지금 인원으로 메모만 적어 둔다(숫자 추가 없음)
+      const ledgerOnlyPatch = {};
+      codes.forEach((code) => {
+        const preview = roomPreviews[code];
+        if (!preview || !preview.headcountRepairOnly || !preview.ledgerKey) return;
+        const n = Math.max(1, Math.min(200, Math.floor(preview.playerCount || 0)));
+        if (n >= MIN_QUALIFIED_PLAYERS) ledgerOnlyPatch[`roomPlays/${preview.ledgerKey}`] = n;
+      });
+      if (Object.keys(ledgerOnlyPatch).length) {
+        try {
+          await adminAuthFetch('sessionUsage', {
+            method: 'PATCH',
+            body: JSON.stringify(ledgerOnlyPatch)
+          }, idToken, execController.signal);
+        } catch (e) {
+          console.warn('room play ledger backfill failed:', e);
+        }
+      }
+
+      for (let i = 0; i < expiredRooms.length; i += 1) {
+        const code = expiredRooms[i];
+        setPurgeStatus(`끝난 방을 지우는 중… ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
+        try {
+          await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
+          deletedRoomsCount += 1;
+        } catch (e) {
+          console.warn('purge room failed:', code, e);
+          failed += 1;
         }
       }
 
@@ -1275,8 +1445,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       clearTimeout(execTimeoutId);
 
-      const playNote = playCounted > 0
-        ? `참가 인원 ${playCounted}명 추가`
+      const playParts = [];
+      if (playCounted > 0) playParts.push(`방별 ${playCounted}명`);
+      if (playRepaired > 0) playParts.push(`맞춤 ${playRepaired}명`);
+      const playNote = playParts.length
+        ? `참가 인원 ${playParts.join(' · ')} 추가`
         : (playFailed > 0
           ? `참가 인원 반영 실패 ${playFailed}건`
           : '참가 인원 변화 없음');

@@ -87,6 +87,20 @@
     return body;
   }
 
+  /** 메모 합이 그날 수업 참가 통계보다 클 때, 차이만 더한다(게임별 칸은 건드리지 않음). */
+  function buildLiveDayRepairPatchBody(atMs, n) {
+    const count = Math.max(1, Math.min(5000, Math.floor(Number(n) || 0)));
+    if (!count) return null;
+    const inc = { '.sv': { increment: count } };
+    const day = usageDayKey(atMs);
+    return {
+      [`byGame/${playTotalKey()}/qualified`]: inc,
+      [`byGame/${playDayKey(day)}/qualified`]: inc,
+      [`byGame/${playChannelKey('live')}/qualified`]: inc,
+      [`byGame/${playDayChannelKey(day, 'live')}/qualified`]: inc
+    };
+  }
+
   function buildPatchBody(gameId, channel, atMs, n, dedupKey) {
     const body = buildIncrementPatchBody(gameId, channel, atMs, n);
     const key = String(dedupKey || '').replace(/[.#$\[\]\/]/g, '_').slice(0, 200);
@@ -215,6 +229,7 @@
     buildPatchBody,
     buildIncrementPatchBody,
     buildLivePlayPatchBody,
+    buildLiveDayRepairPatchBody,
     parsePlayStatsFromSessionUsage
   };
 })(typeof window !== 'undefined' ? window : global);
