@@ -355,6 +355,8 @@
       return false;
     }
 
+    if (playerCount < MIN_QUALIFIED_PLAYERS) return false;
+
     const n = playCountForStats(playerCount);
     if (!n) return false;
 

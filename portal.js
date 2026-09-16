@@ -875,6 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof stats.playSessionDedupKey !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') return 0;
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
     const playerCount = collectLivePlayerCount(room && room.players);
+    if (playerCount < MIN_QUALIFIED_PLAYERS) return 0;
     const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
     if (!n) return 0;
     const gameId = normalizeLiveGameId(meta.gameId);
