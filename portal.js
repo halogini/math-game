@@ -1006,13 +1006,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const dedupKeys = Object.keys(dedupData);
       
       let oldDedupKeys = [];
-      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
       
       dedupKeys.forEach(key => {
         const match = key.match(/_(\d{13})$/);
         if (match) {
           const ts = Number(match[1]);
-          if (now - ts > THIRTY_DAYS_MS) {
+          if (now - ts > TWO_DAYS_MS) {
             oldDedupKeys.push(key);
           }
         }
@@ -1030,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const confirmMsg = `[분석 완료]\n\n` +
         `🗑️ 삭제 예정 대상:\n` +
         `- 종료/만료된 방 (${expiredRooms.length}개): ${formatRoomList(expiredRoomsDetails)}\n` +
-        `- 30일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +
+        `- 2일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +
         `✅ 유지 대상:\n` +
         `- 진행 중인 방 (${activeRooms.length}개): ${formatRoomList(activeRoomsDetails)}\n\n` +
         `이대로 삭제 및 통계 동기화를 진행하시겠습니까? (최종 확인)`;
