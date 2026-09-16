@@ -978,6 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
       
       let expiredRooms = [];
       let activeRooms = [];
+      let expiredRoomsDetails = [];
+      let activeRoomsDetails = [];
       
       codes.forEach(code => {
         const room = rooms[code];
@@ -986,10 +988,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const isClosed = meta.hostSeenAt === 0;
         const isExpiredRoom = createdAt && (now - createdAt) > LIVE_ROOM_TTL_MS;
         
+        const playerCount = collectLivePlayerCount(room && room.players);
+        const detailStr = `${code}(${playerCount}명)`;
+        
         if (isExpiredRoom || isClosed) {
           expiredRooms.push(code);
+          expiredRoomsDetails.push(detailStr);
         } else {
           activeRooms.push(code);
+          activeRoomsDetails.push(detailStr);
         }
       });
 
@@ -1014,12 +1021,18 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(timeoutId); // 사용자 응답 대기를 위해 타임아웃 해제
 
       // 2단계: 최종 확인
+      const formatRoomList = (list) => {
+        if (list.length === 0) return '없음';
+        if (list.length <= 15) return list.join(', ');
+        return `${list.slice(0, 15).join(', ')} 외 ${list.length - 15}개`;
+      };
+
       const confirmMsg = `[분석 완료]\n\n` +
         `🗑️ 삭제 예정 대상:\n` +
-        `- 종료되거나 24시간이 지난 방: ${expiredRooms.length}개\n` +
-        `- 30일이 지난 중복 방지(dedup) 찌꺼기 데이터: ${oldDedupKeys.length}개\n\n` +
+        `- 종료/만료된 방 (${expiredRooms.length}개): ${formatRoomList(expiredRoomsDetails)}\n` +
+        `- 30일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +
         `✅ 유지 대상:\n` +
-        `- 현재 진행 중인 방: ${activeRooms.length}개\n\n` +
+        `- 진행 중인 방 (${activeRooms.length}개): ${formatRoomList(activeRoomsDetails)}\n\n` +
         `이대로 삭제 및 통계 동기화를 진행하시겠습니까? (최종 확인)`;
 
       if (!window.confirm(confirmMsg)) {
