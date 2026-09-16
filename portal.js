@@ -956,11 +956,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    // 1단계: 분석 전 확인
-    if (!window.confirm('세션 동기화 및 정리를 위해 현재 데이터를 분석합니다.\n(이 단계에서는 아무것도 삭제되지 않습니다.)\n\n진행하시겠습니까?')) {
-      return;
-    }
-    
     purgeExpiredRunning = true;
     if (btnPurgeExpiredRooms) btnPurgeExpiredRooms.disabled = true;
     setPurgeStatus('정리 대상을 분석하는 중…', true);
@@ -1033,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `- 2일 경과 dedup 찌꺼기: ${oldDedupKeys.length}개\n\n` +
         `✅ 유지 대상:\n` +
         `- 진행 중인 방 (${activeRooms.length}개): ${formatRoomList(activeRoomsDetails)}\n\n` +
-        `이대로 삭제 및 통계 동기화를 진행하시겠습니까? (최종 확인)`;
+        `이대로 삭제 및 통계 동기화를 진행하시겠습니까?`;
 
       if (!window.confirm(confirmMsg)) {
         setPurgeStatus('정리가 취소되었습니다.', true);
