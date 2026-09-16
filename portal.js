@@ -977,8 +977,12 @@ document.addEventListener('DOMContentLoaded', () => {
       prev = 0;
     }
     if (options && options.resetLedger && prev > 0) {
-      await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'DELETE' }, idToken, signal);
-      prev = 0;
+      // 원장만 높고 통계는 비어 있는 경우: 규칙 변경 없이 현재 인원만 더한다.
+      await adminAuthFetch('sessionUsage', {
+        method: 'PATCH',
+        body: JSON.stringify(stats.buildIncrementPatchBody(gameId, 'live', targetAt, n))
+      }, idToken, signal);
+      return n;
     }
     const patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
     if (!patchBody) return 0;
