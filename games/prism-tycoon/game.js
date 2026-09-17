@@ -7187,7 +7187,8 @@
 
     function syncFullscreenBtn() {
       if (!btnFullscreen) return;
-      const show = fullscreenSupported() && !isAppFullscreen() && !isForcedLandscape();
+      const playing = state && (state.phase === 'play' || state.phase === 'cutLesson');
+      const show = playing && fullscreenSupported() && !isAppFullscreen();
       btnFullscreen.classList.toggle('hidden', !show);
     }
 
