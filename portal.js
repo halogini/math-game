@@ -1083,29 +1083,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function adminRecordLivePlayCount(room, code, idToken, signal) {
-    const stats = window.HalomathPlayStats;
-    if (!stats || typeof stats.buildLivePlayPatchBody !== 'function' || typeof stats.roomPlayLedgerKey !== 'function') {
-      throw new Error('PLAY_STATS_MODULE_MISSING');
+  async function adminRecordLivePlayCount(room, code, idToken, signal, preview) {
+    if (preview) {
+      if (preview.headcountRepairOnly) return 0;
+      if (!(preview.playDelta > 0)) return 0;
     }
     const meta = room && room.meta && typeof room.meta === 'object' ? room.meta : {};
-    const playerCount = collectLivePlayerCount(room && room.players);
+    const playerCount = preview && preview.playerCount != null
+      ? preview.playerCount
+      : collectLivePlayerCount(room && room.players);
     if (playerCount < MIN_QUALIFIED_PLAYERS) return 0;
     const n = Math.max(0, Math.min(200, Math.floor(playerCount)));
     if (!n) return 0;
     const gameId = normalizeLiveGameId(meta.gameId);
-    const createdAt = Number(meta.createdAt) || 0;
+    const createdAt = Number(meta.createdAt) || Number(preview && preview.createdAt) || 0;
     const targetAt = createdAt > 0 ? createdAt : Date.now();
-    const ledgerKey = stats.roomPlayLedgerKey(code, createdAt);
-    let prev = 0;
-    try {
-      const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
-      prev = Number(prevRaw);
-      if (!Number.isFinite(prev) || prev < 0) prev = 0;
-    } catch (e) {
-      prev = 0;
+    const ledgerKey = (preview && preview.ledgerKey) || roomPlayLedgerKey(code, createdAt);
+    let prev = preview && preview.playLedger != null ? Number(preview.playLedger) : 0;
+    if (!Number.isFinite(prev) || prev < 0) prev = 0;
+    if (preview == null) {
+      try {
+        const prevRaw = await adminAuthFetch(`sessionUsage/roomPlays/${ledgerKey}`, { method: 'GET' }, idToken, signal);
+        prev = Number(prevRaw);
+        if (!Number.isFinite(prev) || prev < 0) prev = 0;
+      } catch (e) {
+        prev = 0;
+      }
     }
-    const patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
+    if (n <= prev) return 0;
+
+    const stats = window.HalomathPlayStats;
+    let patchBody = null;
+    if (stats && typeof stats.buildLivePlayPatchBody === 'function') {
+      patchBody = stats.buildLivePlayPatchBody(gameId, 'live', targetAt, n, ledgerKey, prev);
+    } else {
+      const delta = n - prev;
+      const inc = { '.sv': { increment: delta } };
+      const day = usageDayKeyKst(targetAt);
+      const gid = String(gameId || 'unknown').replace(/[.#$\[\]/]/g, '_').slice(0, 24) || 'unknown';
+      patchBody = {
+        [`byGame/play_total/qualified`]: inc,
+        [`byGame/play_day_${day}/qualified`]: inc,
+        [`byGame/play_game_${gid}/qualified`]: inc,
+        [`byGame/play_ch_live/qualified`]: inc,
+        [`byGame/play_dch_${day}_live/qualified`]: inc,
+        [`roomPlays/${ledgerKey}`]: n
+      };
+    }
     if (!patchBody) return 0;
     await adminAuthFetch('sessionUsage', {
       method: 'PATCH',
@@ -1311,7 +1335,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </ul>
         <h4>지울 것</h4>
         <ul>
-          <li>이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만)</li>
+          <li>이미 끝난 방: ${expiredRooms.length}개 (진행 창을 닫았거나, 만든 지 하루가 지난 방만)<br>
+            <span class="purge-confirm-note">통계 반영이 끝난 뒤에만 지웁니다. 반영에 실패하면 방은 그대로 둡니다.</span>
+          </li>
           <li>이틀이 지난 내부 기록: ${oldDedupKeys.length}개 (통계 숫자는 그대로)</li>
         </ul>
         ${expiredRooms.length ? `<h4>끝난 방</h4>${roomItems(expiredRoomsDetails)}` : ''}
@@ -1337,7 +1363,11 @@ document.addEventListener('DOMContentLoaded', () => {
       let playCounted = 0;
       let playRepaired = 0;
       let playFailed = 0;
+      let playFailDetail = '';
+      let sessionFailed = 0;
+      let ledgerBackfillFailed = false;
       let failed = 0;
+      let skippedDeleteForSync = 0;
 
       for (let i = 0; i < codes.length; i += 1) {
         const code = codes[i];
@@ -1348,14 +1378,19 @@ document.addEventListener('DOMContentLoaded', () => {
           const recorded = await adminRecordSessionUsage(room, code, idToken, execController.signal);
           if (recorded) counted += 1;
         } catch (e) {
+          sessionFailed += 1;
+          if (!playFailDetail) {
+            playFailDetail = `수업 횟수 ${code}: ${(e && (e.code || e.message)) || e}`;
+          }
           console.warn('session usage record failed:', code, e);
         }
-        // 메모 없음(날짜 맞춤) 방은 방별 n−0 추가를 하지 않음
-        if (preview && preview.headcountRepairOnly) continue;
         try {
-          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal);
+          playCounted += await adminRecordLivePlayCount(room, code, idToken, execController.signal, preview);
         } catch (e) {
           playFailed += 1;
+          if (!playFailDetail) {
+            playFailDetail = `${code}: ${(e && (e.code || e.message)) || e}`;
+          }
           console.warn('live play stats record failed:', code, e);
         }
       }
@@ -1388,6 +1423,9 @@ document.addEventListener('DOMContentLoaded', () => {
             playRepaired += row.repair;
           } catch (e) {
             playFailed += 1;
+            if (!playFailDetail) {
+              playFailDetail = `맞춤 ${row.day}: ${(e && (e.code || e.message)) || e}`;
+            }
             console.warn('live day repair failed:', row.day, e);
           }
         }
@@ -1408,19 +1446,34 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify(ledgerOnlyPatch)
           }, idToken, execController.signal);
         } catch (e) {
+          ledgerBackfillFailed = true;
+          playFailed += 1;
+          if (!playFailDetail) {
+            playFailDetail = `메모 저장: ${(e && (e.code || e.message)) || e}`;
+          }
           console.warn('room play ledger backfill failed:', e);
         }
       }
 
-      for (let i = 0; i < expiredRooms.length; i += 1) {
-        const code = expiredRooms[i];
-        setPurgeStatus(`끝난 방을 지우는 중… ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
-        try {
-          await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
-          deletedRoomsCount += 1;
-        } catch (e) {
-          console.warn('purge room failed:', code, e);
-          failed += 1;
+      const repairIncomplete = previewPlayRepair > 0 && playRepaired < previewPlayRepair;
+      const syncReadyToDelete = playFailed === 0 && sessionFailed === 0 && !ledgerBackfillFailed && !repairIncomplete;
+
+      if (!syncReadyToDelete) {
+        skippedDeleteForSync = expiredRooms.length;
+        if (expiredRooms.length) {
+          setPurgeStatus('통계 반영이 끝나지 않아 끝난 방은 지우지 않습니다. 방은 그대로 둡니다.', true);
+        }
+      } else {
+        for (let i = 0; i < expiredRooms.length; i += 1) {
+          const code = expiredRooms[i];
+          setPurgeStatus(`끝난 방을 지우는 중… ${deletedRoomsCount + failed + 1}/${expiredRooms.length}`, true);
+          try {
+            await adminAuthFetch(`liveRooms/${code}`, { method: 'DELETE' }, idToken, execController.signal);
+            deletedRoomsCount += 1;
+          } catch (e) {
+            console.warn('purge room failed:', code, e);
+            failed += 1;
+          }
         }
       }
 
@@ -1450,11 +1503,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (playRepaired > 0) playParts.push(`맞춤 ${playRepaired}명`);
       const playNote = playParts.length
         ? `참가 인원 ${playParts.join(' · ')} 추가`
-        : (playFailed > 0
-          ? `참가 인원 반영 실패 ${playFailed}건`
+        : (playFailed > 0 || sessionFailed > 0
+          ? `참가 인원 반영 실패 ${playFailed + sessionFailed}건${playFailDetail ? ` (${playFailDetail})` : ''}`
           : '참가 인원 변화 없음');
+      const deleteNote = skippedDeleteForSync > 0
+        ? `끝난 방 ${skippedDeleteForSync}개는 반영 실패로 삭제하지 않음`
+        : `끝난 방 ${deletedRoomsCount}개 삭제`;
       
-      setPurgeStatus(`완료: 수업 횟수 ${counted}번 추가 · ${playNote} · 끝난 방 ${deletedRoomsCount}개 삭제 · 오래된 기록 ${deletedDedupCount}개 삭제${failed ? ` · 실패 ${failed}건` : ''}`, true);
+      setPurgeStatus(`완료: 수업 횟수 ${counted}번 추가 · ${playNote} · ${deleteNote} · 오래된 기록 ${deletedDedupCount}개 삭제${failed ? ` · 삭제 실패 ${failed}건` : ''}`, true);
       
       sessionUsageLoadingFlag = false;
       playStatsLoadingFlag = false;

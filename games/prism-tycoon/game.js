@@ -2497,12 +2497,38 @@
         : 'WASD(방향키), 드래그, 클릭으로 이동.';
     }
 
+    let portraitBias = window.innerHeight >= window.innerWidth;
+    let lastGamma = 0;
+    let forcedRot = 90;
+    let forcedRotLocked = false;
+
     function isNaturalPortrait() {
-      return window.innerHeight > window.innerWidth && window.innerWidth < 800;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (w >= 800) {
+        portraitBias = false;
+        return false;
+      }
+      const gap = 28;
+      if (h > w + gap) portraitBias = true;
+      else if (w > h + gap) portraitBias = false;
+      return portraitBias;
     }
 
     function isForcedLandscape() {
       return document.documentElement.classList.contains('force-landscape');
+    }
+
+    function currentLandscapeType() {
+      const type = screen.orientation && screen.orientation.type;
+      return type && type.indexOf('landscape') === 0 ? type : '';
+    }
+
+    function pickForcedRotFromTilt() {
+      if (typeof lastGamma === 'number' && Math.abs(lastGamma) >= 10) {
+        return lastGamma > 0 ? -90 : 90;
+      }
+      return 90;
     }
 
     function forcedViewport() {
@@ -2517,6 +2543,12 @@
 
     function clientToAppLocal(clientX, clientY) {
       const v = forcedViewport();
+      if (forcedRot < 0) {
+        return {
+          x: (v.top + v.h) - clientY,
+          y: clientX - v.left
+        };
+      }
       return {
         x: clientY - v.top,
         y: (v.left + v.w) - clientX
@@ -2537,6 +2569,7 @@
       }
       if (!isNaturalPortrait()) {
         if (isForcedLandscape()) applyForcedLandscape(false);
+        tryLockCurrentLandscape();
         gate.classList.add('hidden');
         return;
       }
@@ -2566,7 +2599,13 @@
       gate.setAttribute('aria-hidden', 'false');
     }
     window.addEventListener('resize', resize);
-    window.addEventListener('orientationchange', () => { setTimeout(resize, 100); });
+    window.addEventListener('orientationchange', () => { setTimeout(onViewportChange, 100); });
+    window.addEventListener('deviceorientation', (e) => {
+      if (typeof e.gamma === 'number' && !Number.isNaN(e.gamma)) lastGamma = e.gamma;
+    }, true);
+    if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+      screen.orientation.addEventListener('change', () => { setTimeout(onViewportChange, 50); });
+    }
 
     function updateCamera(dt) {
       if (!state || !state.player) return;
@@ -2878,6 +2917,7 @@
 
     function update(dt) {
       const s = state;
+      if (isEndConfirmOpen()) return;
       const prevTime = s.time;
       s.time -= dt;
       if (s.time <= 0) { s.time = 0; finish(); return; }
@@ -6881,6 +6921,7 @@
         }
       }
       shopSig = '';
+      hideEndConfirm();
       startOverlay.classList.add('hidden');
       resultOverlay.classList.add('hidden');
       if (el && el.hud) el.hud.classList.remove('hidden');
@@ -6899,16 +6940,20 @@
       if (resultOverlay) resultOverlay.scrollTop = 0;
     }
 
-    function fillResultHome(isRecord) {
+    function fillResultHome(isRecord, early) {
       const made = (state && state.made) || {};
       const trophy = document.getElementById('result-trophy');
       const title = document.getElementById('result-title');
       const flavor = document.getElementById('result-flavor');
       if (trophy && title && flavor) {
         trophy.textContent = isRecord ? '🏆' : '💎';
-        title.textContent = '주어진 시간 끝!';
-        flavor.textContent = '동굴이 무너지기 직전에 서둘러 빠져나왔습니다.';
+        title.textContent = early ? '탐험을 마쳤습니다!' : '주어진 시간 끝!';
+        flavor.textContent = early
+          ? '시간이 남았지만 지금까지 모은 금액을 기록했습니다.'
+          : '동굴이 무너지기 직전에 서둘러 빠져나왔습니다.';
       }
+      const earnedLabel = document.getElementById('result-earned-label');
+      if (earnedLabel) earnedLabel.textContent = early ? '지금까지 모은 금액' : '5분간 모은 금액';
       const gems = document.getElementById('result-gems');
       if (gems) {
         gems.innerHTML = '';
@@ -6922,7 +6967,10 @@
       }
     }
 
-    function finish() {
+    function finish(opts) {
+      if (!state || state.phase === 'over') return;
+      hideEndConfirm();
+      const early = !!(opts && opts.early);
       state.phase = 'over';
       stick = null;
       keys.clear();
@@ -6940,7 +6988,7 @@
       document.getElementById('best-line').innerHTML = preview
         ? '미리보기 · 랭킹 미등록'
         : ('최고 기록 ' + Math.max(prevBest, state.gold).toLocaleString());
-      fillResultHome(isRecord);
+      fillResultHome(isRecord, early);
 
       const madeMap = (state && state.made) || {};
       const albumLead = document.getElementById('album-lead');
@@ -7019,8 +7067,17 @@
     function applyForcedLandscape(on) {
       const root = document.documentElement;
       const enable = !!on && isNaturalPortrait();
-      if (enable) root.classList.add('force-landscape');
-      else root.classList.remove('force-landscape');
+      if (enable) {
+        if (!forcedRotLocked) {
+          forcedRot = pickForcedRotFromTilt();
+          forcedRotLocked = true;
+        }
+        root.classList.add('force-landscape');
+        root.classList.toggle('force-landscape-ccw', forcedRot < 0);
+      } else {
+        root.classList.remove('force-landscape', 'force-landscape-ccw');
+        forcedRotLocked = false;
+      }
 
       if (!appEl) return;
       if (!enable) {
@@ -7044,27 +7101,31 @@
       appEl.style.inset = 'auto';
       appEl.style.right = 'auto';
       appEl.style.bottom = 'auto';
-      appEl.style.top = top + 'px';
-      appEl.style.left = (left + w) + 'px';
       appEl.style.width = h + 'px';
       appEl.style.height = w + 'px';
-      appEl.style.transform = 'rotate(90deg)';
       appEl.style.transformOrigin = 'top left';
+      if (forcedRot < 0) {
+        appEl.style.top = (top + h) + 'px';
+        appEl.style.left = left + 'px';
+        appEl.style.transform = 'rotate(-90deg)';
+      } else {
+        appEl.style.top = top + 'px';
+        appEl.style.left = (left + w) + 'px';
+        appEl.style.transform = 'rotate(90deg)';
+      }
     }
 
-    function tryLockLandscape() {
+    function tryLockCurrentLandscape() {
       const orient = screen.orientation;
       if (!orient || typeof orient.lock !== 'function') return Promise.resolve(false);
-      const types = ['landscape', 'landscape-primary', 'landscape-secondary'];
-      return types.reduce((prev, type) => prev.then((ok) => {
-        if (ok) return true;
-        try {
-          const p = orient.lock(type);
-          return Promise.resolve(p).then(() => true).catch(() => false);
-        } catch (_) {
-          return false;
-        }
-      }), Promise.resolve(false));
+      const type = currentLandscapeType();
+      if (!type) return Promise.resolve(false);
+      try {
+        const p = orient.lock(type);
+        return Promise.resolve(p).then(() => true).catch(() => false);
+      } catch (_) {
+        return Promise.resolve(false);
+      }
     }
 
     function requestFullscreenNow() {
@@ -7099,20 +7160,18 @@
         checkOrientation();
         resize();
         syncFullscreenBtn();
+        if (!isNaturalPortrait()) tryLockCurrentLandscape();
       };
 
-      // Lock in the same user-gesture turn. Awaiting fullscreen first often
-      // drops activation on Android Chrome, so orientation.lock becomes a no-op.
-      tryLockLandscape();
       requestFullscreenNow();
-      tryLockLandscape();
-
-      // Native lock is unreliable on Android; CSS rotate makes the button
-      // do something immediately even when Fullscreen/Orientation APIs fail.
+      // Do not lock to generic `landscape` while the phone is still portrait.
+      // That lets the OS pick the opposite landscape from the CSS rotate,
+      // so the playfield jumps 180° and kids turn the device again.
       if (isNaturalPortrait()) applyForcedLandscape(true);
+      else tryLockCurrentLandscape();
       requestAnimationFrame(relayout);
 
-      const afterFs = () => { tryLockLandscape().then(relayout); };
+      const afterFs = () => { relayout(); };
       document.addEventListener('fullscreenchange', afterFs, { once: true });
       document.addEventListener('webkitfullscreenchange', afterFs, { once: true });
     }
@@ -7133,8 +7192,12 @@
     }
 
     function onViewportChange() {
-      if (isForcedLandscape() && isNaturalPortrait()) applyForcedLandscape(true);
-      else if (!isNaturalPortrait()) applyForcedLandscape(false);
+      if (isNaturalPortrait()) {
+        if (isForcedLandscape()) applyForcedLandscape(true);
+      } else {
+        if (isForcedLandscape()) applyForcedLandscape(false);
+        tryLockCurrentLandscape();
+      }
       resize();
       syncFullscreenBtn();
     }
@@ -7241,6 +7304,59 @@
       }
       start();
     });
+    const endConfirm = document.getElementById('end-confirm');
+    function isEndConfirmOpen() {
+      return !!(endConfirm && !endConfirm.classList.contains('hidden'));
+    }
+    function hideEndConfirm() {
+      if (!endConfirm) return;
+      endConfirm.classList.add('hidden');
+      endConfirm.setAttribute('aria-hidden', 'true');
+    }
+    function showEndConfirm() {
+      if (!state || (state.phase !== 'play' && state.phase !== 'cutLesson')) return;
+      stick = null;
+      keys.clear();
+      const lead = document.getElementById('end-confirm-lead');
+      if (lead) {
+        lead.textContent = '지금까지 모은 금액 ' + Number(state.gold || 0).toLocaleString()
+          + '이 순위에 올라갑니다.';
+      }
+      if (endConfirm) {
+        endConfirm.classList.remove('hidden');
+        endConfirm.setAttribute('aria-hidden', 'false');
+      }
+    }
+    const btnEndRun = document.getElementById('btn-end-run');
+    if (btnEndRun) {
+      btnEndRun.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sound.init();
+        sound.click();
+        showEndConfirm();
+      });
+    }
+    const btnEndConfirm = document.getElementById('btn-end-confirm');
+    if (btnEndConfirm) {
+      btnEndConfirm.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sound.init();
+        sound.click();
+        finish({ early: true });
+      });
+    }
+    const btnEndCancel = document.getElementById('btn-end-cancel');
+    if (btnEndCancel) {
+      btnEndCancel.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sound.init();
+        sound.click();
+        hideEndConfirm();
+      });
+    }
     const btnViewAlbum = document.getElementById('btn-view-album');
     const btnViewHall = document.getElementById('btn-view-hall');
     const btnAlbumBack = document.getElementById('btn-album-back');

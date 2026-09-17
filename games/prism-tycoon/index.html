@@ -75,6 +75,13 @@
       transform: rotate(90deg);
       transform-origin: top left;
     }
+    /* Opposite physical turn (clockwise) — keep "up" on the same side of the phone. */
+    html.force-landscape.force-landscape-ccw #app {
+      top: 100vh;
+      top: 100dvh;
+      left: 0;
+      transform: rotate(-90deg);
+    }
     #game { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 
     .hud {
@@ -88,7 +95,43 @@
       pointer-events: none;
       z-index: 5;
     }
-    .hud-left { display: flex; align-items: center; gap: 8px; min-width: 0; padding-top: 4px; }
+    .hud-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 0;
+      padding-top: 4px;
+    }
+    .hud-left-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .btn-end-run {
+      pointer-events: auto;
+      margin: 0;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(240, 195, 106, 0.45);
+      background: rgba(20, 12, 28, 0.82);
+      color: #f5e9d6;
+      font: 700 12px Pretendard, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    .btn-end-run:hover { border-color: var(--gold); }
+    #end-confirm {
+      z-index: 70;
+      align-items: center;
+    }
+    #end-confirm .end-confirm-card {
+      width: min(360px, 92vw);
+      text-align: center;
+    }
+    #end-confirm .end-confirm-card h2 { margin: 0 0 6px; }
+    #end-confirm .btn-rank { margin-top: 8px; }
     .hud-center {
       display: flex;
       flex-direction: column;
@@ -746,6 +789,8 @@
       .chip.gold .value { font-size: 18px; -webkit-text-stroke-width: 3px; }
       .hud { gap: 6px; }
       .hud-center { gap: 4px; }
+      .hud-left { gap: 4px; padding-top: 0; }
+      .btn-end-run { padding: 4px 9px; font-size: 11px; }
       .time-gauge { width: 220px; max-width: min(220px, 42vw); padding: 3px 8px 3px 6px; }
       .time-gauge-track { height: 10px; }
       .time-gauge-label { font-size: 15px; min-width: 44px; }
@@ -844,8 +889,11 @@
 
     <div class="hud hidden">
       <div class="hud-left">
-        <span class="hud-title">보석 타이쿤</span>
-        <span class="hud-player" id="hud-player"></span>
+        <div class="hud-left-meta">
+          <span class="hud-title">보석 타이쿤</span>
+          <span class="hud-player" id="hud-player"></span>
+        </div>
+        <button type="button" class="btn-end-run" id="btn-end-run">끝내기</button>
       </div>
       <div class="hud-center">
         <div class="time-gauge" id="chip-time" aria-label="남은 시간">
@@ -933,6 +981,15 @@
       </div>
     </div>
 
+    <div class="overlay hidden" id="end-confirm" aria-hidden="true">
+      <div class="card end-confirm-card">
+        <h2>게임을 끝낼까요?</h2>
+        <p class="result-flavor" id="end-confirm-lead">지금까지 모은 금액이 순위에 올라갑니다.</p>
+        <button type="button" class="btn-main" id="btn-end-confirm">기록하고 끝내기</button>
+        <button type="button" class="btn-rank" id="btn-end-cancel">계속하기</button>
+      </div>
+    </div>
+
     <div class="overlay hidden" id="result-overlay">
       <div class="card result-card">
         <div id="result-home">
@@ -943,7 +1000,7 @@
           </div>
           <div class="final">
             <div class="big"><img class="ico-bill ico-bill-lg" src="assets/bill.png" alt=""><span id="final-gold">0</span></div>
-            <div class="sub">5분간 모은 금액</div>
+            <div class="sub" id="result-earned-label">5분간 모은 금액</div>
             <div class="sub" id="result-player"></div>
             <div class="sub" id="best-line">최고 기록 0</div>
           </div>
