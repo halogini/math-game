@@ -1,35 +1,50 @@
-:root{--bg:#fff1dc;--ink:#3b2a1a;--accent:#ff8a3d;--ok:#2f9e63;--bad:#d94b43;--card:#fffdf8;--line:#ead6b4;--cheese:#ffd24a;--edge:#e0a800}
+:root{
+  --bg:#fff1dc;--ink:#3b2a1a;--accent:#ff8a3d;--ok:#2f9e63;--bad:#d94b43;--card:#fffdf8;--line:#ead6b4;--cheese:#ffd24a;--edge:#e0a800;
+  /* 교실 태블릿 기준. 본문 16 / 보조 14 미만은 쓰지 않는다 */
+  --fs-xs:14px;--fs-sm:15px;--fs-md:16px;--fs-lg:18px;--fs-xl:20px;--fs-2xl:24px;--fs-3xl:28px;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;height:100dvh;background:var(--bg);color:var(--ink);font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;overflow:hidden;overscroll-behavior:none;touch-action:none}
+html,body{margin:0;height:100%;height:100dvh;background:var(--bg);color:var(--ink);font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;font-size:var(--fs-md);line-height:1.45;overflow:hidden;overscroll-behavior:none;touch-action:none}
 button{font:inherit;color:inherit;cursor:pointer}
-.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:8px 14px}
+.screen{
+  position:absolute;inset:0;display:none;flex-direction:column;
+  padding:max(8px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px))
+    max(8px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));
+}
 .screen.on{display:flex}
-h1{margin:0;font-size:28px}
-h2{margin:0 0 6px;font-size:16px}
-.sub{margin:2px 0 10px;color:#8a6a45;font-size:14px}
+h1{margin:0;font-size:var(--fs-3xl)}
+h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
+.sub{margin:2px 0 10px;color:#8a6a45;font-size:var(--fs-sm)}
 .card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:10px}
-.btn{min-height:50px;min-width:50px;padding:6px 16px;border:0;border-radius:14px;background:var(--accent);color:#fff;font-weight:700;font-size:17px;box-shadow:0 4px 0 #c9631f}
+.btn{min-height:50px;min-width:50px;padding:8px 16px;border:0;border-radius:14px;background:var(--accent);color:#fff;font-weight:700;font-size:var(--fs-lg);box-shadow:0 4px 0 #c9631f}
 .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #c9631f}
 .btn.ghost{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 3px 0 var(--line)}
 .btn.off{opacity:.45}
 .row{display:flex;gap:12px;align-items:center}
-.cols{display:flex;gap:14px}
-.cols>.card{flex:1;padding:14px}
+.cols{display:flex;gap:14px;align-items:flex-start}
+.cols>.card{flex:1;min-width:0;padding:14px}
+.cols-one{max-width:720px;margin:0 auto;width:100%}
+.cols-result{flex-wrap:wrap}
+.cols-result>.card{flex:1 1 260px}
+.row-center{justify-content:center;margin:12px 0 20px}
+.row-end{justify-content:flex-end;margin:8px 0 20px}
+.mt{margin-top:14px}
+#toOven{width:100%;margin-top:6px}
 /* intro */
-.intro{max-width:780px;margin:auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
-.intro .big{font-size:60px}
-.intro ol{text-align:left;font-size:18px;line-height:1.85;margin:0;padding-left:24px}
+.intro{max-width:780px;margin:auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;width:100%;max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;padding:4px 0 12px}
+.intro .big{font-size:clamp(40px,8vw,60px)}
+.intro ol{text-align:left;font-size:var(--fs-lg);line-height:1.75;margin:0;padding-left:24px;max-width:640px}
 /* play */
-.hud{display:flex;align-items:center;gap:12px;height:40px;flex:none}
-.hud .title{font-weight:800;font-size:17px;white-space:nowrap}
+.hud{display:flex;align-items:center;gap:12px;height:42px;flex:none}
+.hud .title{font-weight:800;font-size:var(--fs-lg);white-space:nowrap}
 .timer{flex:1;height:14px;background:#f0dfc0;border-radius:99px;overflow:hidden}
 .timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffb347,#ff8a3d);transform-origin:left}
-.coins{font-weight:800;font-size:19px;min-width:120px;text-align:right}
+.coins{font-weight:800;font-size:var(--fs-xl);min-width:120px;text-align:right}
 .custrow{display:flex;gap:10px;flex:none;margin:2px 0 6px;padding-bottom:6px;border-bottom:8px solid #d9553f}
 .slot{flex:1;min-width:0;background:var(--card);border:2px solid var(--line);border-radius:16px;position:relative;display:flex;flex-direction:column;align-items:center;padding:2px 6px 6px;cursor:pointer;overflow:hidden;transition:box-shadow .12s,background .12s}
 .slot canvas{width:100%;max-width:330px;height:auto;display:block}
-.slot .cat{font-size:44px;line-height:1.05}
-.slot .tag{font-size:12px;font-weight:800;color:#8a5a2b;background:#f3e1bd;border-radius:99px;padding:0 8px;margin:0 0 3px}
+.slot .cat{font-size:50px;line-height:1.05}
+.slot .tag{font-size:var(--fs-sm);font-weight:800;color:#8a5a2b;background:#f3e1bd;border-radius:99px;padding:2px 10px;margin:0 0 3px}
 .slot .pbar{width:80%;height:8px;background:#f0dfc0;border-radius:99px;overflow:hidden}
 .slot .pbar i{display:block;height:100%;background:#5fbf82;width:100%}
 .slot.low .pbar i{background:var(--bad)}
@@ -43,204 +58,198 @@ h2{margin:0 0 6px;font-size:16px}
 @keyframes enter{from{transform:translateY(-36px);opacity:0}to{transform:none;opacity:1}}
 .kitchen{display:flex;gap:10px;flex:1;min-height:0;position:relative}
 .kitchen>.card{display:flex;flex-direction:column;min-height:0}
-.shelf{width:196px;flex:none}
-.shelfgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;overflow:hidden}
-.mold{background:#fff;border:2px solid var(--line);border-radius:12px;padding:2px 2px 4px;display:flex;flex-direction:column;align-items:center;cursor:pointer;box-shadow:0 3px 0 var(--line)}
-.mold canvas{width:100%;height:auto;display:block}
-.mold span{font-size:13px;font-weight:700;color:#6b5236}
+.shelf{flex:0 0 clamp(148px,17vw,180px);width:auto}
+.oven{flex:0 0 clamp(200px,24vw,260px);width:auto;display:flex;flex-direction:column}
+.bench{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.shelfgrid{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.mold{position:relative;background:#fff;border:2px solid var(--line);border-radius:12px;padding:3px 2px 4px;display:flex;flex-direction:column;align-items:center;cursor:pointer;box-shadow:0 3px 0 var(--line)}
+.mold canvas{width:50%;height:auto;display:block}
+.mold b{font-size:var(--fs-md);color:#4a3320}
+.mold span{font-size:var(--fs-sm);font-weight:700;color:#6b5236}
 .mold:active{transform:translateY(2px)}
 .mold.on{border-color:#4f86f7;background:#eef4ff}
 .mold.orig{border-style:dashed}
-.bench{flex:1;min-width:0}
+.mold .lock{display:none;position:absolute;inset:0;border-radius:12px;background:rgba(228,230,233,.93)!important;align-items:center;justify-content:center;flex-direction:column;font-size:26px;text-align:center;line-height:1.2;cursor:pointer}
+.mold.locked{cursor:not-allowed}
+.mold.locked .lock{display:flex}
+.mold .lock small{font-size:var(--fs-xs);font-weight:700;color:#5b5b5b}
+.mold.canbuy .lock{background:rgba(190,240,210,.96)!important;animation:glow 1.1s infinite}
 .benchwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#fff8ec;border-radius:12px;border:2px dashed var(--line)}
 .benchwrap.sel,#ovenCv.sel{outline:4px solid #4f86f7}
+.benchwrap.drop{outline:4px solid #4f86f7;background:#eef4ff}
 canvas#benchCv{width:100%;max-height:100%;height:auto;touch-action:none}
-.benchinfo{font-size:14px;color:#6b5236;margin:6px 0;min-height:20px;text-align:center}
-.oven{width:250px;flex:none}
-#ovenCv{width:100%;height:auto;display:block;border-radius:12px;touch-action:none}
+.benchinfo{font-size:var(--fs-sm);color:#6b5236;margin:6px 0;min-height:22px;text-align:center}
+#ovenCv{width:100%;height:auto;display:block;border-radius:12px;touch-action:none;flex:1;min-height:0;object-fit:contain}
 .oven.drop{box-shadow:0 0 0 5px #4f86f7}
-#cookBtn{width:100%;margin-top:8px;min-height:56px;font-size:19px}
+#cookBtn{width:100%;margin-top:8px;min-height:56px;font-size:var(--fs-xl)}
 #cookBtn.cooking{background:#e8590c;box-shadow:0 4px 0 #a63d06;animation:pulse .7s infinite}
 #cookBtn.done{background:#2f9e63;box-shadow:0 4px 0 #1f7444}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-.drawer{width:206px;flex:none}
-.ingbox{text-align:center;font-size:14px;font-weight:700;color:#6b5236;background:#fff8ec;border:2px dashed var(--line);border-radius:12px;padding:4px 4px;margin:2px 0 4px;line-height:1.5}
-.ingbox b{font-size:26px;display:block}
+.drawer{width:auto;flex:none;display:flex;gap:8px;margin-top:8px;align-items:stretch}
+.ingbox{text-align:center;font-size:var(--fs-sm);font-weight:700;color:#6b5236;background:#fff8ec;border:2px dashed var(--line);border-radius:12px;padding:4px 4px;margin:2px 0 4px;line-height:1.5}
+.ingbox b{font-size:var(--fs-2xl);display:block}
 .minigrid{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;width:150px;margin:2px auto 4px}
 .minigrid i{display:block;aspect-ratio:1;border-radius:4px;background:#efe3cc}
 .minigrid i.on{background:var(--cheese);box-shadow:inset 0 0 0 2px var(--edge)}
-.units{display:flex;gap:5px;margin-top:4px}
-.bags{display:flex;flex-direction:column;gap:6px;margin-top:2px}
-.bag{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:46px;padding:2px 10px;white-space:nowrap;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 3px 0 var(--line);font-weight:800;font-size:16px;cursor:grab;touch-action:none}
+.bags{flex:1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0}
+.bag{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:62px;padding:2px 2px;white-space:nowrap;background:#fff;border:2px solid var(--line);border-radius:14px;box-shadow:0 3px 0 var(--line);font-weight:800;font-size:var(--fs-sm);line-height:1.2;cursor:grab;touch-action:none;overflow:hidden}
 .bag:active{transform:translateY(2px)}
-.bag .bi{font-size:20px;letter-spacing:-5px}
+.bag .bi{font-size:18px;letter-spacing:-6px;margin-right:-4px;height:24px}
+.bag .bl{font-size:var(--fs-sm)}
 .bag.off{opacity:.45}
-.benchwrap.drop{outline:4px solid #4f86f7;background:#eef4ff}
-.units .btn{flex:1;min-width:0;padding:4px 0;font-size:15px;min-height:44px}
-.title2{font-size:14px;color:#8a6a45;font-weight:400}
-.trash{margin-top:auto;border:3px dashed #c9b28a;border-radius:16px;text-align:center;padding:8px 4px;font-size:34px;line-height:1.1;background:#f7efe0;transition:background .12s,border-color .12s}
-.trash small{display:block;font-size:12px;color:#8a6a45;margin-top:2px}
+.bag.hide{display:none}
+.bag.locked{background:#eee7d8;opacity:.8;cursor:pointer}
+.bag .bk{display:none;position:absolute;inset:0;background:rgba(232,226,212,.96);align-items:center;justify-content:center;flex-direction:column;font-size:var(--fs-lg);line-height:1.2;font-weight:800}
+.bag.locked .bk{display:flex}
+.bag .bk small{font-size:var(--fs-xs)}
+.bag.canbuy .bk{background:rgba(190,240,210,.96)!important;animation:glow 1.1s infinite}
+.units{display:flex;gap:5px;margin-top:4px}
+.units .btn{flex:1;min-width:0;padding:4px 0;font-size:var(--fs-md);min-height:44px}
+.dbtns{display:flex;flex-direction:column;gap:6px;width:104px}
+.dbtns .btn{min-height:36px;font-size:var(--fs-sm);padding:4px 6px;flex:1}
+.title2{font-size:var(--fs-sm);color:#8a6a45;font-weight:400}
+.trash{margin-top:auto;border:3px dashed #c9b28a;border-radius:16px;text-align:center;padding:6px 4px;font-size:28px;line-height:1.1;background:#f7efe0;transition:background .12s,border-color .12s}
+.trash small{display:block;font-size:var(--fs-xs);color:#8a6a45;margin-top:2px}
 .trash.drop{background:#ffe1dc;border-color:var(--bad)}
-.toast{position:fixed;left:50%;top:252px;/* 실제 위치는 fit()이 화면 크기에 맞춰 다시 정한다 */transform:translateX(-50%);background:#3b2a1a;color:#fff;padding:10px 18px;border-radius:99px;font-size:16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:92%;text-align:center}
+.toast{position:fixed;left:50%;top:252px;transform:translateX(-50%);background:#3b2a1a;color:#fff;padding:10px 18px;border-radius:99px;font-size:var(--fs-md);opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:92%;text-align:center}
 .toast.on{opacity:1}
 #ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:70;display:none;opacity:.92;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
-/* guide */
-.guide{position:absolute;inset:0;background:rgba(59,42,26,.55);z-index:40;display:flex;align-items:center;justify-content:center}
-.gcard{background:#fff;border-radius:20px;padding:20px 26px;max-width:860px;width:92%}
-.gcard h2{font-size:22px;margin-bottom:10px}
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 14px}
-.step{background:#fff8ec;border:2px solid var(--line);border-radius:14px;padding:10px;font-size:15px;line-height:1.5;text-align:center}
-.step .ic{font-size:34px}
-.gcard .foot{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.gcard .foot span{font-size:14px;color:#6b5236}
+/* guide — viewport 고정 (stage 밖) */
+.guide{
+  position:fixed;inset:0;z-index:80;
+  display:none;align-items:center;justify-content:center;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px))
+    max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:rgba(59,42,26,.55);box-sizing:border-box;
+}
+.guide[hidden]{display:none!important}
+.guide.is-on{display:flex}
+.gcard{background:#fff;border-radius:20px;padding:22px 28px;max-width:860px;width:min(94vw,640px);max-height:min(90vh,90dvh);overflow:auto;margin:auto;box-shadow:0 12px 40px rgba(59,42,26,.28)}
+.gcard.h-center{text-align:center}
+.gcard h2{font-size:var(--fs-2xl);margin-bottom:10px}
+.gcard .ri-ico{font-size:clamp(40px,8vw,56px);line-height:1}
+.gcard .ri-desc{font-size:var(--fs-lg);line-height:1.65;margin:8px 0 16px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:8px 0 14px}
+.step{background:#fff8ec;border:2px solid var(--line);border-radius:14px;padding:10px;font-size:var(--fs-sm);line-height:1.5;text-align:center}
+.step .ic{font-size:32px}
+.gcard .foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.gcard .foot span{font-size:var(--fs-sm);color:#6b5236;flex:1;min-width:180px}
+.gcard .foot .btn{flex:none}
 /* result */
 .res{max-width:1000px;margin:0 auto;width:100%;overflow:auto;flex:1}
+.res h2{font-size:var(--fs-lg)}
 table{border-collapse:collapse;width:100%}
-td,th{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:16px}
+td,th{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:var(--fs-md)}
 td.r,th.r{text-align:right}
-.total td{font-weight:800;font-size:20px;border-top:2px solid var(--ink)}
-.insight{background:#fff7d6;border:2px solid #f0d67a;border-radius:14px;padding:10px 14px;margin:10px 0;line-height:1.55}
-#rot{position:fixed;inset:0;background:var(--bg);z-index:99;display:none;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.total td{font-weight:800;font-size:var(--fs-xl);border-top:2px solid var(--ink)}
+.insight{background:#fff7d6;border:2px solid #f0d67a;border-radius:14px;padding:10px 14px;margin:10px 0;line-height:1.55;font-size:var(--fs-md)}
+#rot{
+  position:fixed;inset:0;background:var(--bg);z-index:99;display:none;align-items:center;justify-content:center;
+  font-size:var(--fs-2xl);font-weight:700;text-align:center;padding:24px;
+  padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right))
+    max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
+}
 @media (orientation:portrait){#rot{display:flex}}
-/* ===== 화면 맞추기 (기기마다 다른 크기를 통째로 축소/확대) ===== */
-#stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden}
-/* 설정 버튼은 무대 안에 둔다. 화면 밖에 고정하면 무대 가장자리를 몰라 코인 표시를 덮는다 */
-#chrome{position:absolute;right:10px;top:6px;z-index:60;display:flex;gap:6px;align-items:flex-start}
-#chrome button{min-height:44px;padding:4px 12px;font-size:16px;border-radius:12px;background:rgba(59,42,26,.72);color:#fff;border:0;font-weight:700;box-shadow:none}
-.compact #chrome button{min-height:36px;padding:2px 9px;font-size:14px}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;border-radius:0;background:var(--bg)}
+#chrome{
+  position:absolute;z-index:60;display:flex;gap:6px;align-items:flex-start;
+  right:max(8px,env(safe-area-inset-right,0px));top:max(6px,env(safe-area-inset-top,0px));
+}
+#chrome button{min-height:44px;min-width:44px;padding:4px 12px;font-size:var(--fs-md);border-radius:12px;background:rgba(59,42,26,.72);color:#fff;border:0;font-weight:700;box-shadow:none}
 #fsBtn{display:none}
 #fsBtn.on{display:block}
-/* 떠오르는 숫자 (코인·감점) */
 .flo{position:absolute;transform:translate(-50%,-50%);font-weight:800;pointer-events:none;z-index:50;white-space:nowrap;animation:flo 1.05s ease-out forwards;text-shadow:0 2px 0 rgba(255,255,255,.8),0 0 6px rgba(255,255,255,.6)}
-.flo.coin{color:#d98600;font-size:25px}
-.flo.bad{color:#d94b43;font-size:19px}
-.flo.ok{color:#2f9e63;font-size:21px}
+.flo.coin{color:#d98600;font-size:var(--fs-2xl)}
+.flo.bad{color:#d94b43;font-size:var(--fs-lg)}
+.flo.ok{color:#2f9e63;font-size:var(--fs-xl)}
 @keyframes flo{0%{opacity:0;transform:translate(-50%,-50%) scale(.55)}16%{opacity:1;transform:translate(-50%,-88%) scale(1.14)}100%{opacity:0;transform:translate(-50%,-185%) scale(1)}}
-/* 콤보 배너 */
-.combo{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:46px;font-weight:800;color:#ff8a3d;text-shadow:0 3px 0 #fff,0 0 20px rgba(255,138,61,.55);pointer-events:none;z-index:55;animation:cmb 1.15s ease-out forwards}
+.combo{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:44px;font-weight:800;color:#ff8a3d;text-shadow:0 3px 0 #fff,0 0 20px rgba(255,138,61,.55);pointer-events:none;z-index:55;animation:cmb 1.15s ease-out forwards}
 @keyframes cmb{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-8deg)}22%{opacity:1;transform:translate(-50%,-50%) scale(1.18) rotate(3deg)}70%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-90%) scale(.95)}}
-/* 남은 시간 경고 */
 .timer.warn i{background:linear-gradient(90deg,#ff7a6d,#d94b43);animation:tw .55s infinite}
 @keyframes tw{0%,100%{opacity:1}50%{opacity:.45}}
 .coins.bump{animation:bump .34s ease-out}
 @keyframes bump{0%{transform:none}30%{transform:scale(1.26)}100%{transform:none}}
-#dbg{position:fixed;right:4px;bottom:4px;z-index:80;background:rgba(59,42,26,.82);color:#fff;font:10px/1.4 monospace;padding:4px 7px;border-radius:7px;white-space:pre;pointer-events:none;display:none}
-
-.bags{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-top:2px}
-.shelfgrid .mold:nth-child(3){grid-column:1/3}
-.shelfgrid .mold:nth-child(3) canvas{width:50%}
-.bag{min-height:44px;padding:2px 6px;font-size:13px;gap:2px;overflow:hidden}
-.bag .bi{font-size:14px;letter-spacing:-5px;flex:none}
-.bag.hide{display:none}
-.mold{position:relative}
-.mold .lock{display:none;position:absolute;inset:0;border-radius:12px;background:rgba(223,228,232,.85);align-items:center;justify-content:center;font-size:30px}
-.mold.locked{cursor:not-allowed}
-.mold.locked .lock{display:flex}
+#dbg{position:fixed;right:4px;bottom:4px;z-index:80;background:rgba(59,42,26,.82);color:#fff;font:12px/1.4 monospace;padding:4px 7px;border-radius:7px;white-space:pre;pointer-events:none;display:none}
 .slot.boss{border-color:#d94b43;box-shadow:0 0 0 3px #f6c9c5}
 .slot.boss .tag{background:#f6c9c5;color:#a02a24}
-/* ===== v7 ===== */
-.shelf{width:172px}
-.shelfgrid{display:flex;flex-direction:column;gap:8px}
-.shelfgrid .mold:nth-child(3){grid-column:auto}
-.shelfgrid .mold:nth-child(3) canvas{width:100%}
-.mold{padding:4px 2px 5px}
-.mold canvas{width:68%}
-.mold b{font-size:15px;color:#4a3320}
-.mold .lock{background:rgba(228,230,233,.93)!important;flex-direction:column;font-size:26px;text-align:center;line-height:1.1}
-.mold .lock small{font-size:11px;font-weight:700;color:#5b5b5b}
-.bench{display:flex;flex-direction:column}
-.drawer{width:auto;flex:none;display:flex;gap:8px;margin-top:8px;align-items:stretch}
-.bags{flex:1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0}
-.bag{position:relative;flex-direction:column;justify-content:center;gap:0;min-height:62px;padding:2px 2px;font-size:15px;overflow:hidden;line-height:1.15}
-.bag .bi{font-size:18px;letter-spacing:-6px;margin-right:-4px;height:24px}
-.bag .bl{font-size:15px}
-.bag.locked{background:#eee7d8;opacity:.8;cursor:not-allowed}
-.bag .bk{display:none;position:absolute;inset:0;background:rgba(232,226,212,.96);align-items:center;justify-content:center;font-size:22px}
-.bag.locked .bk{display:flex}
-.dbtns{display:flex;flex-direction:column;gap:6px;width:104px}
-.dbtns .btn{min-height:28px;font-size:13px;padding:2px 6px;flex:1}
-.oven{width:250px}
-.trash{margin-top:auto;padding:4px;font-size:26px}
-.cust .cat,.slot .cat{font-size:50px}
-.slot.giant .cat{font-size:60px}
-.slot .cat .md{font-size:22px;vertical-align:top}
 .slot.giant{border-color:#d94b43;box-shadow:0 0 0 3px #f6c9c5}
+.slot.giant .cat{font-size:60px}
 .slot.giant .tag{background:#f6c9c5;color:#a02a24}
+.slot .cat .md{font-size:22px;vertical-align:top}
 .shoprow{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line)}
 .shoprow .si{font-size:30px;width:40px;text-align:center}
-.shoprow .sx{flex:1;line-height:1.35}
-.shoprow .sx b{display:block;font-size:16px}
-.shoprow .sx span{font-size:13px;color:#8a6a45}
-.shoprow .btn{min-width:108px;min-height:42px;font-size:15px;padding:4px 10px}
+.shoprow .sx{flex:1;line-height:1.4}
+.shoprow .sx b{display:block;font-size:var(--fs-md)}
+.shoprow .sx span{font-size:var(--fs-sm);color:#8a6a45}
+.shoprow .btn{min-width:108px;min-height:44px;font-size:var(--fs-md);padding:4px 10px}
 .shoprow .btn.done{background:#dcefe3;color:#2f7a4c;box-shadow:none}
 .shoprow .btn.lockd{background:#e3e3e3;color:#777;box-shadow:none}
-.shoph{font-size:13px;font-weight:800;color:#8a5a2b;margin:8px 0 0}
-.res{overflow:auto}
-.upb{margin-top:3px;border:0;border-radius:10px;background:#e8dfcb;color:#8a7a5c;font-weight:800;font-size:12px;padding:5px 6px;width:92%}
+.shoph{font-size:var(--fs-sm);font-weight:800;color:#8a5a2b;margin:8px 0 0}
+.upb{margin-top:3px;border:0;border-radius:10px;background:#e8dfcb;color:#8a7a5c;font-weight:800;font-size:var(--fs-xs);padding:6px;width:92%}
 .upb.can,.upg.can{background:#2f9e63;color:#fff;box-shadow:0 2px 0 #1f7444;animation:glow 1.1s infinite}
-.upg{width:100%;min-height:34px;font-size:12px;padding:3px 4px;margin:0 0 6px;background:#e8dfcb;color:#8a7a5c;box-shadow:none}
+.upg{width:100%;min-height:38px;font-size:var(--fs-xs);padding:4px;margin:0 0 6px;background:#e8dfcb;color:#8a7a5c;box-shadow:none}
 .upg.can{background:#2f9e63;color:#fff}
 @keyframes glow{0%,100%{filter:none}50%{filter:brightness(1.18)}}
-.mold.canbuy .lock,.bag.canbuy .bk{background:rgba(190,240,210,.96)!important;animation:glow 1.1s infinite}
-.mold .lock{cursor:pointer}.bag.locked{cursor:pointer}
-.bag .bk{flex-direction:column;font-size:18px;line-height:1.1;font-weight:800}
-.bag .bk small,.mold .lock small{font-size:12px}
-.mold{padding:3px 2px 4px}.mold canvas{width:50%}.shelfgrid{gap:6px}
-/* ===== 좁은 화면(폰 가로) : 세로로 눌러 담기 ===== */
-.compact .screen{padding:4px 8px}
-.compact .hud{height:30px}
-.compact .hud .title{font-size:15px}
-.compact .coins{font-size:17px;min-width:96px}
-.compact .custrow{margin:0 0 4px;padding-bottom:3px;border-bottom-width:5px}
-.compact .slot canvas{max-width:236px}
-.compact .slot .cat,.compact .cust .cat{font-size:30px}
-.compact .slot.giant .cat{font-size:36px}
-.compact .slot .tag{font-size:11px;margin-bottom:2px}
-.compact .slot .pbar{height:6px}
-.compact h2{font-size:13px;margin-bottom:3px}
-.compact .card{padding:6px}
-.compact .oven{width:196px}
-.compact .shelf{width:140px}
-/* 재료 3칸이 반드시 다 보여야 한다 (선반 그리드는 overflow:hidden이라 넘치면 소리 없이 잘린다) */
+/* 좁은 화면(폰 가로): 간격·열 폭만 줄이고, 글씨는 14px 미만으로 내리지 않는다 */
+.compact{
+  --fs-xs:14px;--fs-sm:14px;--fs-md:15px;--fs-lg:16px;--fs-xl:18px;--fs-2xl:20px;--fs-3xl:24px;
+}
+.compact .screen{
+  padding:max(4px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px))
+    max(4px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+}
+.compact .hud{height:34px;gap:8px}
+.compact .coins{min-width:88px}
+.compact .custrow{margin:0 0 4px;padding-bottom:3px;border-bottom-width:5px;gap:6px}
+.compact .slot{padding:1px 4px 4px;border-radius:12px}
+.compact .slot canvas{max-width:220px}
+.compact .slot .cat,.compact .cust .cat{font-size:34px}
+.compact .slot.giant .cat{font-size:40px}
+.compact .card{padding:5px 6px;border-radius:12px}
+.compact .kitchen{gap:6px}
+.compact .shelf{flex-basis:clamp(120px,16vw,148px)}
+.compact .oven{flex-basis:clamp(160px,22vw,200px)}
 .compact .shelfgrid{gap:4px}
-.compact .mold{padding:2px 2px 3px}
-.compact .mold canvas,.compact .shelfgrid .mold:nth-child(3) canvas{width:36%}
-.compact .mold b{font-size:12px}
-.compact .mold span{font-size:10px}
+.compact .mold{padding:2px;box-shadow:0 2px 0 var(--line)}
+.compact .mold canvas{width:40%}
 .compact .mold .lock{font-size:20px}
-.compact .mold .lock small{font-size:9px}
-.compact .upb{font-size:10px;padding:3px 4px;margin-top:2px}
-.compact .dbtns{width:86px}
-.compact .dbtns .btn{min-height:22px;font-size:11px}
-.compact .bag{min-height:46px;font-size:13px}
-.compact .upg{min-height:26px;font-size:11px}
-.compact #cookBtn{min-height:40px;font-size:16px;margin-top:4px}
-.compact #toOven{min-height:40px;font-size:16px}
-.compact .trash{font-size:20px;padding:2px}
+.compact .dbtns{width:86px;gap:4px}
+.compact .dbtns .btn{min-height:36px}
+.compact .bag{min-height:48px;border-radius:10px;box-shadow:0 2px 0 var(--line)}
+.compact .drawer{gap:6px;margin-top:4px}
+.compact .upg{min-height:34px;margin-bottom:4px}
+.compact #cookBtn,.compact #toOven{min-height:44px}
+.compact #cookBtn,.compact #toOven{margin-top:4px}
+.compact .trash{font-size:22px;padding:3px;border-width:2px}
 .compact .trash small{display:none}
-.compact .benchinfo{margin:3px 0}
-.compact .gcard{padding:12px 16px}
-.compact .gcard h2{font-size:18px}
-.compact .step{padding:6px;font-size:13px;line-height:1.4}
+.compact .benchinfo{margin:2px 0;min-height:18px}
+.compact .gcard{padding:14px 16px;width:min(96vw,560px);border-radius:16px}
+.compact .gcard .ri-ico{font-size:40px}
+.compact .steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.compact .step{padding:8px}
 .compact .step .ic{font-size:26px}
-/* ===== 이름·학번 ===== */
+.compact .gcard .foot{flex-direction:column;align-items:stretch}
+.compact .gcard .foot .btn{width:100%;min-height:48px}
+.compact .intro{gap:8px;padding-bottom:8px}
+.compact .intro .big{font-size:36px}
+.compact .intro ol{font-size:var(--fs-md);line-height:1.55;padding-left:20px}
+.compact #chrome button{min-height:40px;padding:3px 10px}
+.compact .pf input{min-height:44px;width:min(46vw,170px);padding:6px 10px}
+.compact .cols-result>.card{flex:1 1 220px}
+.compact .profile{gap:8px}
+.compact h2{margin-bottom:4px}
+/* 이름·학번 */
+.profile-lead{margin:10px 0 4px;font-size:var(--fs-sm);font-weight:700;color:#6b5236;line-height:1.45}
 .profile{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:2px 0 0}
 .pf{display:flex;align-items:center;gap:7px}
-.pf label{font-size:15px;font-weight:800;color:#6b5236}
-/* 게임 전체가 touch-action:none, user-select:none 이라 입력칸은 되돌려 준다.
-   안 그러면 태블릿에서 글자를 넣거나 고를 수 없다. font-size는 16px 이상이어야
-   iOS가 입력할 때 화면을 확대하지 않는다 */
+.pf label{font-size:var(--fs-sm);font-weight:800;color:#6b5236}
 .pf input{font:inherit;font-size:16px;padding:9px 12px;min-height:46px;width:190px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);-webkit-user-select:text;user-select:text;touch-action:manipulation}
 .pf input:focus{outline:3px solid #4f86f7;border-color:#4f86f7}
-.perr{min-height:20px;font-size:14px;font-weight:700;color:var(--bad)}
-.priv{font-size:12px;color:#8a6a45;margin-top:2px}
+.perr{min-height:20px;font-size:var(--fs-sm);font-weight:700;color:var(--bad)}
+.priv{font-size:var(--fs-xs);color:#8a6a45;margin-top:2px}
 .priv a{color:#8a6a45}
-.compact .intro ol{font-size:14px;line-height:1.5}
-.compact .intro .big{font-size:34px}
-.compact h1{font-size:22px}
-.compact .pf input{min-height:38px;width:150px;font-size:14px;padding:5px 9px}
-/* ===== 랭킹 ===== */
-#rankTable td{font-size:14px;padding:4px 7px}
+/* 랭킹 */
+#rankTable td,#rankTable th{font-size:var(--fs-md);padding:6px 8px}
 #rankTable .me td{font-weight:800;color:#c9631f;background:#fff7e6}
 #rankMsg.ok{color:var(--ok);font-weight:700}
 #rankMsg.err{color:var(--bad);font-weight:700}

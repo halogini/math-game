@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>🥖 냥셰프의 빵집 - HaloMath Arcade</title>
 
 <!-- Security & Meta Tags -->
@@ -13,7 +16,7 @@
 <!-- X-Frame-Options와 frame-ancestors는 <meta>로는 효력이 없다(브라우저가 무시하고 경고만 낸다).
      클릭재킹을 막으려면 서버가 HTTP 헤더로 보내야 한다. -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
-<meta name="description" content="거인 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
+<meta name="description" content="사자·코끼리 같은 큰 동물 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
 
 <link rel="stylesheet" href="style.css">
 
@@ -28,7 +31,7 @@
 <div class="toast" id="toast"></div>
 <canvas id="ghost" width="200" height="200"></canvas>
 <div id="dbg"></div>
-<div id="stage">
+<div id="stage" style="visibility:hidden">
 <div id="chrome">
   <button id="fsBtn">⛶ 전체화면</button>
   <button id="sndBtn" title="소리 켜기/끄기">🔊</button>
@@ -39,21 +42,22 @@
   <div class="intro">
     <div class="big">🦁🐯🐘🦒 🥖🍞🍰</div>
     <h1>냥셰프의 빵집</h1>
-    <div class="sub">4라운드 · 거인 손님들의 주문</div>
+    <div class="sub">4라운드 · 큰 동물 손님들의 주문</div>
     <ol>
-      <li>🦁 몸집 큰 <b>거인 손님</b>들이 빵집에 몰려와요! 우리 크기 빵의 <b>몇 배 크기</b>를 주문해요.</li>
+      <li>🦁🐯🐘 사자·코뿔소처럼 <b>몸집 큰 동물 손님</b>들이 빵집에 몰려와요! 우리 크기 빵의 <b>몇 배 크기</b>를 주문해요.</li>
       <li><b>재료 선반</b>에서 만들 빵의 재료를 고르고, <b>재료 봉지</b>를 접시에 끌어다 놓아요.</li>
       <li><b>오븐</b>에서 박자에 맞춰 <b>화면 아무 곳이나</b> 톡톡! 탭할수록 노릇노릇 익어요.</li>
-      <li>완성품을 <b>거인에게 끌어다 놓으면</b> 서빙! <b>빨리 해결할수록 손님이 더 많이</b> 와요. 번 코인으로 <b>바로바로 가게를 업그레이드</b>해요!</li>
+      <li>완성품을 <b>손님에게 끌어다 놓으면</b> 서빙! <b>빨리 해결할수록 손님이 더 많이</b> 와요. 번 코인으로 <b>바로바로 가게를 업그레이드</b>해요!</li>
     </ol>
+    <p class="profile-lead" id="profileLead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
     <div class="profile">
       <div class="pf">
-        <label for="inName" id="labName">이름</label>
+        <label for="inName" id="labName">이름:</label>
         <input type="text" id="inName" maxlength="12" placeholder="예: 홍길동" autocomplete="nickname">
       </div>
       <div class="pf" id="idGroup">
-        <label for="inId">학번</label>
-        <input type="text" id="inId" maxlength="10" placeholder="예: 2230" inputmode="numeric">
+        <label for="inId" id="labId">학번:</label>
+        <input type="text" id="inId" maxlength="10" placeholder="4글자로 입력 (예: 2230)" autocomplete="off">
       </div>
     </div>
     <div class="perr" id="pErr"></div>
@@ -86,7 +90,7 @@
           <button class="btn ghost" id="clearBtn">🧹 비우기</button>
         </div>
       </div>
-      <button class="btn" id="toOven" style="width:100%;margin-top:6px">🔥 오븐에 넣기</button>
+      <button class="btn" id="toOven">🔥 오븐에 넣기</button>
     </div>
     <div class="card oven" id="ovenBox">
       <h2>🔥 오븐</h2>
@@ -95,43 +99,23 @@
       <button class="btn" id="cookBtn">🔥 굽기</button>
       <div class="trash" id="trash">🗑️<small>끌어서 버리기</small></div>
     </div>
-    <div class="guide" id="guide">
-      <div class="gcard">
-        <h2>🦁 이렇게 일해요!</h2>
-        <div class="steps">
-          <div class="step"><div class="ic">🧺</div><b>① 재료 고르기</b><br>손님이 주문한 빵의 <b>재료 선반</b>을 탭해요</div>
-          <div class="step"><div class="ic">🥖</div><b>② 재료 넣기</b><br><b>재료 봉지를 접시에 끌어다</b> 놓아요. 거인 크기의 빵이 되게!</div>
-          <div class="step"><div class="ic">🔥</div><b>③ 오븐 굽기</b><br>링이 가운데 원에 닿을 때 <b>화면 아무 곳이나 톡!</b></div>
-          <div class="step"><div class="ic">🦒</div><b>④ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
-        </div>
-        <div class="foot"><span>빨리 해결하면 손님이 더 많이 와요! 번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (🔒나 ⬆ 버튼을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
-      </div>
-    </div>
-    <div class="guide" id="rintro" style="display:none">
-      <div class="gcard" style="text-align:center;max-width:620px">
-        <div style="font-size:64px" id="riIco">🥖</div>
-        <h2 id="riTitle" style="font-size:26px">1라운드</h2>
-        <div id="riDesc" style="font-size:17px;line-height:1.6;margin:6px 0 14px"></div>
-        <button class="btn" id="riBtn">영업 시작 ▶</button>
-      </div>
-    </div>
   </div>
 </section>
 
-<!-- 라운드 종료 + 상점 -->
+<!-- 라운드 종료 -->
 <section id="roundEnd" class="screen">
   <div class="res">
     <h1 id="reTitle">라운드 종료</h1>
     <div class="sub" id="reSub"></div>
-    <div class="cols" style="align-items:flex-start;max-width:720px;margin:0 auto">
+    <div class="cols cols-one">
       <div class="card">
-        <h2 style="font-size:18px">이번 라운드 장부</h2><table id="reLedger"></table>
-        <h2 style="font-size:18px;margin-top:14px">📒 요리 기록장</h2>
+        <h2>이번 라운드 장부</h2><table id="reLedger"></table>
+        <h2 class="mt">📒 요리 기록장</h2>
         <div class="title2" id="reNoteHint"></div>
         <table id="reNotebook"></table>
       </div>
     </div>
-    <div class="row" style="justify-content:center;margin:12px 0 20px"><button class="btn" id="nextBtn">다음 라운드 ▶</button></div>
+    <div class="row row-center"><button class="btn" id="nextBtn">다음 라운드 ▶</button></div>
   </div>
 </section>
 
@@ -140,24 +124,46 @@
   <div class="res">
     <h1 id="resTitle">영업 종료!</h1>
     <div class="sub" id="resSub">4라운드 결과</div>
-    <div class="cols" style="align-items:flex-start">
-      <div class="card"><h2 style="font-size:18px">오늘의 장부</h2><table id="ledger"></table></div>
+    <div class="cols cols-result">
+      <div class="card"><h2>오늘의 장부</h2><table id="ledger"></table></div>
       <div class="card">
-        <h2 style="font-size:18px">📒 요리 기록장</h2>
+        <h2>📒 요리 기록장</h2>
         <div class="title2" id="noteHint"></div>
         <table id="notebook"></table>
       </div>
       <div class="card">
-        <h2 style="font-size:18px">🏆 명예의 전당</h2>
+        <h2>🏆 명예의 전당</h2>
         <div class="title2" id="rankMsg">랭킹을 불러오는 중…</div>
         <table id="rankTable"></table>
       </div>
     </div>
     <div class="insight" id="insight"></div>
-    <div class="row" style="justify-content:flex-end;margin:8px 0 20px"><button class="btn" id="againBtn">처음부터 다시 ↻</button></div>
+    <div class="row row-end"><button class="btn" id="againBtn">처음부터 다시 ↻</button></div>
   </div>
 </section>
 </div><!-- /#stage -->
+
+<!-- 안내 창은 stage transform 밖에 둔다. 그래야 실제 화면 중앙에 고정된다 -->
+<div class="guide" id="guide" hidden>
+  <div class="gcard">
+    <h2>🦁 이렇게 일해요!</h2>
+    <div class="steps">
+      <div class="step"><div class="ic">🧺</div><b>① 재료 고르기</b><br>손님이 주문한 빵의 <b>재료 선반</b>을 탭해요</div>
+      <div class="step"><div class="ic">🥖</div><b>② 재료 넣기</b><br><b>재료 봉지를 접시에 끌어다</b> 놓아요. 손님이 시킨 배율 크기의 빵이 되게!</div>
+      <div class="step"><div class="ic">🔥</div><b>③ 오븐 굽기</b><br>링이 가운데 원에 닿을 때 <b>화면 아무 곳이나 톡!</b></div>
+      <div class="step"><div class="ic">🦒</div><b>④ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
+    </div>
+    <div class="foot"><span>빨리 해결하면 손님이 더 많이 와요! 번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (🔒나 ⬆ 버튼을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
+  </div>
+</div>
+<div class="guide" id="rintro" hidden>
+  <div class="gcard h-center">
+    <div class="ri-ico" id="riIco">🥖</div>
+    <h2 id="riTitle">1라운드</h2>
+    <div class="ri-desc" id="riDesc"></div>
+    <button class="btn" id="riBtn">영업 시작 ▶</button>
+  </div>
+</div>
 
 <script src="../../shared/halomath-mode.js"></script>
 <script src="../../shared/halomath-profile.js"></script>

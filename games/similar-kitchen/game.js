@@ -6,15 +6,51 @@
    여기서는 부르기만 한다. Firebase가 없거나 막혀도 게임은 그대로 돌아가야 한다. */
 var firebaseConfig=(window.ENV&&window.ENV.FIREBASE_CONFIG)||null;
 var firebaseDb=null;
+var firebaseAuth=null;
 if(window.firebase&&firebaseConfig&&firebaseConfig.apiKey){
   try{
     if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
     firebaseDb=firebase.database();
+    if(firebase.auth)firebaseAuth=firebase.auth();
   }catch(err){console.error('Firebase init failed:',err)}
+}
+/* 관리자 미리보기만 허용. 포털 관리자 로그인 중이거나 이메일 계정이 있을 때만. */
+function hasAdminPreviewAccess(){
+  try{if(localStorage.getItem('halomath_admin_preview')==='1')return true}catch(e){}
+  var u=firebaseAuth&&firebaseAuth.currentUser;
+  return !!(u&&u.email);
+}
+function showPreviewLocked(){
+  var stage=document.getElementById('stage');
+  if(!stage)return;
+  stage.style.visibility='visible';
+  stage.innerHTML='<div class="intro" style="max-width:420px;margin:12vh auto;text-align:center;padding:28px">'
+    +'<div class="big">🥖</div>'
+    +'<h1>냥셰프의 빵집</h1>'
+    +'<div class="sub" style="margin-top:12px;line-height:1.5">이 게임은 아직 준비 중이에요.</div>'
+    +'</div>';
+}
+function gateAdminPreview(then){
+  var stage=document.getElementById('stage');
+  if(stage)stage.style.visibility='hidden';
+  function pass(){
+    if(hasAdminPreviewAccess()){
+      if(stage)stage.style.visibility='visible';
+      then();
+    }else showPreviewLocked();
+  }
+  if(firebaseAuth){
+    var done=false;
+    var unsub=firebaseAuth.onAuthStateChanged(function(){
+      if(done)return;done=true;try{unsub()}catch(e){}
+      pass();
+    });
+    setTimeout(function(){if(done)return;done=true;try{unsub()}catch(e){}pass()},2500);
+  }else pass();
 }
 var GAME_ID='similar-kitchen';
 var GAME_IDS=['similar-kitchen','nyang-bakery','similar_kitchen'];
-var activeMode=(window.HalomathMode&&HalomathMode.detectActiveMode())||'school';
+var activeMode=(window.HalomathMode&&HalomathMode.detectActiveMode())||'dorms';
 function sanitize(s,max){
   if(typeof s!=='string')return '';
   return s.replace(/[<>'"/]/g,'').trim().slice(0,max||12);
@@ -37,6 +73,9 @@ if(activeMode==='dorms'&&(!playerName||playerName==='도전자')){
 }
 /* ===== 설정 ===== */
 var SLOTS=3,BEAT=0.7,WRONG_COST=5,BASE_R=16,PAT_BONUS=0.3,GIANT_MULT=1.5,ROUND_T=70,COMBO_BONUS=20,LAST_ROUND=4;
+/* 라운드 종료 N초 전부터는 손님이 한 명이라도 있으면 새 손님을 받지 않는다.
+   빈자리만 남은 경우에는 그래도 한 명 받아, 마감 직전에 손님이 텅 비지 않게 한다 */
+var SPAWN_LOCK=18;
 var ANIMALS=[['🦁','사자'],['🐯','호랑이'],['🦛','하마'],['🐘','코끼리'],['🦒','기린'],['🦏','코뿔소'],['🐻','곰']];
 var DISHES=[
   {name:'냥 바게트',ing:'반죽',ico:'🥖',dim:1,max:15,tile:'#e8a94f',edge:'#b8742a',raw:'#f6e6c8',rawEdge:'#dcc08e',unit:'개',price:0,unlockR:1,up:[150,300],lvDesc:['','','깨를 솔솔 뿌린 바게트','윤기 나는 황금 바게트']},
@@ -207,8 +246,17 @@ function freeSeat(){
   var used={};S.cust.forEach(function(c){if(c.slot>=0&&c.state!=='gone')used[c.slot]=true});
   for(var i=0;i<SLOTS;i++)if(!used[i])return i;return -1;
 }
+function liveCustCount(){
+  var n=0;S.cust.forEach(function(c){if(c.state!=='gone')n++});return n;
+}
+/* 마감 임박에는 손님이 남아 있으면 더 받지 않는다. 텅 비었을 때만 예외 */
+function canSpawnMore(){
+  if(S.roundT-S.time>SPAWN_LOCK)return true;
+  return liveCustCount()===0;
+}
 function spawn(giant){
   var seat=freeSeat();if(seat<0)return null;
+  if(!canSpawnMore())return null;
   var c=makeCust(giant);c.slot=seat;S.cust.push(c);
   S.nextAt=S.time+8+rnd()*4;
   sfx(giant?'giantIn':'arrive');
@@ -528,7 +576,7 @@ function cookTap(){
     o.state='done';o.dish.cooked=true;
     o.dish.quality=o.grades.reduce(function(a,b){return a+b},0)/o.grades.length;
     sfx('done');
-    toast('✅ 완성! 완성도 '+Math.round(o.dish.quality*100)+'% · 거인에게 끌어다 놓아요');
+    toast('✅ 완성! 완성도 '+Math.round(o.dish.quality*100)+'% · 손님에게 끌어다 놓아요');
   }
   updateAll();
 }
@@ -572,9 +620,9 @@ function renderOven(){
   ovenFrame(octx,G.u.oven);
   var o=S.oven,d=o.dish;
   if(!d){
-    octx.fillStyle='#8f7350';octx.font='700 16px Malgun Gothic,sans-serif';octx.textAlign='center';
+    octx.fillStyle='#8f7350';octx.font='700 17px Malgun Gothic,sans-serif';octx.textAlign='center';
     octx.fillText('빈 오븐',OW/2,OH/2);
-    octx.font='13px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+22);
+    octx.font='15px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
     return;
   }
   var CO=fitCell(d,220,135,44);
@@ -650,22 +698,22 @@ function drawBubble(cnv,c0,got){
   var k=c0.k,ty=c0.dish,c=cnv.getContext('2d'),w=SLOT_W,h=SLOT_H,base=h-14;
   c.clearRect(0,0,w,h);
   rr(c,2,2,w-4,h-6,16);c.fillStyle='#fff';c.fill();c.lineWidth=2;c.strokeStyle='#ead6b4';c.stroke();
-  c.fillStyle='#8a6a45';c.font='700 12px Malgun Gothic,sans-serif';c.textAlign='left';
+  c.fillStyle='#8a6a45';c.font='700 15px Malgun Gothic,sans-serif';c.textAlign='left';
   if(!got){
     c.fillText(DISHES[ty].name+' 원본',12,base-36);
     sil(c,ty,1,40,base,30);
     c.fillStyle='#3b2a1a';c.font='800 22px Malgun Gothic,sans-serif';c.textAlign='center';c.fillText('→',100,base-14);
     sil(c,ty,k,186,base,ty===0?124:ty===1?84:38);
-    c.fillStyle='#8a6a45';c.font='700 12px Malgun Gothic,sans-serif';c.textAlign='center';c.fillText('이 크기로 만들어 줘!',186,15);
-    c.fillStyle=c0.giant?'#d94b43':'#c9631f';c.font='700 13px Malgun Gothic,sans-serif';c.textAlign='center';c.fillText('닮음비',296,base-52);
-    c.font='800 24px Malgun Gothic,sans-serif';c.fillText('1 : '+k,296,base-26);
+    c.fillStyle='#8a6a45';c.font='700 15px Malgun Gothic,sans-serif';c.textAlign='center';c.fillText('이 크기로 만들어 줘!',186,15);
+    c.fillStyle=c0.giant?'#d94b43':'#c9631f';c.font='700 15px Malgun Gothic,sans-serif';c.textAlign='center';c.fillText('닮음비',296,base-52);
+    c.font='800 26px Malgun Gothic,sans-serif';c.fillText('1 : '+k,296,base-26);
   }else{
     var g=got,gd=newDish(g.type,g.n);gd.cooked=true;
-    c.fillStyle='#8a6a45';c.textAlign='center';c.font='700 13px Malgun Gothic,sans-serif';
+    c.fillStyle='#8a6a45';c.textAlign='center';c.font='700 15px Malgun Gothic,sans-serif';
     c.fillText('주문 1 : '+k,80,22);
     sil(c,ty,k,80,base,ty===0?110:ty===1?70:34);
     c.fillStyle='#d94b43';c.font='800 26px Malgun Gothic,sans-serif';c.fillText('≠',170,base-24);
-    c.fillStyle='#d94b43';c.font='700 13px Malgun Gothic,sans-serif';
+    c.fillStyle='#d94b43';c.font='700 15px Malgun Gothic,sans-serif';
     c.fillText('받은 것 '+DISHES[g.type].ico+g.n+'개',260,22);
     var c2=fitCell(gd,110,76,20);drawDishState(c,260,base,c2,gd,1);
   }
@@ -834,28 +882,45 @@ function updateAll(){
 
 /* ===== 라운드 진행 ===== */
 /* ===== 이름·학번 =====
-   기숙사(dorms) 모드는 닉네임만, 학교(school) 모드는 이름과 학번을 받는다 */
+   다른 아케이드 게임과 같은 HalomathProfile 규칙:
+   dorms = 닉네임만, school = 이름 + 학번 */
+function nameFieldLabel(){return activeMode==='dorms'?'닉네임':'이름'}
 function profileInit(){
-  var n=$('inName'),i=$('inId');
-  n.value=playerName;i.value=studentId;
-  $('labName').textContent=activeMode==='dorms'?'닉네임':'이름';
-  $('idGroup').style.display=activeMode==='school'?'':'none';
-  n.placeholder=activeMode==='dorms'?'예: 별빛42':'예: 홍길동';
+  var n=$('inName'),i=$('inId'),lead=$('profileLead');
+  if(activeMode==='dorms'){
+    document.body.classList.add('mode-dorms');
+    $('labName').textContent='닉네임:';
+    $('idGroup').style.display='none';
+    if(i){i.value='';i.disabled=true;i.removeAttribute('required')}
+    n.placeholder='닉네임';
+    if(lead)lead.textContent='닉네임을 입력해야 시작할 수 있습니다.';
+    if(!playerName||playerName==='도전자'){
+      playerName=randomDormsNick();
+      if(window.HalomathProfile)HalomathProfile.saveName(activeMode,playerName);
+    }
+  }else{
+    document.body.classList.remove('mode-dorms');
+    $('labName').textContent='이름:';
+    $('idGroup').style.display='';
+    if(i){i.disabled=false;i.placeholder='4글자로 입력 (예: 2230)';i.value=studentId||''}
+    n.placeholder='예: 홍길동';
+    if(lead)lead.textContent='이름과 학번을 입력해야 시작할 수 있습니다.';
+  }
+  n.value=playerName||'';
 }
 /* 통과하면 이름·학번을 저장하고 true를 준다 */
 function profileCommit(){
   var e=$('pErr'),name=sanitize($('inName').value,12);
-  if(!name){e.textContent=(activeMode==='dorms'?'닉네임을':'이름을')+' 입력해 주세요.';$('inName').focus();return false}
+  if(!name){e.textContent=nameFieldLabel()+'을 입력해야 시작할 수 있습니다.';$('inName').focus();return false}
   if(activeMode==='school'){
     var id=sanitize($('inId').value,10);
-    /* 판정은 공유 모듈(1~10자, 한글·영문·숫자·-)에 맡긴다. 다른 게임과 같은 기준이어야
-       같은 학생의 기록이 게임마다 어긋나지 않는다. 자릿수를 더 죄려면 여기가 아니라
-       shared/halomath-profile.js를 고쳐 다 같이 바꿔야 한다 */
     if(window.HalomathProfile&&!HalomathProfile.isValidStudentId(id)){
-      e.textContent='학번을 입력해 주세요. (예: 2230)';$('inId').focus();return false;
+      e.textContent='학번을 1~10자 영문·숫자·한글로 입력해 주세요.';$('inId').focus();return false;
     }
     studentId=id;
     if(window.HalomathProfile)HalomathProfile.saveStudentId(activeMode,studentId);
+  }else{
+    studentId='';
   }
   playerName=name;
   if(window.HalomathProfile)HalomathProfile.saveName(activeMode,playerName);
@@ -866,15 +931,19 @@ profileInit();
 
 /* 전체화면 전환은 사용자가 누른 순간에만 허용된다. 시작 버튼이 그 기회다 */
 $('startBtn').onclick=function(){
+  if(!hasAdminPreviewAccess()){showPreviewLocked();return}
   if(!profileCommit())return;
   if(wantsFS())fsRequest();
   audioUnlock();
-  if(window.HalomathPlayStats&&HalomathPlayStats.recordPlay){
-    try{HalomathPlayStats.recordPlay({gameId:GAME_ID,activeMode:activeMode,name:playerName,studentId:studentId})}catch(e){}
-  }
   startGame();
 };
 function startGame(){resetG();startRound(1,true)}
+function setOverlay(id,on){
+  var el=$(id);if(!el)return;
+  el.hidden=!on;
+  el.classList.toggle('is-on',!!on);
+  if(on)el.style.display='flex';else el.style.display='';
+}
 function startRound(r,withGuide){
   G.round=r;newRound(r);drag=null;bagDrag=null;fx=[];fxClear();
   shake.mag=0;shake.until=0;applyStage(0,0);
@@ -888,15 +957,15 @@ function startRound(r,withGuide){
   DISHES.forEach(function(d,i){if(d.unlockR===r&&r>1)msg+='<br>🆕 <b>'+d.name+'</b>을 열 수 있어요! 재료 선반의 🔒를 눌러 코인으로 열어요.'});
   $('riDesc').innerHTML=msg;
   slotEls.forEach(function(el){el.dataset.cid='';el.dataset.mode='';el.dataset.f=''});
-  if(withGuide&&G.hintOn){$('guide').style.display='flex';$('rintro').style.display='none'}
-  else{$('guide').style.display='none';$('rintro').style.display='flex'}
+  if(withGuide&&G.hintOn){setOverlay('guide',true);setOverlay('rintro',false)}
+  else{setOverlay('guide',false);setOverlay('rintro',true)}
   show('play');last=performance.now();updateAll();requestAnimationFrame(loop);
 }
 function endGuide(){
   if(!S.guide)return;
-  S.guide=false;G.hintOn=false;$('guide').style.display='none';$('rintro').style.display='none';last=performance.now();updateAll();
+  S.guide=false;G.hintOn=false;setOverlay('guide',false);setOverlay('rintro',false);last=performance.now();updateAll();
 }
-$('guideBtn').onclick=function(){$('guide').style.display='none';$('rintro').style.display='flex'};
+$('guideBtn').onclick=function(){setOverlay('guide',false);setOverlay('rintro',true)};
 $('riBtn').onclick=endGuide;
 
 function update(dt){
@@ -911,7 +980,7 @@ function update(dt){
       c.state='gone';callNext(sp);c.slot=-1;
     }
   });
-  if(freeSeat()>=0){
+  if(freeSeat()>=0&&canSpawnMore()){
     if(S.giants.length&&S.time>=S.giants[0]){S.giants.shift();spawn(true)}
     else if(S.time>=S.nextAt)spawn(false);
   }
@@ -1025,10 +1094,11 @@ function finishGame(){
 }
 
 /* ===== 랭킹 =====
-   점수는 설계대로 「번 코인의 합 + 참여 30」이다. 높을수록 좋다. */
+   점수는 설계대로 「번 코인의 합 + 참여 30」이다. 높을수록 좋다.
+   쓰기·읽기는 다른 아케이드와 같이 scores/ 평탄 경로 + 레거시 dorms 하위. */
 function submitScore(score){
   var msg=$('rankMsg');
-  if(!playerName){msg.textContent='이름이 없어 랭킹에 올리지 않았어요.';return}
+  if(!playerName){msg.textContent=nameFieldLabel()+'이 없어 랭킹에 올리지 않았어요.';return}
   if(!firebaseDb||!window.HalomathScores){
     msg.className='title2 err';
     msg.textContent='랭킹 서버에 연결하지 못했어요. 점수는 화면에만 남아요.';
@@ -1063,52 +1133,94 @@ function submitScore(score){
 }
 function rankRows(list){
   if(!list.length)return '<tr><td>아직 기록이 없어요</td></tr>';
-  var h='<tr><th>순위</th><th>이름</th>'+(activeMode==='school'?'<th>학번</th>':'')+'<th class="r">코인</th></tr>';
+  var nameTh=activeMode==='dorms'?'닉네임':'이름';
+  var h='<tr><th>순위</th><th>'+nameTh+'</th>'+(activeMode==='school'?'<th>학번</th>':'')+'<th class="r">코인</th></tr>';
   list.forEach(function(e,i){
     var me=window.HalomathScores&&HalomathScores.matchesPlayer(e,playerName,studentId,activeMode);
+    var sid=e.studentId&&e.studentId!=='DORMS'&&e.studentId!=='DOREMS'?e.studentId:'—';
     h+='<tr'+(me?' class="me"':'')+'><td>'+(i+1)+'</td><td>'+esc(e.name||'')+'</td>'
-      +(activeMode==='school'?'<td>'+esc(e.studentId||'')+'</td>':'')
+      +(activeMode==='school'?'<td>'+esc(sid)+'</td>':'')
       +'<td class="r">'+Math.round(e.score||0)+'</td></tr>';
   });
   return h;
 }
-function fetchRanking(){
-  var url='https://math-game-halogini-default-rtdb.firebaseio.com/scores'
-    +(activeMode==='dorms'?'/dorms':'')+'.json';
-  var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},3500);
-  fetch(url,{signal:ctl.signal}).then(function(r){return r.json()}).then(function(data){
-    clearTimeout(to);
-    var list=[];
-    Object.keys(data||{}).forEach(function(k){
-      var v=data[k];
-      if(!v||typeof v!=='object'||typeof v.score!=='number')return;
-      if(window.HalomathScores){
-        if(!HalomathScores.matchesGameId(v,GAME_IDS))return;
-        /* 학교 랭킹에 기숙사 기록이 섞이지 않게 */
-        if(activeMode!=='dorms'&&HalomathScores.isDormsRecord(v))return;
-      }else if(String(v.gameId||'')!==GAME_ID)return;
-      list.push(v);
+function collectKitchenScores(dataObj){
+  var best=new Map();
+  function walk(obj,inDorms){
+    if(!obj||typeof obj!=='object')return;
+    Object.keys(obj).forEach(function(key){
+      var item=obj[key];
+      if(!item||typeof item!=='object')return;
+      if(item.name&&typeof item.score==='number'){
+        if(window.HalomathScores){
+          if(!HalomathScores.matchesGameId(item,GAME_IDS))return;
+        }else if(String(item.gameId||'')!==GAME_ID)return;
+        var isDorms=inDorms||(window.HalomathScores&&HalomathScores.isDormsRecord(item));
+        if(activeMode==='dorms'? !isDorms : isDorms)return;
+        var name=sanitize(item.name,12);
+        var sid=String(item.studentId||'').trim();
+        var score=Math.max(0,Math.round(Number(item.score)||0));
+        var userKey=activeMode==='school'?name+'_'+sid:name;
+        var prev=best.get(userKey);
+        if(!prev||score>prev.score)best.set(userKey,{name:name,studentId:sid,score:score});
+        return;
+      }
+      walk(item,inDorms||key==='dorms'||key==='dorems');
     });
-    list.sort(function(a,b){return b.score-a.score});
-    $('rankTable').innerHTML=rankRows(list.slice(0,20));
-  }).catch(function(){
-    clearTimeout(to);
-    $('rankTable').innerHTML='<tr><td>랭킹을 불러오지 못했어요</td></tr>';
-  });
+  }
+  walk(dataObj,false);
+  return Array.from(best.values()).sort(function(a,b){return b.score-a.score});
+}
+function processRankingData(dataObj){
+  var list=collectKitchenScores(dataObj||{});
+  $('rankTable').innerHTML=rankRows(list.slice(0,20));
+}
+function fetchRanking(){
+  var REST='https://math-game-halogini-default-rtdb.firebaseio.com';
+  function viaRest(){
+    var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},3500);
+    Promise.all([
+      fetch(REST+'/scores.json',{signal:ctl.signal}).then(function(r){return r.json()}).catch(function(){return null}),
+      fetch(REST+'/scores/dorms.json',{signal:ctl.signal}).then(function(r){return r.json()}).catch(function(){return null})
+    ]).then(function(parts){
+      clearTimeout(to);
+      var combined={};
+      if(parts[0]&&typeof parts[0]==='object')Object.assign(combined,parts[0]);
+      if(parts[1]&&typeof parts[1]==='object')Object.assign(combined,parts[1]);
+      processRankingData(combined);
+    }).catch(function(){
+      clearTimeout(to);
+      $('rankTable').innerHTML='<tr><td>랭킹을 불러오지 못했어요</td></tr>';
+    });
+  }
+  if(firebaseDb){
+    var done=false;
+    var to=setTimeout(function(){if(done)return;done=true;viaRest()},2500);
+    firebaseDb.ref('scores').once('value').then(function(snap){
+      return firebaseDb.ref('scores/dorms').once('value').then(function(snapD){
+        if(done)return;done=true;clearTimeout(to);
+        var combined={};
+        var a=snap.val(),b=snapD.val();
+        if(a&&typeof a==='object')Object.assign(combined,a);
+        if(b&&typeof b==='object')Object.assign(combined,b);
+        processRankingData(combined);
+      });
+    }).catch(function(){
+      if(done)return;done=true;clearTimeout(to);viaRest();
+    });
+    return;
+  }
+  viaRest();
 }
 $('againBtn').onclick=function(){show('intro')};
 
 /* ===== 화면 맞추기 =====
    기기마다 화면 크기가 제각각이라, 정해진 크기로 만든 화면을 통째로 줄이거나 키워서 맞춘다.
-   덕분에 어떤 기기에서도 버튼이 잘려 나가지 않는다.
-   DESIGN : 태블릿·PC 기준 크기. 지금 레이아웃이 실제로 요구하는 높이가 약 713px이다.
-   COMPACT: 폰 가로처럼 높이가 아주 낮은 화면. .compact CSS로 눌러 담은 뒤의 요구 높이다. */
-/* MAX_S: 기준 크기보다 크게는 키우지 않는다. 큰 모니터에서 화면이 부풀지 않게 하려는 것으로,
-   three-chances의 .game-container{max-width:1100px;margin:0 auto}와 같은 뜻이다 */
-var DESIGN={w:1024,h:740},COMPACT={w:900,h:540},MAX_S=1;
+   DESIGN : 태블릿·PC 기준. COMPACT: 폰 가로(낮은 높이).
+   safe-area는 CSS padding으로 흡수하고, 스케일은 visualViewport 기준으로 잡는다. */
+var DESIGN={w:1024,h:720},COMPACT={w:860,h:420},MAX_S=1;
 var VIEW={w:1024,h:716,s:1,q:1,compact:false,ox:0,oy:0};
 var stage=$('stage');
-/* 화면 흔들기가 기준 위치를 덮어쓰지 않도록, 변환은 항상 여기서만 쓴다 */
 function applyStage(dx,dy){
   stage.style.transform='translate('+(VIEW.ox+dx)+'px,'+(VIEW.oy+dy)+'px) scale('+VIEW.s+')';
 }
@@ -1119,11 +1231,31 @@ function tickShake(now){
 }
 var DBG=(function(){try{return new URLSearchParams(location.search).has('debug')}catch(e){return false}})();
 
+function safePad(){
+  var cs=getComputedStyle(document.documentElement);
+  function read(name){return parseFloat(cs.getPropertyValue(name))||0}
+  /* env()는 JS에서 직접 못 읽으므로, 임시 측정 노드로 읽는다 */
+  var probe=document.getElementById('__safeProbe');
+  if(!probe){
+    probe=document.createElement('div');probe.id='__safeProbe';
+    probe.style.cssText='position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    document.body.appendChild(probe);
+  }
+  var s=getComputedStyle(probe);
+  return{
+    t:parseFloat(s.paddingTop)||0,
+    r:parseFloat(s.paddingRight)||0,
+    b:parseFloat(s.paddingBottom)||0,
+    l:parseFloat(s.paddingLeft)||0
+  };
+}
 function vpSize(){
   var vv=window.visualViewport;
-  return{w:Math.round((vv&&vv.width)||window.innerWidth),h:Math.round((vv&&vv.height)||window.innerHeight)};
+  var w=Math.round((vv&&vv.width)||window.innerWidth);
+  var h=Math.round((vv&&vv.height)||window.innerHeight);
+  var pad=safePad();
+  return{w:Math.max(320,w-pad.l-pad.r),h:Math.max(240,h-pad.t-pad.b),ox:pad.l+(vv&&vv.offsetLeft||0),oy:pad.t+(vv&&vv.offsetTop||0)};
 }
-/* 캔버스는 논리 크기로 그리고, 실제 화소는 기기 해상도 × 화면 배율만큼 잡는다 (글자가 안 흐려진다) */
 function hidpi(cv,w,h,q){
   var W=Math.round(w*q),H=Math.round(h*q);
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
@@ -1136,26 +1268,24 @@ function setupCanvases(){
   hidpi(bcv,BW,BH,q);hidpi(ocv,OW,OH,q);hidpi(ghost,200,200,q);
   slotEls.forEach(function(el){hidpi(el.querySelector('canvas'),SLOT_W,SLOT_H,q)});
   dishEls.forEach(function(el){hidpi(el.querySelector('canvas'),100,70,q)});
-  /* 배경 캔버스는 CSS 크기가 없으므로 직접 정해 준다 */
   ghost.style.width=(200*VIEW.s)+'px';ghost.style.height=(200*VIEW.s)+'px';
   return true;
 }
 function invalidate(){
-  /* 다시 그리게 캐시를 비운다 */
   dishEls.forEach(function(el){el.dataset.lv=''});
   slotEls.forEach(function(el){el.dataset.cid='';el.dataset.mode='';el.dataset.f=''});
   if(S&&S.oven)updateAll();else renderShelf();
 }
 function fit(){
   var v=vpSize();
-  /* 폰 가로는 높이가 350px 안팎이다. 태블릿(가로 545px 이상)과 같은 배치로는 글씨가 너무 작아진다 */
-  var compact=v.h<=480||v.w/v.h>=1.9;
+  /* 폰 가로(낮은 높이)·초광폭은 compact. 태블릿 가로는 기본 레이아웃 유지 */
+  var compact=v.h<=460||(v.w/v.h>=1.85&&v.h<=520);
   var D=compact?COMPACT:DESIGN;
   document.documentElement.classList.toggle('compact',compact);
   stage.style.width=D.w+'px';stage.style.height=D.h+'px';
   var s=Math.min(v.w/D.w,v.h/D.h,MAX_S);
   VIEW.w=v.w;VIEW.h=v.h;VIEW.s=s;VIEW.compact=compact;
-  VIEW.ox=(v.w-D.w*s)/2;VIEW.oy=(v.h-D.h*s)/2;
+  VIEW.ox=v.ox+(v.w-D.w*s)/2;VIEW.oy=v.oy+(v.h-D.h*s)/2;
   applyStage(0,0);
   if(setupCanvases())invalidate();
   layoutChrome();
@@ -1226,7 +1356,9 @@ function inField(e){var t=e.target;return !!(t&&t.tagName&&(t.tagName==='INPUT'|
 document.addEventListener('dblclick',function(e){if(!inField(e))e.preventDefault()},{passive:false});
 document.addEventListener('contextmenu',function(e){if(!inField(e))e.preventDefault()});
 
-fit();syncFsBtn();sndSync();
+gateAdminPreview(function(){
+  fit();syncFsBtn();sndSync();
+});
 
 window.__api={chooseDish:chooseDish,addN:addN,toOven:toOven,cookTap:cookTap,setClock:function(f){clock=f},
   serveDish:serveDish,discard:discard,tick:function(d){update(d);updateAll()},endGuide:endGuide,startGame:startGame,startRound:startRound,

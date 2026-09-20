@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnPlayThreeChances = document.getElementById('btn-play-three-chances');
   const btnPlayPrismTycoon = document.getElementById('btn-play-prism-tycoon');
   const btnPlaySimilarKitchen = document.getElementById('btn-play-similar-kitchen');
+  const cardSimilarKitchen = document.getElementById('card-similar-kitchen');
   const leaderboardTitle = document.getElementById('leaderboard-title');
   const leaderboardModeNote = document.getElementById('leaderboard-mode-note');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
@@ -182,7 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
     tycoon: '보석 타이쿤',
     'three-chances': '기회는 세 번',
     congruence: '합동',
-    'similar-kitchen': '냥셰프의 빵집'
+    'similar-kitchen': '냥셰프의 빵집',
+    'nyang-bakery': '냥셰프의 빵집',
+    similar_kitchen: '냥셰프의 빵집'
   };
 
   function usageDayKeyKst(nowMs) {
@@ -1919,10 +1922,11 @@ document.addEventListener('DOMContentLoaded', () => {
               metricLabel: formatClearTime(clearTimeMs)
             }, !prev || clearTimeMs < prev.clearTimeMs);
           } else {
-            const rawScore = gameKey === 'prism-tycoon'
+            const highScoreGame = gameKey === 'prism-tycoon' || gameKey === 'similar-kitchen';
+            const rawScore = highScoreGame
               ? (Number(item.score) || 0)
               : (parseInt(item.score, 10) || 0);
-            const score = gameKey === 'prism-tycoon' ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
+            const score = highScoreGame ? Math.max(0, rawScore) : Math.max(0, Math.min(500, rawScore));
             const prev = bestMap.get(userKey);
 
             if (gameKey === 'bingsoo2') {
@@ -2052,10 +2056,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function setAdminPreviewFlag(on) {
+    try {
+      if (on) localStorage.setItem('halomath_admin_preview', '1');
+      else localStorage.removeItem('halomath_admin_preview');
+    } catch (err) { /* ignore */ }
+  }
+
   function applyAdminChrome() {
     document.body.classList.toggle('admin-mode', portalAdminUnlocked);
     setElHidden(adminToolbar, !portalAdminUnlocked);
     setElHidden(leaderboardSection, !portalAdminUnlocked);
+    setElHidden(cardSimilarKitchen, !portalAdminUnlocked);
     if (btnAdminToggleMode) {
       btnAdminToggleMode.textContent = activeMode === 'school' ? '도름 기록 보기' : '학교 기록 보기';
     }
@@ -2069,6 +2081,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function enterAdminMode() {
     portalAdminUnlocked = true;
+    setAdminPreviewFlag(true);
     applyAdminChrome();
     setElHidden(adminGate, true);
     syncLeaderboardFold(false);
@@ -2088,6 +2101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exitAdminMode() {
     portalAdminUnlocked = false;
+    setAdminPreviewFlag(false);
     adminQuery = '';
     if (adminSearch) adminSearch.value = '';
     stripAdminQuery();
@@ -2562,7 +2576,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentAdminUser()) enterAdminMode();
       else openAdminGate();
     } else {
+      setAdminPreviewFlag(false);
       setElHidden(leaderboardSection, true);
+      setElHidden(cardSimilarKitchen, true);
     }
     updateMetricHeader();
   }
