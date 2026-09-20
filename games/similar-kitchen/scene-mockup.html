@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>냥셰프의 닮음 주방 - 장면 시안</title>
+<style>
+html,body{margin:0;height:100%;background:#2b1b10;font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;overflow:hidden}
+#stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+svg{width:100%;height:100%;max-width:calc(100vh*1.6);max-height:calc(100vw/1.6);display:block}
+text{font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif}
+#tog{position:fixed;right:14px;bottom:14px;z-index:5;border:0;border-radius:14px;padding:12px 18px;font:700 16px 'Malgun Gothic',sans-serif;background:#ff8a3d;color:#fff;box-shadow:0 4px 0 #c9631f;cursor:pointer}
+#ann{display:none}
+#ann.on{display:block}
+.steam circle{animation:rise 2.4s infinite ease-out;opacity:0}
+.steam circle:nth-child(2){animation-delay:.8s}.steam circle:nth-child(3){animation-delay:1.6s}
+@keyframes rise{0%{transform:translateY(0);opacity:.0}20%{opacity:.5}100%{transform:translateY(-50px);opacity:0}}
+.fall{animation:fall 2.2s infinite ease-in}
+.fall:nth-of-type(2){animation-delay:.3s}.fall:nth-of-type(3){animation-delay:.6s}
+@keyframes fall{0%{transform:translateY(-60px);opacity:0}15%{opacity:1}60%{transform:translateY(0);opacity:1}100%{transform:translateY(6px);opacity:0}}
+.blink{animation:blink 4s infinite}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+.glow{animation:glow 1.4s infinite alternate}
+@keyframes glow{from{opacity:.65}to{opacity:1}}
+.bob{animation:bob 2.6s infinite ease-in-out}
+@keyframes bob{50%{transform:translateY(-5px)}}
+</style>
+</head>
+<body>
+<div id="stage">
+<svg id="s" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <pattern id="chk" width="90" height="60" patternUnits="userSpaceOnUse">
+    <rect width="90" height="60" fill="#f6ead2"/><rect width="45" height="30" fill="#2f6f7a"/><rect x="45" y="30" width="45" height="30" fill="#2f6f7a"/>
+  </pattern>
+  <linearGradient id="floorFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7c2"/><stop offset="1" stop-color="#f7cf9b"/></linearGradient>
+  <linearGradient id="ctop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8543c"/><stop offset="1" stop-color="#a63d2a"/></linearGradient>
+  <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8703e"/><stop offset="1" stop-color="#7d4d27"/></linearGradient>
+  <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9edf0"/><stop offset="1" stop-color="#aab4bc"/></linearGradient>
+  <linearGradient id="ovenGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#e8590c"/></linearGradient>
+  <filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".3"/></filter>
+</defs>
+
+<!-- 벽 · 바닥 -->
+<rect width="1280" height="440" fill="url(#wall)"/>
+<rect y="205" width="1280" height="14" fill="#e8783a"/>
+<rect y="219" width="1280" height="221" fill="url(#chk)"/>
+<rect y="219" width="1280" height="221" fill="url(#floorFade)"/>
+<!-- 창문 -->
+<g id="win">
+  <rect x="50" y="70" width="230" height="120" rx="8" fill="#bfe6f5" stroke="#8a5a2b" stroke-width="7"/>
+  <line x1="165" y1="70" x2="165" y2="190" stroke="#8a5a2b" stroke-width="6"/>
+  <circle cx="110" cy="115" r="18" fill="#fff" opacity=".8"/><circle cx="130" cy="120" r="14" fill="#fff" opacity=".8"/>
+  <rect x="1000" y="70" width="230" height="120" rx="8" fill="#bfe6f5" stroke="#8a5a2b" stroke-width="7"/>
+  <line x1="1115" y1="70" x2="1115" y2="190" stroke="#8a5a2b" stroke-width="6"/>
+  <circle cx="1180" cy="112" r="18" fill="#fff" opacity=".8"/><circle cx="1160" cy="118" r="13" fill="#fff" opacity=".8"/>
+</g>
+<!-- 큰 문 (거인용) -->
+<g>
+  <rect x="540" y="30" width="200" height="190" rx="10" fill="#8a5a2b"/>
+  <rect x="552" y="42" width="84" height="178" fill="#a8703e"/><rect x="644" y="42" width="84" height="178" fill="#a8703e"/>
+  <circle cx="626" cy="140" r="6" fill="#ffd24a"/><circle cx="654" cy="140" r="6" fill="#ffd24a"/>
+  <text x="640" y="22" text-anchor="middle" font-size="20" font-weight="800" fill="#8a5a2b">🐾 거인족 손님 입구 🐾</text>
+</g>
+
+<!-- HUD -->
+<g filter="url(#sh)">
+  <rect x="24" y="12" width="120" height="40" rx="20" fill="#2f6f7a"/><text x="84" y="40" text-anchor="middle" font-size="19" font-weight="800" fill="#fff">📋 메뉴</text>
+  <rect x="160" y="12" width="60" height="40" rx="20" fill="#3b2a1a"/><text x="190" y="40" text-anchor="middle" font-size="19" font-weight="800" fill="#ffd24a">3R</text>
+  <rect x="236" y="12" width="330" height="40" rx="20" fill="#fff8ec"/>
+  <rect x="246" y="24" width="310" height="16" rx="8" fill="#f0dfc0"/><rect x="246" y="24" width="228" height="16" rx="8" fill="#ff8a3d"/>
+  <rect x="1010" y="12" width="140" height="40" rx="20" fill="#fff8ec"/><text x="1030" y="40" font-size="20">🪙</text><text x="1140" y="40" text-anchor="end" font-size="20" font-weight="800" fill="#3b2a1a">120</text>
+  <rect x="1160" y="12" width="100" height="40" rx="20" fill="#fff8ec"/><text x="1210" y="40" text-anchor="middle" font-size="21">⭐⭐☆</text>
+</g>
+
+<!-- 손님 (거인 냥이) -->
+<script type="text/javascript"><![CDATA[
+function giantCat(x,y,r,fur,belly,extra){
+  var s='<g transform="translate('+x+','+y+')" filter="url(#sh)">';
+  s+='<rect x="'+(-r*1.05)+'" y="'+(r*0.55)+'" width="'+(r*2.1)+'" height="'+(r*1.2)+'" rx="'+(r*0.5)+'" fill="'+fur+'"/>';
+  s+='<ellipse cx="0" cy="'+(r*0.95)+'" rx="'+(r*0.55)+'" ry="'+(r*0.45)+'" fill="'+belly+'"/>';
+  s+='<polygon points="'+(-r*0.95)+','+(-r*0.25)+' '+(-r*0.75)+','+(-r*1.25)+' '+(-r*0.15)+','+(-r*0.85)+'" fill="'+fur+'"/>';
+  s+='<polygon points="'+(r*0.95)+','+(-r*0.25)+' '+(r*0.75)+','+(-r*1.25)+' '+(r*0.15)+','+(-r*0.85)+'" fill="'+fur+'"/>';
+  s+='<polygon points="'+(-r*0.78)+','+(-r*0.45)+' '+(-r*0.68)+','+(-r*0.98)+' '+(-r*0.35)+','+(-r*0.75)+'" fill="#ffb3c1"/>';
+  s+='<polygon points="'+(r*0.78)+','+(-r*0.45)+' '+(r*0.68)+','+(-r*0.98)+' '+(r*0.35)+','+(-r*0.75)+'" fill="#ffb3c1"/>';
+  s+='<ellipse cx="0" cy="0" rx="'+(r*1.05)+'" ry="'+(r*0.9)+'" fill="'+fur+'"/>';
+  s+=(extra||'');
+  s+='<g class="blink" style="transform-origin:0 '+(-r*0.1)+'px"><ellipse cx="'+(-r*0.4)+'" cy="'+(-r*0.1)+'" rx="'+(r*0.12)+'" ry="'+(r*0.17)+'" fill="#3b2a1a"/><ellipse cx="'+(r*0.4)+'" cy="'+(-r*0.1)+'" rx="'+(r*0.12)+'" ry="'+(r*0.17)+'" fill="#3b2a1a"/></g>';
+  s+='<polygon points="'+(-r*0.09)+','+(r*0.1)+' '+(r*0.09)+','+(r*0.1)+' 0,'+(r*0.22)+'" fill="#ff8fa6"/>';
+  s+='<path d="M0 '+(r*0.22)+' q'+(-r*0.15)+' '+(r*0.15)+' '+(-r*0.3)+' 0 M0 '+(r*0.22)+' q'+(r*0.15)+' '+(r*0.15)+' '+(r*0.3)+' 0" stroke="#3b2a1a" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  [[-1,-0.02],[-1,0.1],[1,-0.02],[1,0.1]].forEach(function(v){s+='<line x1="'+(v[0]*r*0.35)+'" y1="'+(r*(0.14+v[1]))+'" x2="'+(v[0]*r*0.95)+'" y2="'+(r*(0.08+v[1]*2))+'" stroke="#3b2a1a" stroke-width="2.5" stroke-linecap="round"/>'});
+  s+='<ellipse cx="'+(-r*0.62)+'" cy="'+(r*0.2)+'" rx="'+(r*0.16)+'" ry="'+(r*0.09)+'" fill="#ffb3c1" opacity=".7"/><ellipse cx="'+(r*0.62)+'" cy="'+(r*0.2)+'" rx="'+(r*0.16)+'" ry="'+(r*0.09)+'" fill="#ffb3c1" opacity=".7"/>';
+  return s+'</g>';
+}
+/* 주문 말풍선 : 원본 → 거인 크기 */
+function dishMini(x,y,w,h,pal,ears){
+  var s='';
+  if(ears)s+='<polygon points="'+(x+w*0.08)+','+y+' '+(x+w*0.2)+','+(y-h*0.28)+' '+(x+w*0.34)+','+y+'" fill="'+pal[0]+'"/><polygon points="'+(x+w*0.66)+','+y+' '+(x+w*0.8)+','+(y-h*0.28)+' '+(x+w*0.92)+','+y+'" fill="'+pal[0]+'"/>';
+  s+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(Math.min(w,h)*0.12)+'" fill="'+pal[0]+'" stroke="#8a5a2b" stroke-width="2"/>';
+  s+='<rect x="'+(x+w*0.08)+'" y="'+(y+h*0.08)+'" width="'+(w*0.84)+'" height="'+(h*0.84)+'" rx="'+(Math.min(w,h)*0.08)+'" fill="'+pal[1]+'"/>';
+  s+='<circle cx="'+(x+w*0.3)+'" cy="'+(y+h*0.4)+'" r="'+(w*0.045)+'" fill="#3b2a1a"/><circle cx="'+(x+w*0.7)+'" cy="'+(y+h*0.4)+'" r="'+(w*0.045)+'" fill="#3b2a1a"/>';
+  return s;
+}
+function bubble(x,y,k,pal,name,pct,low){
+  var u=26,s='<g transform="translate('+x+','+y+')" filter="url(#sh)">';
+  s+='<rect width="300" height="150" rx="22" fill="#fff" stroke="#ead6b4" stroke-width="3"/><polygon points="40,148 70,148 40,176" fill="#fff" stroke="#ead6b4" stroke-width="3"/><rect x="38" y="145" width="34" height="6" fill="#fff"/>';
+  s+='<text x="16" y="30" font-size="15" font-weight="700" fill="#8a6a45">'+name+'</text>';
+  s+='<text x="284" y="32" text-anchor="end" font-size="23" font-weight="800" fill="#c9631f">닮음비 1 : '+k+'</text>';
+  s+=dishMini(24,104-u,u,u,pal,true);
+  s+='<text x="24" y="122" font-size="12" font-weight="700" fill="#8a6a45">원본</text>';
+  s+='<text x="88" y="98" font-size="26" font-weight="800" fill="#3b2a1a">→</text>';
+  s+=dishMini(140,126-u*k*0.85,u*k*0.85,u*k*0.85,pal,true);
+  s+='<text x="284" y="122" text-anchor="end" font-size="13" font-weight="700" fill="#8a6a45">거인 크기로!</text>';
+  s+='</g>';
+  return s;
+}
+function pbar(x,y,pct,low){
+  return '<g transform="translate('+x+','+y+')"><rect width="160" height="12" rx="6" fill="#f0dfc0"/><rect width="'+(160*pct)+'" height="12" rx="6" fill="'+(low?'#d94b43':'#5fbf82')+'"/></g>';
+}
+var P_PIZZA=['#e2a85f','#d9553f'],P_CAKE=['#f1c9a5','#fff0d6'];
+var h='';
+h+=giantCat(210,330,88,'#f2a65a','#fff3e0');
+h+=bubble(70,60,2,P_PIZZA,'냥 피자 주문',0.8,false);
+h+=pbar(130,432,0.72,false).replace('translate(130,432)','translate(130,410)');
+h+=giantCat(640,350,80,'#9aa3ad','#f1f3f5');
+h+=bubble(500,72,3,P_CAKE,'냥 케이크 주문',0.4,true).replace('translate(500,72)','translate(720,80)');
+h+='<g transform="translate(560,418)"><rect width="160" height="12" rx="6" fill="#f0dfc0"/><rect width="64" height="12" rx="6" fill="#d94b43"/></g>';
+/* 빈 자리 */
+h+='<g opacity=".5"><ellipse cx="1100" cy="380" rx="60" ry="14" fill="#8a5a2b"/><rect x="1075" y="300" width="50" height="80" rx="10" fill="#a8703e"/><text x="1100" y="345" text-anchor="middle" font-size="32">🪑</text></g>';
+document.currentScript.parentNode.insertAdjacentHTML('beforeend',h);
+]]></script>
+<!-- 이름표 -->
+<g font-size="15" font-weight="800">
+  <rect x="140" y="440" width="150" height="24" rx="12" fill="#f3e1bd" opacity="0"/>
+</g>
+
+<!-- 카운터 -->
+<g>
+  <!-- 유리 가림막 -->
+  <rect x="0" y="432" width="1280" height="16" fill="#3b8f9e"/>
+  <rect x="0" y="446" width="1280" height="10" fill="#1f5f6a"/>
+  <!-- 카운터 상판 -->
+  <rect x="0" y="456" width="1280" height="190" fill="url(#ctop)"/>
+  <rect x="0" y="636" width="1280" height="14" fill="#3b2a1a"/>
+  <g opacity=".85"><pattern id="tr" width="24" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#fff"/><rect x="12" width="12" height="12" fill="#3b2a1a"/></pattern></g>
+  <rect x="0" y="650" width="1280" height="12" fill="url(#tr)"/>
+  <!-- 캐비닛 앞면 -->
+  <rect x="0" y="662" width="1280" height="138" fill="url(#wood)"/>
+</g>
+
+<!-- ① 쓰레기통 -->
+<g transform="translate(34,470)" filter="url(#sh)">
+  <rect x="6" y="30" width="96" height="120" rx="12" fill="#2f9e63"/><rect x="0" y="16" width="108" height="24" rx="10" fill="#1f7444"/>
+  <rect x="38" y="6" width="32" height="14" rx="6" fill="#1f7444"/>
+  <text x="54" y="112" text-anchor="middle" font-size="46">🗑️</text>
+  <text x="54" y="170" text-anchor="middle" font-size="14" font-weight="800" fill="#fff5e6">잘못 만들면 여기로</text>
+</g>
+
+<!-- ② 메뉴 선반 (요리 고르기) -->
+<g transform="translate(170,466)">
+  <rect x="0" y="0" width="290" height="178" rx="14" fill="url(#steel)" stroke="#8a97a3" stroke-width="3" filter="url(#sh)"/>
+  <text x="145" y="22" text-anchor="middle" font-size="15" font-weight="800" fill="#3b2a1a">📋 요리 메뉴 · 탭해서 접시에 올리기</text>
+  <g font-size="13" font-weight="800" text-anchor="middle">
+    <g transform="translate(12,32)"><rect width="84" height="68" rx="10" fill="#fff8ec" stroke="#4f86f7" stroke-width="4"/><rect x="24" y="8" width="36" height="30" rx="5" fill="#d9553f" stroke="#8a5a2b" stroke-width="2"/><text x="42" y="56" fill="#3b2a1a">냥 피자</text></g>
+    <g transform="translate(103,32)"><rect width="84" height="68" rx="10" fill="#fff8ec" stroke="#ead6b4" stroke-width="3"/><rect x="24" y="8" width="36" height="30" rx="5" fill="#fff0d6" stroke="#8a5a2b" stroke-width="2"/><text x="42" y="56" fill="#3b2a1a">냥 케이크</text></g>
+    <g transform="translate(194,32)" opacity=".85"><rect width="84" height="68" rx="10" fill="#dfe4e8" stroke="#b3bcc4" stroke-width="3"/><text x="42" y="40" font-size="30">🔒</text><text x="42" y="58" fill="#5b6770" font-size="12">길이 요리</text></g>
+    <g transform="translate(12,106)" opacity=".85"><rect width="84" height="64" rx="10" fill="#dfe4e8" stroke="#b3bcc4" stroke-width="3"/><text x="42" y="38" font-size="28">🔒</text><text x="42" y="56" fill="#5b6770" font-size="12">길이 요리 2</text></g>
+    <g transform="translate(103,106)" opacity=".85"><rect width="84" height="64" rx="10" fill="#dfe4e8" stroke="#b3bcc4" stroke-width="3"/><text x="42" y="38" font-size="28">🔒</text><text x="42" y="56" fill="#5b6770" font-size="12">부피 요리</text></g>
+    <g transform="translate(194,106)" opacity=".85"><rect width="84" height="64" rx="10" fill="#dfe4e8" stroke="#b3bcc4" stroke-width="3"/><text x="42" y="38" font-size="28">🔒</text><text x="42" y="56" fill="#5b6770" font-size="12">부피 요리 2</text></g>
+  </g>
+</g>
+
+<!-- ③ 작업판 (재료 올리기) -->
+<g transform="translate(500,470)">
+  <ellipse cx="150" cy="150" rx="150" ry="28" fill="#000" opacity=".22"/>
+  <rect x="0" y="0" width="300" height="168" rx="20" fill="#fbf3e4" stroke="#cbb28a" stroke-width="5" filter="url(#sh)"/>
+  <!-- 접시 위 재료 조각 3x3 (날것 = 연한 색, 얼굴 없음) -->
+  <g transform="translate(75,16)">
+    <rect width="150" height="136" rx="10" fill="#fff" stroke="#e2d2b0" stroke-width="3"/>
+    <g stroke="#d8c48a" stroke-width="2" fill="#f6e8b8">
+      <rect x="8" y="8" width="42" height="36" rx="5"/><rect x="54" y="8" width="42" height="36" rx="5"/><rect x="100" y="8" width="42" height="36" rx="5"/>
+      <rect x="8" y="50" width="42" height="36" rx="5"/><rect x="54" y="50" width="42" height="36" rx="5"/><rect x="100" y="50" width="42" height="36" rx="5"/>
+      <rect x="8" y="92" width="42" height="36" rx="5"/><rect x="54" y="92" width="42" height="36" rx="5" fill="none" stroke-dasharray="5 4" stroke="#cdb98d"/><rect x="100" y="92" width="42" height="36" rx="5" fill="none" stroke-dasharray="5 4" stroke="#cdb98d"/>
+    </g>
+  </g>
+  <!-- 떨어지는 재료 -->
+  <g font-size="30" text-anchor="middle">
+    <text class="fall" x="120" y="60">🧀</text><text class="fall" x="170" y="80">🧀</text><text class="fall" x="205" y="50">🧀</text>
+  </g>
+  <text x="150" y="-8" text-anchor="middle" font-size="16" font-weight="800" fill="#fff" stroke="#3b2a1a" stroke-width="4" paint-order="stroke">🧀 7개</text>
+  <text x="150" y="196" text-anchor="middle" font-size="14" font-weight="800" fill="#fff5e6">🍽️ 작업판 · 재료 봉지를 끌어다 놓기</text>
+</g>
+
+<!-- 꼬마 셰프 냥 (거인과 크기 비교) -->
+<g transform="translate(470,438)" class="bob">
+  <g transform="scale(.55)">
+    <circle cx="0" cy="0" r="40" fill="#f6d9a8" stroke="#8a5a2b" stroke-width="4"/>
+    <polygon points="-36,-12 -30,-52 -8,-32" fill="#f6d9a8" stroke="#8a5a2b" stroke-width="4"/><polygon points="36,-12 30,-52 8,-32" fill="#f6d9a8" stroke="#8a5a2b" stroke-width="4"/>
+    <rect x="-26" y="-74" width="52" height="30" rx="10" fill="#fff" stroke="#c8c8c8" stroke-width="3"/><rect x="-32" y="-52" width="64" height="14" rx="6" fill="#fff" stroke="#c8c8c8" stroke-width="3"/>
+    <circle cx="-14" cy="0" r="5" fill="#3b2a1a"/><circle cx="14" cy="0" r="5" fill="#3b2a1a"/><polygon points="-4,8 4,8 0,14" fill="#ff8fa6"/>
+  </g>
+</g>
+
+<!-- ④ 오븐 -->
+<g transform="translate(850,462)">
+  <rect x="0" y="0" width="240" height="190" rx="16" fill="url(#steel)" stroke="#7d8996" stroke-width="4" filter="url(#sh)"/>
+  <rect x="12" y="12" width="216" height="24" rx="8" fill="#5b6770"/>
+  <circle cx="34" cy="24" r="8" fill="#ffd24a"/><circle cx="62" cy="24" r="8" fill="#e8590c"/><circle cx="90" cy="24" r="8" fill="#5fe08f"/>
+  <text x="210" y="30" text-anchor="end" font-size="13" font-weight="800" fill="#fff">굽기 1/2</text>
+  <rect x="18" y="46" width="204" height="122" rx="14" fill="#2b1b10" stroke="#4a2f1d" stroke-width="6"/>
+  <rect class="glow" x="28" y="56" width="184" height="102" rx="10" fill="url(#ovenGlow)" opacity=".85"/>
+  <!-- 구워지는 요리 (얼굴이 점점 나타남) -->
+  <g transform="translate(96,86)">
+    <rect width="48" height="56" rx="6" fill="#f0c986" stroke="#8a5a2b" stroke-width="3"/>
+    <rect x="5" y="5" width="38" height="46" rx="4" fill="#e8b45a"/>
+    <circle cx="16" cy="22" r="3" fill="#3b2a1a" opacity=".55"/><circle cx="32" cy="22" r="3" fill="#3b2a1a" opacity=".55"/>
+  </g>
+  <g class="steam" fill="#fff"><circle cx="100" cy="52" r="8"/><circle cx="120" cy="52" r="10"/><circle cx="140" cy="52" r="7"/></g>
+  <!-- 박자 링 -->
+  <g transform="translate(120,-42)">
+    <circle r="26" fill="rgba(255,138,61,.25)" stroke="#ff8a3d" stroke-width="5"/>
+    <circle r="44" fill="none" stroke="#78b4ff" stroke-width="4" opacity=".8"/>
+  </g>
+  <text x="120" y="-84" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" stroke="#3b2a1a" stroke-width="4" paint-order="stroke">화면 아무 곳이나 톡!</text>
+</g>
+
+<!-- 오른쪽 장식 (접시 더미) -->
+<g transform="translate(1110,500)">
+  <ellipse cx="60" cy="118" rx="52" ry="10" fill="#000" opacity=".2"/>
+  <ellipse cx="60" cy="100" rx="48" ry="12" fill="#fff" stroke="#cfd6db" stroke-width="3"/><ellipse cx="60" cy="88" rx="48" ry="12" fill="#fff" stroke="#cfd6db" stroke-width="3"/><ellipse cx="60" cy="76" rx="48" ry="12" fill="#fff" stroke="#cfd6db" stroke-width="3"/>
+  <text x="60" y="150" text-anchor="middle" font-size="13" font-weight="800" fill="#fff5e6">완성된 요리는 손님에게 끌어서</text>
+</g>
+
+<!-- ⑤ 카운터 아래 재료 선반 -->
+<g transform="translate(230,676)">
+  <rect x="0" y="0" width="560" height="112" rx="10" fill="#6b4020" stroke="#4a2c14" stroke-width="4"/>
+  <rect x="8" y="8" width="544" height="96" rx="6" fill="#3d2410"/>
+  <rect x="8" y="88" width="544" height="16" fill="#a8703e"/>
+  <text x="14" y="-6" font-size="15" font-weight="800" fill="#fff5e6">🧺 재료 선반 · 봉지를 접시로 끌어다 놓기</text>
+  <g font-size="26" font-weight="800" text-anchor="middle">
+    <g transform="translate(82,22)"><path d="M0 62 h96 l-8 -50 h-80z" fill="#fff8ec" stroke="#d8c8a8" stroke-width="3"/><text x="48" y="44" font-size="20">🧀</text><text x="48" y="80" font-size="15" fill="#3b2a1a">1개</text></g>
+    <g transform="translate(232,22)"><path d="M0 62 h96 l-8 -50 h-80z" fill="#fff8ec" stroke="#d8c8a8" stroke-width="3"/><text x="48" y="44" font-size="20">🧀🧀🧀</text><text x="48" y="80" font-size="15" fill="#3b2a1a">5개</text></g>
+    <g transform="translate(382,22)"><path d="M0 62 h96 l-8 -50 h-80z" fill="#fff8ec" stroke="#d8c8a8" stroke-width="3"/><text x="48" y="44" font-size="20">🧀🧀🧀🧀</text><text x="48" y="80" font-size="15" fill="#3b2a1a">10개</text></g>
+  </g>
+</g>
+<!-- 왼쪽/오른쪽 서랍 -->
+<g>
+  <rect x="34" y="680" width="160" height="104" rx="10" fill="#8f5a2e" stroke="#5f3a1c" stroke-width="3"/><rect x="84" y="700" width="60" height="10" rx="5" fill="#d8dde1"/>
+  <rect x="830" y="680" width="200" height="104" rx="10" fill="#8f5a2e" stroke="#5f3a1c" stroke-width="3"/><rect x="890" y="700" width="80" height="10" rx="5" fill="#d8dde1"/>
+  <rect x="1050" y="680" width="200" height="104" rx="10" fill="#8f5a2e" stroke="#5f3a1c" stroke-width="3"/><rect x="1110" y="700" width="80" height="10" rx="5" fill="#d8dde1"/>
+  <text x="114" y="760" text-anchor="middle" font-size="12" font-weight="700" fill="#e9d2b0" opacity=".8">(딸기 재료: 케이크를 고르면 열려요)</text>
+</g>
+
+<!-- 설명 오버레이 -->
+<g id="ann" font-weight="800" font-size="18">
+  <g><circle cx="120" cy="620" r="17" fill="#4f86f7"/><text x="120" y="627" text-anchor="middle" fill="#fff">1</text></g>
+  <g><circle cx="215" cy="493" r="17" fill="#4f86f7"/><text x="215" y="500" text-anchor="middle" fill="#fff">2</text></g>
+  <g><circle cx="540" cy="497" r="17" fill="#4f86f7"/><text x="540" y="504" text-anchor="middle" fill="#fff">3</text></g>
+  <g><circle cx="880" cy="490" r="17" fill="#4f86f7"/><text x="880" y="497" text-anchor="middle" fill="#fff">4</text></g>
+  <g><circle cx="260" cy="700" r="17" fill="#4f86f7"/><text x="260" y="707" text-anchor="middle" fill="#fff">5</text></g>
+  <g><circle cx="210" cy="240" r="17" fill="#4f86f7"/><text x="210" y="247" text-anchor="middle" fill="#fff">6</text></g>
+  <g><circle cx="500" cy="440" r="17" fill="#4f86f7"/><text x="500" y="447" text-anchor="middle" fill="#fff">7</text></g>
+  <rect x="820" y="230" width="440" height="190" rx="16" fill="rgba(255,255,255,.95)" stroke="#4f86f7" stroke-width="3"/>
+  <g font-size="15" fill="#3b2a1a" font-weight="700">
+    <text x="838" y="258">① 쓰레기통 : 잘못 만든 요리 끌어서 버리기</text>
+    <text x="838" y="282">② 메뉴 : 요리 탭 → 접시 (잠긴 칸 = 다음 라운드 해금)</text>
+    <text x="838" y="306">③ 작업판 : 재료를 넣으면 닮은 모양이 되는지 보임</text>
+    <text x="838" y="330">④ 오븐 : 화면 아무 곳이나 두 번 톡 → 완성</text>
+    <text x="838" y="354">⑤ 재료 선반 : 1·5·10개 봉지를 끌어다 놓기</text>
+    <text x="838" y="378">⑥ 거인 손님 : 크고, 위에서 주문 · 인내심 막대</text>
+    <text x="838" y="402">⑦ 꼬마 셰프 : 거인과 크기 비교(우리=원본)</text>
+  </g>
+</g>
+</svg>
+</div>
+<button id="tog">🔢 구성 설명 보기</button>
+<script>
+var on=false;document.getElementById('tog').onclick=function(){on=!on;document.getElementById('ann').classList.toggle('on',on);this.textContent=on?'🙈 설명 숨기기':'🔢 구성 설명 보기'};
+</script>
+</body>
+</html>
