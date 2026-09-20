@@ -1437,7 +1437,11 @@ function fit(){
   applyForcedLandscape(isNaturalPortrait());
   var v=vpSize();
   /* 폰 가로(낮은 높이)·초광폭은 compact. 태블릿 가로는 기본 레이아웃 유지 */
-  var compact=v.h<=460||(v.w/v.h>=1.85&&v.h<=520);
+  /* 여유 레이아웃(DESIGN)이 거의 그대로 들어가는 화면에서만 그걸 쓴다.
+     안 들어가면 통째로 축소하지 말고 촘촘한 레이아웃을 「실제 크기」로 편다.
+     축소는 글자와 터치 칸을 같이 줄여서, 960x545 태블릿에서 글자 11.4px,
+     터치 33px까지 내려가 있었다. */
+  var compact=!(v.w>=DESIGN.w*0.95&&v.h>=DESIGN.h*0.95);
   /* 폰에서는 줄이지 않고 화면 크기 그대로 배치한다.
      태블릿처럼 통째로 축소하면 글자가 10px, 터치 칸이 31px까지 작아져 못 쓴다.
      PHONE_MIN보다 작은 화면에서만 줄인다. */
