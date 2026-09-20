@@ -164,9 +164,13 @@ function sndSync(){$('sndBtn').textContent=SND.on?'🔊':'🔇'}
 
 /* ===== 연출 ===== */
 var flos=[];
+/* 무대 안에서의 위치. 화면 사각형이 아니라 offset으로 잰다.
+   사각형은 무대의 확대·회전이 이미 반영된 값이라, 그걸로 역산하면 돌렸을 때 어긋난다.
+   offset은 변환과 무관한 배치 좌표라 어느 경우에나 맞는다. */
 function stageXY(el){
-  var r=el.getBoundingClientRect(),s=stage.getBoundingClientRect();
-  return{x:(r.left+r.width/2-s.left)/VIEW.s,y:(r.top+r.height/2-s.top)/VIEW.s};
+  var x=el.offsetWidth/2,y=el.offsetHeight/2,n=el;
+  while(n&&n!==stage){x+=n.offsetLeft;y+=n.offsetTop;n=n.offsetParent}
+  return{x:x,y:y};
 }
 function fxDrop(d){
   var i=flos.indexOf(d);if(i>=0)flos.splice(i,1);
@@ -275,7 +279,8 @@ function toast(msg,ms){
   var t=$('toast');
   /* 손님 줄 바로 아래에 띄운다. 기기마다 화면이 줄어드는 비율이 달라 고정값을 쓸 수 없다 */
   var r=$('custRow').getBoundingClientRect();
-  if(r.height)t.style.top=Math.round(r.bottom+8)+'px';
+  /* 토스트는 돌아간 좌표계 안에 있으므로, 화면 사각형을 게임 좌표로 바꿔서 얹는다 */
+  if(r.height){var p=toGame(r.left+r.width/2,r.bottom);t.style.top=Math.round(p.y+8)+'px'}
   t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on')},ms||1900);
 }
 function show(id){$('toast').classList.remove('on');['intro','play','roundEnd','result'].forEach(function(s){$(s).classList.toggle('on',s===id)})}
@@ -892,7 +897,11 @@ function beginGhost(d){
   drawDishState(gctx,100,190,fitCell(d,170,120,56),d,d.cooked?1:0);
   ghost.style.display='block';
 }
-function moveGhost(x,y){ghost.style.transform='translate('+(x-100*VIEW.s)+'px,'+(y-160*VIEW.s)+'px)'}
+/* 끌고 다니는 그림은 손가락을 따라간다. 돌아갔으면 손가락 좌표를 게임 좌표로 바꿔야 한다 */
+function moveGhost(x,y){
+  var p=toGame(x,y);
+  ghost.style.transform='translate('+(p.x-100*VIEW.s)+'px,'+(p.y-160*VIEW.s)+'px)';
+}
 function targetAt(x,y){
   var el=document.elementFromPoint(x,y);if(!el)return {};
   var sl=el.closest&&el.closest('.slot');
@@ -1354,12 +1363,54 @@ function safePad(){
     l:parseFloat(s.paddingLeft)||0
   };
 }
+/* ===== 세로로 든 기기 돌려 주기 =====
+   ROT: 0=그대로, 90=시계방향, -90=반시계방향. CSS의 force-landscape와 짝이다. */
+var ROT=0,lastGamma=null,rotLocked=false;
+try{
+  window.addEventListener('deviceorientation',function(e){
+    if(typeof e.gamma==='number')lastGamma=e.gamma;
+  },true);
+}catch(e){}
+/* 폭이 넓으면(태블릿·PC) 건드리지 않는다. 폰이 세로일 때만 돌린다 */
+function isNaturalPortrait(){
+  var w=window.innerWidth,h=window.innerHeight;
+  if(w>=800)return false;
+  return h>w+28;
+}
+function applyForcedLandscape(on){
+  var root=document.documentElement;
+  if(on){
+    if(!rotLocked){
+      /* 기기를 어느 쪽으로 눕힐지는 기울기로 고른다. 모르면 시계방향 */
+      ROT=(typeof lastGamma==='number'&&Math.abs(lastGamma)>=10)?(lastGamma>0?-90:90):90;
+      rotLocked=true;
+    }
+    root.classList.add('force-landscape');
+    root.classList.toggle('force-landscape-ccw',ROT<0);
+  }else{
+    ROT=0;rotLocked=false;
+    root.classList.remove('force-landscape','force-landscape-ccw');
+  }
+}
+/* 화면 좌표(손가락) -> 돌아간 게임 좌표.
+   맞히기(elementFromPoint)와 사각형은 브라우저가 알아서 변환해 주므로 건드릴 필요가 없고,
+   손가락 위치로 직접 무언가를 놓을 때만 이 변환이 필요하다. */
+function toGame(sx,sy){
+  if(!ROT)return{x:sx,y:sy};
+  var vv=window.visualViewport;
+  var w=Math.round((vv&&vv.width)||window.innerWidth);
+  var h=Math.round((vv&&vv.height)||window.innerHeight);
+  return ROT>0?{x:sy,y:w-sx}:{x:h-sy,y:sx};
+}
 function vpSize(){
   var vv=window.visualViewport;
   var w=Math.round((vv&&vv.width)||window.innerWidth);
   var h=Math.round((vv&&vv.height)||window.innerHeight);
   var pad=safePad();
-  return{w:Math.max(320,w-pad.l-pad.r),h:Math.max(240,h-pad.t-pad.b),ox:pad.l+(vv&&vv.offsetLeft||0),oy:pad.t+(vv&&vv.offsetTop||0)};
+  var box={w:Math.max(320,w-pad.l-pad.r),h:Math.max(240,h-pad.t-pad.b),ox:pad.l+(vv&&vv.offsetLeft||0),oy:pad.t+(vv&&vv.offsetTop||0)};
+  /* 돌렸으면 게임이 쓰는 가로·세로가 서로 바뀐다 */
+  if(ROT)return{w:box.h,h:box.w,ox:0,oy:0};
+  return box;
 }
 function hidpi(cv,w,h,q){
   var W=Math.round(w*q),H=Math.round(h*q);
@@ -1383,6 +1434,7 @@ function invalidate(){
   if(S&&S.oven)updateAll();else renderShelf();
 }
 function fit(){
+  applyForcedLandscape(isNaturalPortrait());
   var v=vpSize();
   /* 폰 가로(낮은 높이)·초광폭은 compact. 태블릿 가로는 기본 레이아웃 유지 */
   var compact=v.h<=460||(v.w/v.h>=1.85&&v.h<=520);

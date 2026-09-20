@@ -27,7 +27,7 @@
 <script src="../../config.sample.js"></script>
 </head>
 <body>
-<div id="rot">📱 태블릿을 가로로 돌려 주세요</div>
+<div id="rot">📱 화면을 가로로 돌려 주세요</div>
 <div class="toast" id="toast"></div>
 <canvas id="ghost" width="200" height="200"></canvas>
 <div id="dbg"></div>
@@ -45,9 +45,9 @@
     <div class="sub">4라운드 · 큰 동물 손님들의 주문</div>
     <ol>
       <li>🦁🐯🐘 사자·코뿔소처럼 <b>몸집 큰 동물 손님</b>들이 빵집에 몰려와요! 우리 크기 빵의 <b>몇 배 크기</b>를 주문해요.</li>
-      <li><b>재료 선반</b>에서 만들 빵의 재료를 고르고, <b>재료 봉지</b>를 접시에 끌어다 놓아요.</li>
-      <li><b>오븐</b>에서 박자에 맞춰 <b>화면 아무 곳이나</b> 톡톡! 탭할수록 노릇노릇 익어요.</li>
-      <li>완성품을 <b>손님에게 끌어다 놓으면</b> 서빙! <b>빨리 해결할수록 손님이 더 많이</b> 와요. 번 코인으로 <b>바로바로 가게를 업그레이드</b>해요!</li>
+      <li><b>재료 선반</b>에서 빵 열의 <b>개수(1·5·10…)</b>를 톡하면 접시에 바로 쌓여요.</li>
+      <li><b>오븐</b>에 넣으면 화면이 집중 모드로 바뀌고, <b>박자에 맞춰 톡!</b></li>
+      <li>완성품을 <b>손님에게 끌어다 놓으면</b> 서빙! 번 코인으로 <b>가게를 업그레이드</b>해요!</li>
     </ol>
     <p class="profile-lead" id="profileLead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
     <div class="profile">
@@ -70,34 +70,37 @@
 <section id="play" class="screen">
   <div class="hud">
     <div class="title" id="hudTitle">R1</div>
-    <div class="timer"><i id="timerBar"></i></div>
+    <div class="timer" aria-label="남은 시간">
+      <i id="timerBar"></i>
+      <span class="timer-txt" id="timerTxt">1:10</span>
+    </div>
     <div class="coins" id="coinsTxt">🪙 0</div>
+    <button type="button" class="btn-end-hud" id="endBtn" hidden>끝내기</button>
   </div>
   <div class="custrow" id="custRow"></div>
   <div class="kitchen">
-    <div class="card shelf">
-      <h2>🧺 재료 선반</h2>
-      <div class="shelfgrid" id="shelf"></div>
-      
-    </div>
-    <div class="card bench">
-      <h2>🍳 작업판 <span class="title2" id="benchInfo"></span></h2>
-      <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
-      <div class="drawer">
-        <div class="bags" id="bags"></div>
-        <div class="dbtns">
+    <div class="cook-row">
+      <div class="card bench">
+        <h2>🍳 작업판 <span class="title2" id="benchInfo"></span></h2>
+        <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
+        <div class="bench-actions">
           <button class="btn ghost" id="um1">↩ 1개 빼기</button>
           <button class="btn ghost" id="clearBtn">🧹 비우기</button>
+          <button class="btn" id="toOven">🔥 오븐에 넣기</button>
         </div>
       </div>
-      <button class="btn" id="toOven">🔥 오븐에 넣기</button>
+      <div class="card oven" id="ovenBox">
+        <div class="oven-head">
+          <h2>🔥 오븐</h2>
+          <button type="button" class="upg" id="ovenUp"></button>
+        </div>
+        <canvas id="ovenCv" width="260" height="280"></canvas>
+        <div class="trash" id="trash">🗑️<small>끌어서 버리기</small></div>
+      </div>
     </div>
-    <div class="card oven" id="ovenBox">
-      <h2>🔥 오븐</h2>
-      <button class="btn upg" id="ovenUp"></button>
-      <canvas id="ovenCv" width="260" height="280"></canvas>
-      <button class="btn" id="cookBtn">🔥 굽기</button>
-      <div class="trash" id="trash">🗑️<small>끌어서 버리기</small></div>
+    <div class="card shelf-strip">
+      <h2>🧺 재료 선반 <span class="title2">개수를 톡!</span></h2>
+      <div class="shelfgrid" id="shelf"></div>
     </div>
   </div>
 </section>
@@ -110,12 +113,9 @@
     <div class="cols cols-one">
       <div class="card">
         <h2>이번 라운드 장부</h2><table id="reLedger"></table>
-        <h2 class="mt">📒 요리 기록장</h2>
-        <div class="title2" id="reNoteHint"></div>
-        <table id="reNotebook"></table>
       </div>
     </div>
-    <div class="row row-center"><button class="btn" id="nextBtn">다음 라운드 ▶</button></div>
+    <div class="row row-center"><button class="btn" id="nextBtn">다음 라운드 ▶</button><button class="btn ghost" id="reEndBtn">영업 끝내기</button></div>
   </div>
 </section>
 
@@ -126,11 +126,6 @@
     <div class="sub" id="resSub">4라운드 결과</div>
     <div class="cols cols-result">
       <div class="card"><h2>오늘의 장부</h2><table id="ledger"></table></div>
-      <div class="card">
-        <h2>📒 요리 기록장</h2>
-        <div class="title2" id="noteHint"></div>
-        <table id="notebook"></table>
-      </div>
       <div class="card">
         <h2>🏆 명예의 전당</h2>
         <div class="title2" id="rankMsg">랭킹을 불러오는 중…</div>
@@ -148,12 +143,12 @@
   <div class="gcard">
     <h2>🦁 이렇게 일해요!</h2>
     <div class="steps">
-      <div class="step"><div class="ic">🧺</div><b>① 재료 고르기</b><br>손님이 주문한 빵의 <b>재료 선반</b>을 탭해요</div>
-      <div class="step"><div class="ic">🥖</div><b>② 재료 넣기</b><br><b>재료 봉지를 접시에 끌어다</b> 놓아요. 손님이 시킨 배율 크기의 빵이 되게!</div>
-      <div class="step"><div class="ic">🔥</div><b>③ 오븐 굽기</b><br>링이 가운데 원에 닿을 때 <b>화면 아무 곳이나 톡!</b></div>
-      <div class="step"><div class="ic">🦒</div><b>④ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
+      <div class="step"><div class="ic">🧺</div><b>① 재료 넣기</b><br>주문한 빵 열에서 <b>개수 칩</b>을 톡해요</div>
+      <div class="step"><div class="ic">🔥</div><b>② 오븐 굽기</b><br>오븐에 넣으면 <b>박자 링에 맞춰 톡!</b></div>
+      <div class="step"><div class="ic">🦒</div><b>③ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
+      <div class="step"><div class="ic">⬆</div><b>④ 업그레이드</b><br>번 코인으로 <b>칩·오븐·빵 등급</b>을 바로 올려요</div>
     </div>
-    <div class="foot"><span>빨리 해결하면 손님이 더 많이 와요! 번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (🔒나 ⬆ 버튼을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
+    <div class="foot"><span>번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (칩·🔒·⬆을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
   </div>
 </div>
 <div class="guide" id="rintro" hidden>
@@ -162,6 +157,29 @@
     <h2 id="riTitle">1라운드</h2>
     <div class="ri-desc" id="riDesc"></div>
     <button class="btn" id="riBtn">영업 시작 ▶</button>
+  </div>
+</div>
+
+<!-- 영업 조기 종료 확인 -->
+<div class="guide" id="endConfirm" hidden>
+  <div class="gcard h-center">
+    <h2>영업을 끝낼까요?</h2>
+    <div class="ri-desc">지금까지 번 코인으로 점수를 기록해요.</div>
+    <div class="row row-center" style="gap:10px;flex-wrap:wrap">
+      <button class="btn" id="endConfirmBtn">기록하고 끝내기</button>
+      <button class="btn ghost" id="endCancelBtn">계속하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 오븐 집중 모드: 굽는 동안 다른 조작을 막고 박자 탭만 받는다 -->
+<div id="ovenFocus" class="oven-focus" hidden>
+  <div class="oven-focus-panel" id="ovenFocusHit">
+    <div class="oven-focus-title">🔥 박자에 맞춰 톡!</div>
+    <div class="oven-focus-ring-wrap">
+      <canvas id="ovenFocusCv" width="220" height="220"></canvas>
+    </div>
+    <div class="oven-focus-stat" id="ovenFocusStat">0 / 5</div>
   </div>
 </div>
 

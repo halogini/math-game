@@ -226,6 +226,23 @@ td.r,th.r{text-align:right}
     max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
 }
 @media (orientation:portrait){#rot{display:flex}}
+/* ===== 세로로 든 기기: 막지 않고 화면을 돌려서 보여 준다 =====
+   화면 회전 잠금을 켜 둔 학생은 기기를 돌려도 가로가 되지 않아, 「돌려 주세요」
+   안내 앞에서 그대로 막혀 버린다. prism-tycoon과 같은 방식으로 게임 상자를 돌린다.
+   body를 돌리면 그 안의 position:fixed 요소(안내창·오븐 집중 모드·토스트)도
+   같은 좌표계에 들어가 함께 돌아간다. */
+html.force-landscape,html.force-landscape body{overflow:hidden;touch-action:none}
+html.force-landscape body{
+  position:fixed;top:0;left:100vw;left:100dvw;
+  width:100vh;width:100dvh;height:100vw;height:100dvw;
+  transform:rotate(90deg);transform-origin:top left;
+}
+/* 반대 방향으로 든 경우. 기기 기울기로 고른다 */
+html.force-landscape.force-landscape-ccw body{top:100vh;top:100dvh;left:0;transform:rotate(-90deg)}
+html.force-landscape input,html.force-landscape textarea,
+html.force-landscape button,html.force-landscape a{touch-action:manipulation}
+/* 돌려서 보여 주는 중이면 「돌려 주세요」 안내는 필요 없다 */
+html.force-landscape #rot{display:none!important}
 #stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;border-radius:0;background:var(--bg)}
 #chrome{
   position:absolute;z-index:60;display:flex;gap:6px;align-items:flex-start;
