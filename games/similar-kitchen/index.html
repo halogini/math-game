@@ -111,8 +111,26 @@ td.r,th.r{text-align:right}
 @media (orientation:portrait){#rot{display:flex}}
 /* ===== 화면 맞추기 (기기마다 다른 크기를 통째로 축소/확대) ===== */
 #stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden}
-#fsBtn{position:fixed;right:8px;top:8px;z-index:80;display:none;min-height:38px;min-width:38px;padding:4px 12px;font-size:15px;border-radius:12px;background:rgba(59,42,26,.72);color:#fff;border:0;font-weight:700;box-shadow:none}
+/* 설정 버튼은 무대 안에 둔다. 화면 밖에 고정하면 무대 가장자리를 몰라 코인 표시를 덮는다 */
+#chrome{position:absolute;right:10px;top:6px;z-index:60;display:flex;gap:6px;align-items:flex-start}
+#chrome button{min-height:44px;padding:4px 12px;font-size:16px;border-radius:12px;background:rgba(59,42,26,.72);color:#fff;border:0;font-weight:700;box-shadow:none}
+.compact #chrome button{min-height:36px;padding:2px 9px;font-size:14px}
+#fsBtn{display:none}
 #fsBtn.on{display:block}
+/* 떠오르는 숫자 (코인·감점) */
+.flo{position:absolute;transform:translate(-50%,-50%);font-weight:800;pointer-events:none;z-index:50;white-space:nowrap;animation:flo 1.05s ease-out forwards;text-shadow:0 2px 0 rgba(255,255,255,.8),0 0 6px rgba(255,255,255,.6)}
+.flo.coin{color:#d98600;font-size:25px}
+.flo.bad{color:#d94b43;font-size:19px}
+.flo.ok{color:#2f9e63;font-size:21px}
+@keyframes flo{0%{opacity:0;transform:translate(-50%,-50%) scale(.55)}16%{opacity:1;transform:translate(-50%,-88%) scale(1.14)}100%{opacity:0;transform:translate(-50%,-185%) scale(1)}}
+/* 콤보 배너 */
+.combo{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:46px;font-weight:800;color:#ff8a3d;text-shadow:0 3px 0 #fff,0 0 20px rgba(255,138,61,.55);pointer-events:none;z-index:55;animation:cmb 1.15s ease-out forwards}
+@keyframes cmb{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-8deg)}22%{opacity:1;transform:translate(-50%,-50%) scale(1.18) rotate(3deg)}70%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-90%) scale(.95)}}
+/* 남은 시간 경고 */
+.timer.warn i{background:linear-gradient(90deg,#ff7a6d,#d94b43);animation:tw .55s infinite}
+@keyframes tw{0%,100%{opacity:1}50%{opacity:.45}}
+.coins.bump{animation:bump .34s ease-out}
+@keyframes bump{0%{transform:none}30%{transform:scale(1.26)}100%{transform:none}}
 #dbg{position:fixed;right:4px;bottom:4px;z-index:80;background:rgba(59,42,26,.82);color:#fff;font:10px/1.4 monospace;padding:4px 7px;border-radius:7px;white-space:pre;pointer-events:none;display:none}
 
 .bags{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-top:2px}
@@ -218,9 +236,12 @@ td.r,th.r{text-align:right}
 <div id="rot">📱 태블릿을 가로로 돌려 주세요</div>
 <div class="toast" id="toast"></div>
 <canvas id="ghost" width="200" height="200"></canvas>
-<button id="fsBtn">⛶ 전체화면</button>
 <div id="dbg"></div>
 <div id="stage">
+<div id="chrome">
+  <button id="fsBtn">⛶ 전체화면</button>
+  <button id="sndBtn" title="소리 켜기/끄기">🔊</button>
+</div>
 
 <!-- 시작 -->
 <section id="intro" class="screen on">
@@ -359,6 +380,100 @@ var $=function(id){return document.getElementById(id)};
 var COARSE=(function(){try{return matchMedia('(pointer: coarse)').matches}catch(e){return false}})();
 var DRAG_SLOP=COARSE?18:10;
 
+/* ===== 소리 =====
+   음원 파일 없이 WebAudio로 그때그때 만든다. 「단일 HTML 유지」 규칙을 지키려는 것이다.
+   교실에서 태블릿 여러 대가 동시에 울리면 시끄러우니 끄는 버튼을 두고 선택을 기억한다. */
+var SND={on:true,ctx:null,master:null};
+try{SND.on=localStorage.getItem('nyang.sound')!=='off'}catch(e){}
+function audioMake(){
+  if(SND.ctx)return true;
+  var AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return false;
+  try{
+    SND.ctx=new AC();
+    SND.master=SND.ctx.createGain();SND.master.gain.value=0.22;
+    SND.master.connect(SND.ctx.destination);
+  }catch(e){SND.ctx=null;return false}
+  return true;
+}
+/* iOS·안드로이드는 학생이 화면을 처음 만지기 전에는 소리를 내주지 않는다 */
+function audioUnlock(){
+  if(!audioMake())return;
+  if(SND.ctx.state==='suspended')try{SND.ctx.resume()}catch(e){}
+}
+function audioLive(){return !!(SND.on&&SND.ctx&&SND.ctx.state==='running')}
+function tone(f,at,dur,type,vol,f2){
+  if(!audioLive())return;
+  var c=SND.ctx,t=c.currentTime+at,o=c.createOscillator(),g=c.createGain();
+  o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+  if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||0.4,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(SND.master);o.start(t);o.stop(t+dur+0.03);
+}
+function run(list,type,vol,step,dur){
+  list.forEach(function(f,i){tone(f,i*(step||0.07),dur||0.18,type||'triangle',vol||0.4)});
+}
+var SFX={
+  tap:function(){tone(640,0,0.08,'sine',0.3,760)},
+  bag:function(){tone(420,0,0.1,'sine',0.3,640)},
+  perfect:function(){tone(880,0,0.1,'triangle',0.5);tone(1320,0.06,0.15,'triangle',0.42)},
+  good:function(){tone(740,0,0.12,'triangle',0.4)},
+  miss:function(){tone(210,0,0.17,'sawtooth',0.26,120)},
+  done:function(){run([523,659,784],'triangle',0.42,0.07,0.17)},
+  serve:function(){run([659,784,988,1319],'triangle',0.4,0.062,0.2)},
+  giant:function(){run([392,523,659,784,1047],'triangle',0.46,0.07,0.26);tone(196,0,0.5,'sine',0.3)},
+  fail:function(){tone(330,0,0.15,'square',0.26);tone(247,0.11,0.22,'square',0.24)},
+  coin:function(){tone(988,0,0.06,'square',0.22);tone(1319,0.055,0.11,'square',0.2)},
+  buy:function(){run([784,1047,1319,1568],'triangle',0.36,0.055,0.16)},
+  arrive:function(){tone(784,0,0.15,'sine',0.32);tone(587,0.13,0.2,'sine',0.3)},
+  giantIn:function(){tone(147,0,0.3,'sawtooth',0.3);tone(220,0.16,0.3,'square',0.26)},
+  angry:function(){tone(196,0,0.26,'sawtooth',0.26,98)},
+  combo:function(){run([784,988,1175,1568,1976],'triangle',0.42,0.055,0.2)},
+  warn:function(){tone(880,0,0.09,'square',0.2);tone(880,0.15,0.09,'square',0.2)},
+  trash:function(){tone(160,0,0.14,'sawtooth',0.22,90)},
+  roundEnd:function(){run([523,659,784,1047,1319],'triangle',0.42,0.09,0.28)}
+};
+function sfx(n){if(!audioLive())return;var f=SFX[n];if(f)try{f()}catch(e){}}
+function sndSync(){$('sndBtn').textContent=SND.on?'🔊':'🔇'}
+
+/* ===== 연출 ===== */
+var flos=[];
+function stageXY(el){
+  var r=el.getBoundingClientRect(),s=stage.getBoundingClientRect();
+  return{x:(r.left+r.width/2-s.left)/VIEW.s,y:(r.top+r.height/2-s.top)/VIEW.s};
+}
+function fxDrop(d){
+  var i=flos.indexOf(d);if(i>=0)flos.splice(i,1);
+  if(d.parentNode)d.parentNode.removeChild(d);
+}
+/* animationend만 믿으면 안 된다. 화면이 바뀌거나 한꺼번에 많이 생기면 오지 않는다 */
+function fxAdd(d){
+  stage.appendChild(d);flos.push(d);
+  while(flos.length>24)fxDrop(flos[0]);
+  d.addEventListener('animationend',function(){fxDrop(d)});
+  setTimeout(function(){fxDrop(d)},1600);
+}
+function fxClear(){while(flos.length)fxDrop(flos[0])}
+function floatText(x,y,txt,cls){
+  var d=document.createElement('div');
+  d.className='flo '+(cls||'coin');d.textContent=txt;
+  d.style.left=x+'px';d.style.top=y+'px';
+  fxAdd(d);
+}
+function floatAtSlot(i,txt,cls){
+  var el=slotEls[i];if(!el)return;
+  var p=stageXY(el);floatText(p.x,p.y+12,txt,cls);
+}
+function comboBanner(txt){
+  var d=document.createElement('div');d.className='combo';d.textContent=txt;
+  fxAdd(d);
+}
+function bumpCoins(){var c=$('coinsTxt');c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump')}
+var shake={until:0,mag:0};
+function doShake(mag,ms){shake.mag=mag;shake.until=performance.now()+ms}
+
 /* ===== 랜덤 (학생마다 다른 주문) ===== */
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 var seedParam=(function(){try{return new URLSearchParams(location.search).get('seed')}catch(e){return null}})();
@@ -383,7 +498,7 @@ function newRound(r){
   S={phase:'play',round:r,time:0,cust:[],nid:0,bench:null,oven:ovenIdle(),sel:null,
      reward:0,patience:0,combo:0,streak:0,served:0,penalty:0,left:0,qs:[],
      wrong:{wrongDish:0,notSimilar:0,wrongSize:0,raw:0},trashed:0,wasted:0,
-     guide:false,hover:-1,roundT:ROUND_T,nextAt:2,giants:(GIANT_AT[r]||[]).slice(),lastKey:''};
+     guide:false,hover:-1,roundT:ROUND_T,nextAt:2,giants:(GIANT_AT[r]||[]).slice(),lastKey:'',warned:false};
 }
 window.__S=function(){return S};window.__G=function(){return G};
 
@@ -415,6 +530,8 @@ function spawn(giant){
   var seat=freeSeat();if(seat<0)return null;
   var c=makeCust(giant);c.slot=seat;S.cust.push(c);
   S.nextAt=S.time+8+rnd()*4;
+  sfx(giant?'giantIn':'arrive');
+  if(giant)doShake(6,420);
   toast(giant?'👑 자이언트 '+c.anName+'이(가) 나타났어요!':'🔔 '+c.anName+' 손님이 왔어요!',1300);
   return c;
 }
@@ -646,7 +763,9 @@ function addN(n){
   if(n>0){
     var can=Math.min(n,mx-d.n);
     if(can<=0){toast('접시가 가득 찼어요');return}
-    d.n+=can;refresh(d);spawnFx(d,can);
+    /* 봉지가 접시 한도에 잘려 일부만 들어가면 학생이 모른 채 개수를 틀린다 */
+    if(can<n)toast('접시에 '+can+'개만 더 들어가요');
+    d.n+=can;refresh(d);spawnFx(d,can);sfx(n>1?'bag':'tap');
   }else{
     var m=Math.min(-n,d.n);if(m<=0)return;
     d.n-=m;refresh(d);
@@ -723,9 +842,11 @@ function cookTap(){
   var t=(clock()-o.t0)/1000,n=Math.max(1,Math.round(t/BEAT)),dev=Math.abs(t-n*BEAT);
   var g=dev<=0.10?'perfect':(dev<=0.20?'good':'miss'),q=g==='perfect'?1:(g==='good'?0.7:0.4);
   o.grades.push(q);o.n++;o.last={g:g,at:clock()};
+  sfx(g);
   if(o.n>=o.need){
     o.state='done';o.dish.cooked=true;
     o.dish.quality=o.grades.reduce(function(a,b){return a+b},0)/o.grades.length;
+    sfx('done');
     toast('✅ 완성! 완성도 '+Math.round(o.dish.quality*100)+'% · 거인에게 끌어다 놓아요');
   }
   updateAll();
@@ -919,6 +1040,12 @@ function serveDish(src,c){
     var msg=(c.giant?'👑 ':'😋 ')+'+'+gain+'코인! 완성도 '+Math.round(q*100)+'%';
     if(S.streak%3===0){S.combo+=COMBO_BONUS;gain+=COMBO_BONUS;msg+='  콤보 +'+COMBO_BONUS}
     earn(gain);
+    floatAtSlot(c.slot,'+'+gain,'coin');
+    if(q>=0.9)floatAtSlot(c.slot,'완벽하게 구웠어요!','ok');
+    bumpCoins();
+    sfx(c.giant?'giant':'serve');
+    if(c.giant)doShake(5,320);
+    if(S.streak%3===0){comboBanner('콤보 ×'+S.streak+'  +'+COMBO_BONUS);sfx('combo')}
     toast(msg);
   }else{
     S.wrong[r]++;G.wrongAll[r]++;S.streak=0;
@@ -926,10 +1053,11 @@ function serveDish(src,c){
     c.wait=Math.min(c.pat-1,c.wait+c.pat*frac);   // 기다린 시간이 늘어남 = 인내심 감소
     if(r!=='wrongDish')c.fails=(c.fails||0)+1;
     c.got={type:d.type,n:d.n};c.gotUntil=S.time+2.8;
+    sfx('fail');doShake(4,240);
     if(r==='wrongDish'){c.mood='💢';toast('💢 주문은 「'+DISHES[c.dish].name+'」인데 「'+DISHES[d.type].name+'」이 왔어요!')}
-    else if(r==='notSimilar'){S.penalty+=WRONG_COST;pay(WRONG_COST);c.mood='💢';toast('💢 원본과 모양이 달라요!  −'+WRONG_COST+'코인')}
-    else if(r==='wrongSize'){c.mood='💧';toast('💧 이 크기가 아니에요. '+(d.n<c.N?'너무 작아요':'너무 커요')+'!')}
-    else{c.mood='💧';toast('💧 안 익었어요! 오븐에서 구워 주세요')}
+    else if(r==='notSimilar'){S.penalty+=WRONG_COST;pay(WRONG_COST);c.mood='💢';floatAtSlot(c.slot,'−'+WRONG_COST,'bad');bumpCoins();toast('💢 원본과 모양이 달라요!  −'+WRONG_COST+'코인')}
+    else if(r==='wrongSize'){c.mood='💧';floatAtSlot(c.slot,d.n<c.N?'너무 작아요':'너무 커요','bad');toast('💧 이 크기가 아니에요. '+(d.n<c.N?'너무 작아요':'너무 커요')+'!')}
+    else{c.mood='💧';floatAtSlot(c.slot,'안 익었어요','bad');toast('💧 안 익었어요! 오븐에서 구워 주세요')}
   }
   updateAll();return true;
 }
@@ -937,7 +1065,7 @@ function discard(src){
   if(S.phase!=='play'||S.guide)return false;
   var d=getDish(src);if(!d)return false;
   var n=d.n;S.wasted+=n;G.wastedAll+=n;S.trashed++;G.trashedAll++;
-  removeDish(src);
+  removeDish(src);sfx('trash');
   toast('🗑️ 버렸어요'+(n?' (재료 '+n+'개 낭비)':''));updateAll();return true;
 }
 $('trash').addEventListener('click',function(){if(S.sel)discard(S.sel)});
@@ -1007,6 +1135,8 @@ window.addEventListener('pointercancel',function(e){finishDrag(e,true)});
 function updateHud(){
   $('coinsTxt').textContent='🪙 '+G.wallet;
   $('timerBar').style.transform='scaleX('+clamp(1-S.time/S.roundT,0,1)+')';
+  var tleft=S.roundT-S.time;
+  $('timerBar').parentNode.classList.toggle('warn',tleft<=10&&tleft>0);
   renderSlots();
   var cb=$('cookBtn'),o=S.oven;
   cb.className='btn'+(o.state==='cooking'?' cooking':o.state==='done'?' done':' off');
@@ -1026,7 +1156,8 @@ function updateAll(){
 $('startBtn').onclick=function(){if(wantsFS())fsRequest();startGame()};
 function startGame(){resetG();startRound(1,true)}
 function startRound(r,withGuide){
-  G.round=r;newRound(r);drag=null;bagDrag=null;fx=[];
+  G.round=r;newRound(r);drag=null;bagDrag=null;fx=[];fxClear();
+  shake.mag=0;shake.until=0;applyStage(0,0);
   S.guide=true;
   var ic=[];DISHES.forEach(function(d,i){if(owned(i))ic.push(d.ico)});
   $('hudTitle').textContent='R'+r+' / '+LAST_ROUND;
@@ -1050,10 +1181,11 @@ $('riBtn').onclick=endGuide;
 
 function update(dt){
   S.time+=dt;
+  if(!S.warned&&S.roundT-S.time<=10){S.warned=true;sfx('warn')}
   S.cust.forEach(function(c){
     if(c.state==='wait'){
       c.wait+=dt;
-      if(c.wait>=c.pat){c.state='angry';c.until=S.time+0.9;S.streak=0;S.left++;G.leftAll++;toast('💢 손님이 화나서 떠났어요')}
+      if(c.wait>=c.pat){c.state='angry';c.until=S.time+0.9;S.streak=0;S.left++;G.leftAll++;sfx('angry');floatAtSlot(c.slot,'떠났어요','bad');toast('💢 손님이 화나서 떠났어요')}
     }else if((c.state==='happy'||c.state==='angry')&&S.time>=c.until){
       var sp=c.state==='happy'?c.speed:0;
       c.state='gone';callNext(sp);c.slot=-1;
@@ -1076,6 +1208,7 @@ function loop(now){
   var dt=Math.min(0.1,(now-last)/1000);last=now;
   if(S.guide){requestAnimationFrame(loop);return}
   update(dt);
+  tickShake(now);
   if(S.time>=S.roundT){finishRound();return}
   updateHud();renderBench();renderOven();
   requestAnimationFrame(loop);
@@ -1097,6 +1230,8 @@ function ledgerRows(o){
 }
 function finishRound(){
   S.phase='roundEnd';
+  shake.mag=0;shake.until=0;applyStage(0,0);fxClear();
+  sfx('roundEnd');
   var net=S.reward+S.patience+S.combo-S.penalty;
   var entry={r:S.round,net:net,reward:S.reward,patience:S.patience,combo:S.combo,penalty:S.penalty,notSimilar:S.wrong.notSimilar,served:S.served,left:S.left};
   G.log.push(entry);G.servedAll+=S.served;
@@ -1112,8 +1247,8 @@ function finishRound(){
 /* ===== 즉석 업그레이드 (게임 중에 바로 구입) ===== */
 function spend(cost,msg){
   if(S.phase!=='play'||S.guide)return false;
-  if(G.wallet<cost){toast('🪙 코인이 모자라요 (앞으로 '+(cost-G.wallet)+'코인)');return false}
-  G.wallet-=cost;toast('✅ '+msg,1700);return true;
+  if(G.wallet<cost){toast('🪙 코인이 모자라요 (앞으로 '+(cost-G.wallet)+'코인)');sfx('miss');return false}
+  G.wallet-=cost;sfx('buy');bumpCoins();toast('✅ '+msg,1700);return true;
 }
 function buyDish(i){var D=DISHES[i];if(owned(i))return false;
   if(S.round<D.unlockR){toast('🔒 '+D.unlockR+'라운드부터 열 수 있어요');return false}
@@ -1176,8 +1311,17 @@ $('againBtn').onclick=function(){show('intro')};
 /* MAX_S: 기준 크기보다 크게는 키우지 않는다. 큰 모니터에서 화면이 부풀지 않게 하려는 것으로,
    three-chances의 .game-container{max-width:1100px;margin:0 auto}와 같은 뜻이다 */
 var DESIGN={w:1024,h:740},COMPACT={w:900,h:540},MAX_S=1;
-var VIEW={w:1024,h:716,s:1,q:1,compact:false};
+var VIEW={w:1024,h:716,s:1,q:1,compact:false,ox:0,oy:0};
 var stage=$('stage');
+/* 화면 흔들기가 기준 위치를 덮어쓰지 않도록, 변환은 항상 여기서만 쓴다 */
+function applyStage(dx,dy){
+  stage.style.transform='translate('+(VIEW.ox+dx)+'px,'+(VIEW.oy+dy)+'px) scale('+VIEW.s+')';
+}
+function tickShake(now){
+  if(now>=shake.until){if(shake.mag){shake.mag=0;applyStage(0,0)}return}
+  var k=shake.mag;
+  applyStage((Math.random()-0.5)*2*k,(Math.random()-0.5)*2*k);
+}
 var DBG=(function(){try{return new URLSearchParams(location.search).has('debug')}catch(e){return false}})();
 
 function vpSize(){
@@ -1215,9 +1359,11 @@ function fit(){
   document.documentElement.classList.toggle('compact',compact);
   stage.style.width=D.w+'px';stage.style.height=D.h+'px';
   var s=Math.min(v.w/D.w,v.h/D.h,MAX_S);
-  stage.style.transform='translate('+((v.w-D.w*s)/2)+'px,'+((v.h-D.h*s)/2)+'px) scale('+s+')';
   VIEW.w=v.w;VIEW.h=v.h;VIEW.s=s;VIEW.compact=compact;
+  VIEW.ox=(v.w-D.w*s)/2;VIEW.oy=(v.h-D.h*s)/2;
+  applyStage(0,0);
   if(setupCanvases())invalidate();
+  layoutChrome();
   renderDbg();
 }
 var fitQ=0;
@@ -1237,8 +1383,26 @@ function fsRequest(){
   var r=document.documentElement,p=r.requestFullscreen?r.requestFullscreen():r.webkitRequestFullscreen();
   if(p&&typeof p.catch==='function')p.catch(function(){});
 }
-function syncFsBtn(){$('fsBtn').classList.toggle('on',fsSupported()&&wantsFS()&&!fsActive())}
+/* 버튼 글자 폭은 기기·언어에 따라 달라진다. 자리를 재서 비워 두면 코인 표시를 덮지 않는다 */
+function layoutChrome(){
+  var h=document.querySelector('.hud');
+  if(h)h.style.paddingRight=($('chrome').offsetWidth+14)+'px';
+}
+function syncFsBtn(){$('fsBtn').classList.toggle('on',fsSupported()&&wantsFS()&&!fsActive());layoutChrome()}
 $('fsBtn').addEventListener('click',function(e){e.stopPropagation();fsRequest()});
+
+/* 소리 끄기/켜기. 교실에서 태블릿이 한꺼번에 울리는 상황을 위해 눈에 띄게 둔다 */
+$('sndBtn').addEventListener('click',function(e){
+  e.stopPropagation();
+  SND.on=!SND.on;
+  try{localStorage.setItem('nyang.sound',SND.on?'on':'off')}catch(err){}
+  sndSync();
+  if(SND.on){audioUnlock();sfx('coin')}
+});
+/* 첫 터치에서 소리를 깨운다 (모바일 브라우저 규칙) */
+window.addEventListener('pointerdown',function once(){
+  audioUnlock();window.removeEventListener('pointerdown',once,true);
+},true);
 
 function renderDbg(){
   if(!DBG)return;
@@ -1265,7 +1429,7 @@ if(window.visualViewport){
 document.addEventListener('dblclick',function(e){e.preventDefault()},{passive:false});
 document.addEventListener('contextmenu',function(e){e.preventDefault()});
 
-fit();syncFsBtn();
+fit();syncFsBtn();sndSync();
 
 window.__api={chooseDish:chooseDish,addN:addN,toOven:toOven,cookTap:cookTap,setClock:function(f){clock=f},
   serveDish:serveDish,discard:discard,tick:function(d){update(d);updateAll()},endGuide:endGuide,startGame:startGame,startRound:startRound,
