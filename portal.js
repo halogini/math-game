@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnPlayCongruence = document.getElementById('btn-play-congruence');
   const btnPlayThreeChances = document.getElementById('btn-play-three-chances');
   const btnPlayPrismTycoon = document.getElementById('btn-play-prism-tycoon');
+  const btnPlaySimilarKitchen = document.getElementById('btn-play-similar-kitchen');
   const leaderboardTitle = document.getElementById('leaderboard-title');
   const leaderboardModeNote = document.getElementById('leaderboard-mode-note');
   const leaderboardTableHeaderId = document.getElementById('th-header-id');
@@ -163,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const BINGSOO_GAME_IDS = new Set(['bingsoo', '']);
   const BINGSOO2_GAME_IDS = new Set(['bingsoo2', 'bingsoo-2']);
   const PRISM_TYCOON_GAME_IDS = new Set(['prism-tycoon', 'tycoon']);
+  const SIMILAR_KITCHEN_GAME_IDS = new Set(['similar-kitchen', 'nyang-bakery', 'similar_kitchen']);
   let activeLeaderboardGame = 'bingsoo';
   let scoresUnsub = null;
   let threeChancesUnsub = null;
@@ -179,7 +181,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'prism-tycoon': '보석 타이쿤',
     tycoon: '보석 타이쿤',
     'three-chances': '기회는 세 번',
-    congruence: '합동'
+    congruence: '합동',
+    'similar-kitchen': '냥셰프의 빵집'
   };
 
   function usageDayKeyKst(nowMs) {
@@ -533,6 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (id === 'prism-tycoon' || id === 'tycoon') return 'prism-tycoon';
     if (id === 'three-chances' || id === 'three_chances') return 'three-chances';
     if (id === 'congruence' || id === 'triangle' || id === 'congruence_game') return 'congruence';
+    if (id === 'similar-kitchen' || id === 'nyang-bakery' || id === 'similar_kitchen') return 'similar-kitchen';
     return id.slice(0, 24) || 'unknown';
   }
 
@@ -1650,6 +1654,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnPlayCongruence) btnPlayCongruence.href = gameHref('games/congruence/index.html');
     if (btnPlayThreeChances) btnPlayThreeChances.href = gameHref('games/three-chances/index.html');
     if (btnPlayPrismTycoon) btnPlayPrismTycoon.href = gameHref('games/prism-tycoon-live/index.html');
+    if (btnPlaySimilarKitchen) btnPlaySimilarKitchen.href = gameHref('games/similar-kitchen/index.html');
   }
 
   // ----------------------------------------------------
@@ -1855,6 +1860,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = String((entry && (entry.gameId || entry.game)) || '').trim();
     if (key === 'congruence') return CONGRUENCE_GAME_IDS.has(id);
     if (key === 'prism-tycoon') return PRISM_TYCOON_GAME_IDS.has(id);
+    if (key === 'similar-kitchen') return SIMILAR_KITCHEN_GAME_IDS.has(id);
     if (key === 'three-chances') {
       return id === 'three-chances' || id === 'three_chances';
     }
@@ -2222,6 +2228,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (activeLeaderboardGame === 'bingsoo2') {
       return ['bingsoo2', 'bingsoo-2'];
+    }
+    if (activeLeaderboardGame === 'similar-kitchen') {
+      return ['similar-kitchen', 'nyang-bakery', 'similar_kitchen'];
     }
     return ['bingsoo'];
   }
