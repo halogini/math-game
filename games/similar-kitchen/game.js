@@ -657,7 +657,46 @@ function steam(c,o,cx,top,w,pr){
   if(o.state==='cooking'){c.font='800 14px Malgun Gothic,sans-serif';c.textAlign='center';c.fillStyle='rgba(255,200,120,'+(0.55+0.45*Math.sin(t*9))+')';c.fillText(pr<0.5?'지글…':'지글지글~',cx,Math.max(96,top-80))}
   if(o.state==='done'){for(var k=0;k<4;k++){var a=(t*1.2+k/4)%1;c.globalAlpha=Math.sin(a*Math.PI);c.font='18px sans-serif';c.textAlign='center';c.fillText('✨',cx+(k-1.5)*w/4,top+10+Math.cos(k*2+t)*6);c.globalAlpha=1}}
 }
+/* ===== 스프라이트 =====
+   그림은 배경이 형광 초록(#00FF00)으로 채워져 온다. "투명 배경"으로 요청하면
+   생성기가 투명을 나타내는 체크무늬를 진짜 물감으로 그려 버려서 못 쓴다.
+   그래서 단색으로 받아 여기서 빼낸다. */
+var SPRITE={},SPRITE_READY={};
+function loadKeyed(name){
+  if(SPRITE[name]!==undefined)return SPRITE[name];
+  SPRITE[name]=null;
+  var im=new Image();
+  im.onload=function(){
+    try{
+      var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;
+      var g=cv.getContext('2d');g.drawImage(im,0,0);
+      var d=g.getImageData(0,0,cv.width,cv.height),p=d.data;
+      for(var i=0;i<p.length;i+=4){
+        /* 초록이 뚜렷한 화소만 지운다. 빵의 노란색까지 지우지 않도록 여유를 좁게 */
+        if(p[i+1]>150&&p[i]<120&&p[i+2]<120&&(p[i+1]-p[i])>60&&(p[i+1]-p[i+2])>60)p[i+3]=0;
+      }
+      g.putImageData(d,0,0);
+      SPRITE[name]=cv;SPRITE_READY[name]=true;
+      if(S&&S.phase==='play')updateAll();
+    }catch(e){}
+  };
+  im.onerror=function(){SPRITE[name]=null};
+  im.src='assets/'+name+'.png';
+  return null;
+}
+function sprite(name){return SPRITE_READY[name]?SPRITE[name]:null}
+['oven-basic','oven-brick','oven-gold','trash'].forEach(loadKeyed);
+var OVEN_SPR=[null,'oven-basic','oven-brick','oven-gold'];
+/* 스프라이트를 칸에 맞춰(비율 유지) 그리고, 그려진 영역을 돌려준다 */
+function drawSpriteFit(c,cv,x,y,w,h){
+  var s=Math.min(w/cv.width,h/cv.height),dw=cv.width*s,dh=cv.height*s;
+  var dx=x+(w-dw)/2,dy=y+(h-dh)/2;
+  c.drawImage(cv,dx,dy,dw,dh);
+  return{x:dx,y:dy,w:dw,h:dh};
+}
 function ovenFrame(c,lv){
+  var cv=sprite(OVEN_SPR[lv]);
+  if(cv){drawSpriteFit(c,cv,0,0,OW,OH);return}
   if(lv===1){rr(c,0,0,OW,OH,14);c.fillStyle='#4a2f1d';c.fill();rr(c,8,8,OW-16,OH-16,10);c.fillStyle='#2b1b10';c.fill();return}
   if(lv===2){
     rr(c,0,0,OW,OH,14);c.fillStyle='#a8452e';c.fill();
@@ -684,21 +723,25 @@ function renderOven(){
     octx.font='15px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
     return;
   }
-  var CO=fitCell(d,220,135,44);
+  /* 스프라이트 오븐은 창이 가운데 있다. 캔버스 바닥(OBASE)에 그리면 빵이
+     오븐 발밑에 놓인 것처럼 보이므로, 창 안으로 올려서 그린다 */
+  var useSpr=!!sprite(OVEN_SPR[G.u.oven]);
+  var OB=useSpr?Math.round(OH*0.60):OBASE;
+  var CO=fitCell(d,useSpr?150:220,useSpr?92:135,useSpr?30:44);
   var bs=1+(o.last&&clock()-o.last.at<260?0.09*(1-(clock()-o.last.at)/260):0);
-  var pr=o.state==='done'?1:Math.min(0.95,o.n/o.need),bx=dishBox(d,CO,OW/2,OBASE);
-  octx.save();octx.translate(OW/2,OBASE);octx.scale(bs,bs);octx.translate(-OW/2,-OBASE);
-  drawDishState(octx,OW/2,OBASE,CO,d,pr);
+  var pr=o.state==='done'?1:Math.min(0.95,o.n/o.need),bx=dishBox(d,CO,OW/2,OB);
+  octx.save();octx.translate(OW/2,OB);octx.scale(bs,bs);octx.translate(-OW/2,-OB);
+  drawDishState(octx,OW/2,OB,CO,d,pr);
   if(DISHES[d.type].dim===2){
     var w=d.w*CO,h=d.h*CO;
-    octx.save();rr(octx,OW/2-w/2,OBASE-h,w,h,Math.min(w,h)*0.12);octx.fillStyle='rgba(150,70,15,'+(0.03+0.4*(o.state==='done'?1:pr))+')';octx.fill();octx.restore();
+    octx.save();rr(octx,OW/2-w/2,OB-h,w,h,Math.min(w,h)*0.12);octx.fillStyle='rgba(150,70,15,'+(0.03+0.4*(o.state==='done'?1:pr))+')';octx.fill();octx.restore();
   }
   octx.restore();
   steam(octx,o,OW/2,bx.y,bx.w,pr);
   if(o.state==='cooking'){
     /* 박자 링·판정은 집중 모드 패널에만 표시 (오븐 안 중복 제거) */
     octx.fillStyle='#e8d4b0';octx.font='800 16px Malgun Gothic,sans-serif';octx.textAlign='center';
-    octx.fillText('굽는 중…',OW/2,OBASE+16);
+    octx.fillText('굽는 중…',OW/2,OB+16);
   }else if(o.state==='done'){
     var q=d.quality;
     octx.fillStyle='#5fe08f';octx.font='800 18px Malgun Gothic,sans-serif';octx.textAlign='center';
