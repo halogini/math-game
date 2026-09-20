@@ -88,7 +88,7 @@ canvas#benchCv{width:100%;max-height:100%;height:auto;touch-action:none}
 .trash{margin-top:auto;border:3px dashed #c9b28a;border-radius:16px;text-align:center;padding:8px 4px;font-size:34px;line-height:1.1;background:#f7efe0;transition:background .12s,border-color .12s}
 .trash small{display:block;font-size:12px;color:#8a6a45;margin-top:2px}
 .trash.drop{background:#ffe1dc;border-color:var(--bad)}
-.toast{position:fixed;left:50%;top:252px;transform:translateX(-50%);background:#3b2a1a;color:#fff;padding:10px 18px;border-radius:99px;font-size:16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:92%;text-align:center}
+.toast{position:fixed;left:50%;top:252px;/* 실제 위치는 fit()이 화면 크기에 맞춰 다시 정한다 */transform:translateX(-50%);background:#3b2a1a;color:#fff;padding:10px 18px;border-radius:99px;font-size:16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:92%;text-align:center}
 .toast.on{opacity:1}
 #ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:70;display:none;opacity:.92;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
 /* guide */
@@ -109,6 +109,11 @@ td.r,th.r{text-align:right}
 .insight{background:#fff7d6;border:2px solid #f0d67a;border-radius:14px;padding:10px 14px;margin:10px 0;line-height:1.55}
 #rot{position:fixed;inset:0;background:var(--bg);z-index:99;display:none;align-items:center;justify-content:center;font-size:22px;font-weight:700}
 @media (orientation:portrait){#rot{display:flex}}
+/* ===== 화면 맞추기 (기기마다 다른 크기를 통째로 축소/확대) ===== */
+#stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden}
+#fsBtn{position:fixed;right:8px;top:8px;z-index:80;display:none;min-height:38px;min-width:38px;padding:4px 12px;font-size:15px;border-radius:12px;background:rgba(59,42,26,.72);color:#fff;border:0;font-weight:700;box-shadow:none}
+#fsBtn.on{display:block}
+#dbg{position:fixed;right:4px;bottom:4px;z-index:80;background:rgba(59,42,26,.82);color:#fff;font:10px/1.4 monospace;padding:4px 7px;border-radius:7px;white-space:pre;pointer-events:none;display:none}
 
 .bags{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-top:2px}
 .shelfgrid .mold:nth-child(3){grid-column:1/3}
@@ -170,12 +175,52 @@ td.r,th.r{text-align:right}
 .bag .bk{flex-direction:column;font-size:18px;line-height:1.1;font-weight:800}
 .bag .bk small,.mold .lock small{font-size:12px}
 .mold{padding:3px 2px 4px}.mold canvas{width:50%}.shelfgrid{gap:6px}
+/* ===== 좁은 화면(폰 가로) : 세로로 눌러 담기 ===== */
+.compact .screen{padding:4px 8px}
+.compact .hud{height:30px}
+.compact .hud .title{font-size:15px}
+.compact .coins{font-size:17px;min-width:96px}
+.compact .custrow{margin:0 0 4px;padding-bottom:3px;border-bottom-width:5px}
+.compact .slot canvas{max-width:236px}
+.compact .slot .cat,.compact .cust .cat{font-size:30px}
+.compact .slot.giant .cat{font-size:36px}
+.compact .slot .tag{font-size:11px;margin-bottom:2px}
+.compact .slot .pbar{height:6px}
+.compact h2{font-size:13px;margin-bottom:3px}
+.compact .card{padding:6px}
+.compact .oven{width:196px}
+.compact .shelf{width:140px}
+/* 재료 3칸이 반드시 다 보여야 한다 (선반 그리드는 overflow:hidden이라 넘치면 소리 없이 잘린다) */
+.compact .shelfgrid{gap:4px}
+.compact .mold{padding:2px 2px 3px}
+.compact .mold canvas,.compact .shelfgrid .mold:nth-child(3) canvas{width:36%}
+.compact .mold b{font-size:12px}
+.compact .mold span{font-size:10px}
+.compact .mold .lock{font-size:20px}
+.compact .mold .lock small{font-size:9px}
+.compact .upb{font-size:10px;padding:3px 4px;margin-top:2px}
+.compact .dbtns{width:86px}
+.compact .dbtns .btn{min-height:22px;font-size:11px}
+.compact .bag{min-height:46px;font-size:13px}
+.compact .upg{min-height:26px;font-size:11px}
+.compact #cookBtn{min-height:40px;font-size:16px;margin-top:4px}
+.compact #toOven{min-height:40px;font-size:16px}
+.compact .trash{font-size:20px;padding:2px}
+.compact .trash small{display:none}
+.compact .benchinfo{margin:3px 0}
+.compact .gcard{padding:12px 16px}
+.compact .gcard h2{font-size:18px}
+.compact .step{padding:6px;font-size:13px;line-height:1.4}
+.compact .step .ic{font-size:26px}
 </style>
 </head>
 <body>
 <div id="rot">📱 태블릿을 가로로 돌려 주세요</div>
 <div class="toast" id="toast"></div>
 <canvas id="ghost" width="200" height="200"></canvas>
+<button id="fsBtn">⛶ 전체화면</button>
+<div id="dbg"></div>
+<div id="stage">
 
 <!-- 시작 -->
 <section id="intro" class="screen on">
@@ -283,6 +328,7 @@ td.r,th.r{text-align:right}
     <div class="row" style="justify-content:flex-end;margin:8px 0 20px"><button class="btn" id="againBtn">처음부터 다시 ↻</button></div>
   </div>
 </section>
+</div><!-- /#stage -->
 
 <script>
 (function(){
@@ -309,6 +355,9 @@ var GIANT=[[10,12],[8,10],[5]];             // 자이언트 손님이 시키는 
 var GIANT_AT={2:[32],3:[30],4:[22,50]};     // 라운드별 자이언트 등장 시각(초)
 var clock=function(){return performance.now()};
 var $=function(id){return document.getElementById(id)};
+/* 손가락은 마우스보다 많이 흔들린다. 탭이 드래그로 잘못 읽히지 않게 여유를 준다 */
+var COARSE=(function(){try{return matchMedia('(pointer: coarse)').matches}catch(e){return false}})();
+var DRAG_SLOP=COARSE?18:10;
 
 /* ===== 랜덤 (학생마다 다른 주문) ===== */
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -371,7 +420,13 @@ function spawn(giant){
 }
 
 var toastT=null;
-function toast(msg,ms){var t=$('toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on')},ms||1900)}
+function toast(msg,ms){
+  var t=$('toast');
+  /* 손님 줄 바로 아래에 띄운다. 기기마다 화면이 줄어드는 비율이 달라 고정값을 쓸 수 없다 */
+  var r=$('custRow').getBoundingClientRect();
+  if(r.height)t.style.top=Math.round(r.bottom+8)+'px';
+  t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on')},ms||1900);
+}
 function show(id){$('toast').classList.remove('on');['intro','play','roundEnd','result'].forEach(function(s){$(s).classList.toggle('on',s===id)})}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function rr(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
@@ -630,7 +685,7 @@ function bagOver(x,y){var el=document.elementFromPoint(x,y);return !!(el&&el.clo
 window.addEventListener('pointermove',function(e){
   if(!bagDrag||e.pointerId!==bagDrag.pid)return;
   var g=$('ghost');
-  if(!bagDrag.started&&Math.hypot(e.clientX-bagDrag.x0,e.clientY-bagDrag.y0)>10){
+  if(!bagDrag.started&&Math.hypot(e.clientX-bagDrag.x0,e.clientY-bagDrag.y0)>DRAG_SLOP){
     bagDrag.started=true;
     var c=g.getContext('2d'),ic=DISHES[S.bench?S.bench.type:0].ico;
     c.clearRect(0,0,200,200);c.font='40px sans-serif';c.textAlign='center';
@@ -638,7 +693,7 @@ window.addEventListener('pointermove',function(e){
     c.font='800 22px Malgun Gothic,sans-serif';c.fillStyle='#3b2a1a';c.fillText('×'+bagDrag.n,100,165);
     g.style.display='block';
   }
-  if(bagDrag.started){g.style.transform='translate('+(e.clientX-100)+'px,'+(e.clientY-140)+'px)';$('benchWrap').classList.toggle('drop',bagOver(e.clientX,e.clientY))}
+  if(bagDrag.started){g.style.transform='translate('+(e.clientX-100*VIEW.s)+'px,'+(e.clientY-140*VIEW.s)+'px)';$('benchWrap').classList.toggle('drop',bagOver(e.clientX,e.clientY))}
 });
 function endBag(e,cancel){
   if(!bagDrag||e.pointerId!==bagDrag.pid)return;
@@ -675,7 +730,14 @@ function cookTap(){
   }
   updateAll();
 }
-window.addEventListener('pointerdown',function(){if(S.phase==='play'&&!S.guide&&S.oven.state==='cooking')cookTap()},true);
+/* 화면 아무 곳이나 탭 = 박자 1번. 두 손가락이나 손바닥이 한꺼번에 닿아도 1번으로 센다 */
+var ovenLastTap=-1e9;
+window.addEventListener('pointerdown',function(e){
+  if(S.phase!=='play'||S.guide||!S.oven||S.oven.state!=='cooking')return;
+  if(e.isPrimary===false)return;
+  var t=clock();if(t-ovenLastTap<90)return;
+  ovenLastTap=t;cookTap();
+},true);
 function steam(c,o,cx,top,w,pr){
   var t=performance.now()/1000,heat=o.state==='cooking'?0.35+pr*0.65:(o.state==='done'?0.5:0);
   var n=o.state==='idle'?0:3+Math.round(pr*3);
@@ -747,12 +809,12 @@ function renderOven(){
 }
 
 /* ===== 손님 슬롯 ===== */
-var slotEls=[];
+var slotEls=[],SLOT_W=340,SLOT_H=120;
 (function(){
   var row=$('custRow');
   for(var i=0;i<SLOTS;i++){
     var d=document.createElement('div');d.className='slot empty';
-    d.innerHTML='<canvas width="340" height="120"></canvas><div class="cat">🪑</div><div class="tag">손님</div><div class="pbar"><i></i></div>';
+    d.innerHTML='<canvas width="'+SLOT_W+'" height="'+SLOT_H+'"></canvas><div class="cat">🪑</div><div class="tag">손님</div><div class="pbar"><i></i></div>';
     (function(idx){d.addEventListener('click',function(){
       if(S.phase!=='play'||S.guide)return;
       if(S.sel){var c=slotCust(idx);if(c)serveDish(S.sel,c)}
@@ -782,7 +844,8 @@ function sil(c,ty,k,cx,base,cap){
   else{var a=Math.min(k*9,cap||36),d3=newDish(2,1);d3.cooked=true;cake(c,cx,base,a,d3,true)}
 }
 function drawBubble(cnv,c0,got){
-  var k=c0.k,ty=c0.dish,c=cnv.getContext('2d'),w=cnv.width,h=cnv.height,base=h-14;
+  /* w,h는 논리 크기(SLOT_W/SLOT_H). cnv.width는 고해상도 대응 때문에 논리 크기와 다르다 */
+  var k=c0.k,ty=c0.dish,c=cnv.getContext('2d'),w=SLOT_W,h=SLOT_H,base=h-14;
   c.clearRect(0,0,w,h);
   rr(c,2,2,w-4,h-6,16);c.fillStyle='#fff';c.fill();c.lineWidth=2;c.strokeStyle='#ead6b4';c.stroke();
   c.fillStyle='#8a6a45';c.font='700 12px Malgun Gothic,sans-serif';c.textAlign='left';
@@ -898,7 +961,7 @@ function beginGhost(d){
   drawDishState(gctx,100,190,fitCell(d,170,120,56),d,d.cooked?1:0);
   ghost.style.display='block';
 }
-function moveGhost(x,y){ghost.style.transform='translate('+(x-100)+'px,'+(y-160)+'px)'}
+function moveGhost(x,y){ghost.style.transform='translate('+(x-100*VIEW.s)+'px,'+(y-160*VIEW.s)+'px)'}
 function targetAt(x,y){
   var el=document.elementFromPoint(x,y);if(!el)return {};
   var sl=el.closest&&el.closest('.slot');
@@ -915,7 +978,7 @@ function clearHover(){S.hover=-1;$('trash').classList.remove('drop');$('ovenBox'
 window.addEventListener('pointermove',function(e){
   if(!drag||e.pointerId!==drag.pid)return;
   var d=getDish(drag.src);
-  if(!drag.started&&d&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>12){drag.started=true;beginGhost(d)}
+  if(!drag.started&&d&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>DRAG_SLOP){drag.started=true;beginGhost(d)}
   if(drag.started){moveGhost(e.clientX,e.clientY);hoverTargets(e.clientX,e.clientY)}
 });
 function finishDrag(e,cancel){
@@ -959,7 +1022,8 @@ function updateAll(){
 }
 
 /* ===== 라운드 진행 ===== */
-$('startBtn').onclick=function(){startGame()};
+/* 전체화면 전환은 사용자가 누른 순간에만 허용된다. 시작 버튼이 그 기회다 */
+$('startBtn').onclick=function(){if(wantsFS())fsRequest();startGame()};
 function startGame(){resetG();startRound(1,true)}
 function startRound(r,withGuide){
   G.round=r;newRound(r);drag=null;bagDrag=null;fx=[];
@@ -1104,10 +1168,108 @@ function finishGame(){
 }
 $('againBtn').onclick=function(){show('intro')};
 
+/* ===== 화면 맞추기 =====
+   기기마다 화면 크기가 제각각이라, 정해진 크기로 만든 화면을 통째로 줄이거나 키워서 맞춘다.
+   덕분에 어떤 기기에서도 버튼이 잘려 나가지 않는다.
+   DESIGN : 태블릿·PC 기준 크기. 지금 레이아웃이 실제로 요구하는 높이가 약 713px이다.
+   COMPACT: 폰 가로처럼 높이가 아주 낮은 화면. .compact CSS로 눌러 담은 뒤의 요구 높이다. */
+var DESIGN={w:1024,h:740},COMPACT={w:900,h:540};
+var VIEW={w:1024,h:716,s:1,q:1,compact:false};
+var stage=$('stage');
+var DBG=(function(){try{return new URLSearchParams(location.search).has('debug')}catch(e){return false}})();
+
+function vpSize(){
+  var vv=window.visualViewport;
+  return{w:Math.round((vv&&vv.width)||window.innerWidth),h:Math.round((vv&&vv.height)||window.innerHeight)};
+}
+/* 캔버스는 논리 크기로 그리고, 실제 화소는 기기 해상도 × 화면 배율만큼 잡는다 (글자가 안 흐려진다) */
+function hidpi(cv,w,h,q){
+  var W=Math.round(w*q),H=Math.round(h*q);
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+  cv.getContext('2d').setTransform(q,0,0,q,0,0);
+}
+function setupCanvases(){
+  var q=clamp(Math.round((window.devicePixelRatio||1)*VIEW.s*100)/100,1,3);
+  if(q===VIEW.q)return false;
+  VIEW.q=q;
+  hidpi(bcv,BW,BH,q);hidpi(ocv,OW,OH,q);hidpi(ghost,200,200,q);
+  slotEls.forEach(function(el){hidpi(el.querySelector('canvas'),SLOT_W,SLOT_H,q)});
+  dishEls.forEach(function(el){hidpi(el.querySelector('canvas'),100,70,q)});
+  /* 배경 캔버스는 CSS 크기가 없으므로 직접 정해 준다 */
+  ghost.style.width=(200*VIEW.s)+'px';ghost.style.height=(200*VIEW.s)+'px';
+  return true;
+}
+function invalidate(){
+  /* 다시 그리게 캐시를 비운다 */
+  dishEls.forEach(function(el){el.dataset.lv=''});
+  slotEls.forEach(function(el){el.dataset.cid='';el.dataset.mode='';el.dataset.f=''});
+  if(S&&S.oven)updateAll();else renderShelf();
+}
+function fit(){
+  var v=vpSize();
+  /* 폰 가로는 높이가 350px 안팎이다. 태블릿(가로 545px 이상)과 같은 배치로는 글씨가 너무 작아진다 */
+  var compact=v.h<=480||v.w/v.h>=1.9;
+  var D=compact?COMPACT:DESIGN;
+  document.documentElement.classList.toggle('compact',compact);
+  stage.style.width=D.w+'px';stage.style.height=D.h+'px';
+  var s=Math.min(v.w/D.w,v.h/D.h);
+  stage.style.transform='translate('+((v.w-D.w*s)/2)+'px,'+((v.h-D.h*s)/2)+'px) scale('+s+')';
+  VIEW.w=v.w;VIEW.h=v.h;VIEW.s=s;VIEW.compact=compact;
+  if(setupCanvases())invalidate();
+  renderDbg();
+}
+var fitQ=0;
+function refit(){if(fitQ)return;fitQ=requestAnimationFrame(function(){fitQ=0;fit()})}
+
+/* ===== 전체화면 (shared/mobile-fullscreen.js와 같은 동작을 단일 HTML 규칙에 맞춰 옮김) ===== */
+function wantsFS(){
+  try{
+    if(matchMedia('(any-hover: hover) and (any-pointer: fine)').matches)return false; // 터치 노트북 제외
+    return matchMedia('(pointer: coarse)').matches;
+  }catch(e){return false}
+}
+function fsSupported(){var r=document.documentElement;return !!(r.requestFullscreen||r.webkitRequestFullscreen)}
+function fsActive(){return !!(document.fullscreenElement||document.webkitFullscreenElement)}
+function fsRequest(){
+  if(!fsSupported()||fsActive())return;
+  var r=document.documentElement,p=r.requestFullscreen?r.requestFullscreen():r.webkitRequestFullscreen();
+  if(p&&typeof p.catch==='function')p.catch(function(){});
+}
+function syncFsBtn(){$('fsBtn').classList.toggle('on',fsSupported()&&wantsFS()&&!fsActive())}
+$('fsBtn').addEventListener('click',function(e){e.stopPropagation();fsRequest()});
+
+function renderDbg(){
+  if(!DBG)return;
+  var d=$('dbg');d.style.display='block';
+  d.textContent='화면 '+VIEW.w+'×'+VIEW.h+'   배율 '+VIEW.s.toFixed(3)+'\n'
+    +'DPR '+(window.devicePixelRatio||1)+'   캔버스 '+VIEW.q+'배\n'
+    +'모드 '+(VIEW.compact?'좁은화면':'기본')+'   전체화면 '+(fsActive()?'O':'X')+'\n'
+    +'포인터 '+(COARSE?'터치':'마우스')+'   드래그 '+DRAG_SLOP+'px';
+}
+
+window.addEventListener('resize',refit);
+window.addEventListener('orientationchange',function(){setTimeout(fit,260)});
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',refit);
+  window.visualViewport.addEventListener('scroll',refit);
+}
+['fullscreenchange','webkitfullscreenchange'].forEach(function(t){
+  document.addEventListener(t,function(){syncFsBtn();setTimeout(fit,90)});
+});
+/* iOS는 user-scalable=no를 무시한다. 핀치·더블탭 확대와 길게 누르기 메뉴를 직접 막는다 */
+['gesturestart','gesturechange','gestureend'].forEach(function(t){
+  document.addEventListener(t,function(e){e.preventDefault()},{passive:false});
+});
+document.addEventListener('dblclick',function(e){e.preventDefault()},{passive:false});
+document.addEventListener('contextmenu',function(e){e.preventDefault()});
+
+fit();syncFsBtn();
+
 window.__api={chooseDish:chooseDish,addN:addN,toOven:toOven,cookTap:cookTap,setClock:function(f){clock=f},
   serveDish:serveDish,discard:discard,tick:function(d){update(d);updateAll()},endGuide:endGuide,startGame:startGame,startRound:startRound,
   finishRound:finishRound,slotCust:slotCust,judge:judge,needOf:needOf,baseOf:baseOf,spawn:spawn,buyDish:buyDish,upDish:upDish,upOven:upOven,buyBag:buyBag,
-  setRnd:function(f){rnd=f},refresh:refresh,newDish:newDish,earn:earn};
+  setRnd:function(f){rnd=f},refresh:refresh,newDish:newDish,earn:earn,
+  fit:fit,view:function(){return VIEW}};
 })();
 </script>
 </body>
