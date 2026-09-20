@@ -46,7 +46,19 @@
       <li><b>오븐</b>에서 박자에 맞춰 <b>화면 아무 곳이나</b> 톡톡! 탭할수록 노릇노릇 익어요.</li>
       <li>완성품을 <b>거인에게 끌어다 놓으면</b> 서빙! <b>빨리 해결할수록 손님이 더 많이</b> 와요. 번 코인으로 <b>바로바로 가게를 업그레이드</b>해요!</li>
     </ol>
+    <div class="profile">
+      <div class="pf">
+        <label for="inName" id="labName">이름</label>
+        <input type="text" id="inName" maxlength="12" placeholder="예: 홍길동" autocomplete="nickname">
+      </div>
+      <div class="pf" id="idGroup">
+        <label for="inId">학번</label>
+        <input type="text" id="inId" maxlength="10" placeholder="예: 2230" inputmode="numeric">
+      </div>
+    </div>
+    <div class="perr" id="pErr"></div>
     <button class="btn" id="startBtn">영업 시작 ▶</button>
+    <div class="priv"><a href="../../privacy.html" target="_blank" rel="noopener noreferrer">개인정보처리방침</a></div>
   </div>
 </section>
 
@@ -134,6 +146,11 @@
         <h2 style="font-size:18px">📒 요리 기록장</h2>
         <div class="title2" id="noteHint"></div>
         <table id="notebook"></table>
+      </div>
+      <div class="card">
+        <h2 style="font-size:18px">🏆 명예의 전당</h2>
+        <div class="title2" id="rankMsg">랭킹을 불러오는 중…</div>
+        <table id="rankTable"></table>
       </div>
     </div>
     <div class="insight" id="insight"></div>

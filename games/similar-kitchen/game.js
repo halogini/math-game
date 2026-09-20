@@ -1,5 +1,40 @@
 (function(){
 'use strict';
+
+/* ===== 포털 연동 (이름·학번·랭킹) =====
+   집 안의 다른 게임과 같은 방식이다. shared/halomath-*.js가 실제 일을 하고
+   여기서는 부르기만 한다. Firebase가 없거나 막혀도 게임은 그대로 돌아가야 한다. */
+var firebaseConfig=(window.ENV&&window.ENV.FIREBASE_CONFIG)||null;
+var firebaseDb=null;
+if(window.firebase&&firebaseConfig&&firebaseConfig.apiKey){
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    firebaseDb=firebase.database();
+  }catch(err){console.error('Firebase init failed:',err)}
+}
+var GAME_ID='similar-kitchen';
+var GAME_IDS=['similar-kitchen','nyang-bakery','similar_kitchen'];
+var activeMode=(window.HalomathMode&&HalomathMode.detectActiveMode())||'school';
+function sanitize(s,max){
+  if(typeof s!=='string')return '';
+  return s.replace(/[<>'"/]/g,'').trim().slice(0,max||12);
+}
+function esc(s){
+  if(s===null||s===undefined)return '';
+  return String(s).replace(/[&<>"']/g,function(m){
+    return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+  });
+}
+function randomDormsNick(){
+  var p=['도름','별빛','반짝','똑똑','신난','고냥','빙수','프리즘','냥셰프'];
+  return sanitize(p[Math.floor(Math.random()*p.length)]+String(Math.floor(10+Math.random()*90)),12);
+}
+var playerName=sanitize((window.HalomathProfile&&HalomathProfile.loadName(activeMode))||'',12);
+var studentId=activeMode==='school'?sanitize((window.HalomathProfile&&HalomathProfile.loadStudentId(activeMode))||'',10):'';
+if(activeMode==='dorms'&&(!playerName||playerName==='도전자')){
+  playerName=randomDormsNick();
+  if(window.HalomathProfile)HalomathProfile.saveName(activeMode,playerName);
+}
 /* ===== 설정 ===== */
 var SLOTS=3,BEAT=0.7,WRONG_COST=5,BASE_R=16,PAT_BONUS=0.3,GIANT_MULT=1.5,ROUND_T=70,COMBO_BONUS=20,LAST_ROUND=4;
 var ANIMALS=[['🦁','사자'],['🐯','호랑이'],['🦛','하마'],['🐘','코끼리'],['🦒','기린'],['🦏','코뿔소'],['🐻','곰']];
@@ -798,8 +833,47 @@ function updateAll(){
 }
 
 /* ===== 라운드 진행 ===== */
+/* ===== 이름·학번 =====
+   기숙사(dorms) 모드는 닉네임만, 학교(school) 모드는 이름과 학번을 받는다 */
+function profileInit(){
+  var n=$('inName'),i=$('inId');
+  n.value=playerName;i.value=studentId;
+  $('labName').textContent=activeMode==='dorms'?'닉네임':'이름';
+  $('idGroup').style.display=activeMode==='school'?'':'none';
+  n.placeholder=activeMode==='dorms'?'예: 별빛42':'예: 홍길동';
+}
+/* 통과하면 이름·학번을 저장하고 true를 준다 */
+function profileCommit(){
+  var e=$('pErr'),name=sanitize($('inName').value,12);
+  if(!name){e.textContent=(activeMode==='dorms'?'닉네임을':'이름을')+' 입력해 주세요.';$('inName').focus();return false}
+  if(activeMode==='school'){
+    var id=sanitize($('inId').value,10);
+    /* 판정은 공유 모듈(1~10자, 한글·영문·숫자·-)에 맡긴다. 다른 게임과 같은 기준이어야
+       같은 학생의 기록이 게임마다 어긋나지 않는다. 자릿수를 더 죄려면 여기가 아니라
+       shared/halomath-profile.js를 고쳐 다 같이 바꿔야 한다 */
+    if(window.HalomathProfile&&!HalomathProfile.isValidStudentId(id)){
+      e.textContent='학번을 입력해 주세요. (예: 2230)';$('inId').focus();return false;
+    }
+    studentId=id;
+    if(window.HalomathProfile)HalomathProfile.saveStudentId(activeMode,studentId);
+  }
+  playerName=name;
+  if(window.HalomathProfile)HalomathProfile.saveName(activeMode,playerName);
+  e.textContent='';
+  return true;
+}
+profileInit();
+
 /* 전체화면 전환은 사용자가 누른 순간에만 허용된다. 시작 버튼이 그 기회다 */
-$('startBtn').onclick=function(){if(wantsFS())fsRequest();startGame()};
+$('startBtn').onclick=function(){
+  if(!profileCommit())return;
+  if(wantsFS())fsRequest();
+  audioUnlock();
+  if(window.HalomathPlayStats&&HalomathPlayStats.recordPlay){
+    try{HalomathPlayStats.recordPlay({gameId:GAME_ID,activeMode:activeMode,name:playerName,studentId:studentId})}catch(e){}
+  }
+  startGame();
+};
 function startGame(){resetG();startRound(1,true)}
 function startRound(r,withGuide){
   G.round=r;newRound(r);drag=null;bagDrag=null;fx=[];fxClear();
@@ -946,6 +1020,81 @@ function finishGame(){
   if(G.trashedAll>0)t.push('🗑️ 버린 빵 '+G.trashedAll+'개 (낭비한 재료 '+G.wastedAll+'개).');
   $('insight').innerHTML=t.join('<br>');
   S.phase='result';show('result');
+  submitScore(sum);
+  fetchRanking();
+}
+
+/* ===== 랭킹 =====
+   점수는 설계대로 「번 코인의 합 + 참여 30」이다. 높을수록 좋다. */
+function submitScore(score){
+  var msg=$('rankMsg');
+  if(!playerName){msg.textContent='이름이 없어 랭킹에 올리지 않았어요.';return}
+  if(!firebaseDb||!window.HalomathScores){
+    msg.className='title2 err';
+    msg.textContent='랭킹 서버에 연결하지 못했어요. 점수는 화면에만 남아요.';
+    return;
+  }
+  msg.className='title2';msg.textContent='⏳ 랭킹에 올리는 중…';
+  var payload={
+    score:score,
+    gameId:GAME_ID,
+    timestamp:(window.firebase&&firebase.database&&typeof firebase.database.ServerValue!=='undefined')
+      ?firebase.database.ServerValue.TIMESTAMP:Date.now()
+  };
+  HalomathScores.submitScore(firebaseDb,{
+    activeMode:activeMode,
+    name:playerName,
+    studentId:studentId,
+    gameIds:GAME_IDS,
+    payload:payload,
+    compareMode:'higher',
+    acceptEntry:function(v){return v&&typeof v.score==='number'},
+    updatedMessage:'🎉 최고 기록을 '+score+'코인으로 갱신했어요!',
+    createdMessage:'🎉 '+score+'코인이 랭킹에 올랐어요!',
+    unchangedMessage:'ℹ️ 예전 최고 기록이 더 높아 그대로 뒀어요.'
+  }).then(function(r){
+    msg.className='title2 '+(r&&r.success?'ok':'err');
+    msg.textContent=(r&&r.message)||'랭킹 등록을 마쳤어요.';
+    fetchRanking();
+  }).catch(function(){
+    msg.className='title2 err';
+    msg.textContent='랭킹 등록에 실패했어요. 점수는 화면에 남아요.';
+  });
+}
+function rankRows(list){
+  if(!list.length)return '<tr><td>아직 기록이 없어요</td></tr>';
+  var h='<tr><th>순위</th><th>이름</th>'+(activeMode==='school'?'<th>학번</th>':'')+'<th class="r">코인</th></tr>';
+  list.forEach(function(e,i){
+    var me=window.HalomathScores&&HalomathScores.matchesPlayer(e,playerName,studentId,activeMode);
+    h+='<tr'+(me?' class="me"':'')+'><td>'+(i+1)+'</td><td>'+esc(e.name||'')+'</td>'
+      +(activeMode==='school'?'<td>'+esc(e.studentId||'')+'</td>':'')
+      +'<td class="r">'+Math.round(e.score||0)+'</td></tr>';
+  });
+  return h;
+}
+function fetchRanking(){
+  var url='https://math-game-halogini-default-rtdb.firebaseio.com/scores'
+    +(activeMode==='dorms'?'/dorms':'')+'.json';
+  var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},3500);
+  fetch(url,{signal:ctl.signal}).then(function(r){return r.json()}).then(function(data){
+    clearTimeout(to);
+    var list=[];
+    Object.keys(data||{}).forEach(function(k){
+      var v=data[k];
+      if(!v||typeof v!=='object'||typeof v.score!=='number')return;
+      if(window.HalomathScores){
+        if(!HalomathScores.matchesGameId(v,GAME_IDS))return;
+        /* 학교 랭킹에 기숙사 기록이 섞이지 않게 */
+        if(activeMode!=='dorms'&&HalomathScores.isDormsRecord(v))return;
+      }else if(String(v.gameId||'')!==GAME_ID)return;
+      list.push(v);
+    });
+    list.sort(function(a,b){return b.score-a.score});
+    $('rankTable').innerHTML=rankRows(list.slice(0,20));
+  }).catch(function(){
+    clearTimeout(to);
+    $('rankTable').innerHTML='<tr><td>랭킹을 불러오지 못했어요</td></tr>';
+  });
 }
 $('againBtn').onclick=function(){show('intro')};
 
@@ -1072,8 +1221,10 @@ if(window.visualViewport){
 ['gesturestart','gesturechange','gestureend'].forEach(function(t){
   document.addEventListener(t,function(e){e.preventDefault()},{passive:false});
 });
-document.addEventListener('dblclick',function(e){e.preventDefault()},{passive:false});
-document.addEventListener('contextmenu',function(e){e.preventDefault()});
+/* 입력칸은 빼 준다. 길게 누르기·더블탭으로 글자를 고르고 붙여넣어야 한다 */
+function inField(e){var t=e.target;return !!(t&&t.tagName&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'))}
+document.addEventListener('dblclick',function(e){if(!inField(e))e.preventDefault()},{passive:false});
+document.addEventListener('contextmenu',function(e){if(!inField(e))e.preventDefault()});
 
 fit();syncFsBtn();sndSync();
 
