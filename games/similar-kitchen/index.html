@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#fff1dc;--ink:#3b2a1a;--accent:#ff8a3d;--ok:#2f9e63;--bad:#d94b43;--card:#fffdf8;--line:#ead6b4;--cheese:#ffd24a;--edge:#e0a800}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;overflow:hidden;touch-action:none}
+html,body{margin:0;height:100%;height:100dvh;background:var(--bg);color:var(--ink);font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;overflow:hidden;overscroll-behavior:none;touch-action:none}
 button{font:inherit;color:inherit;cursor:pointer}
 .screen{position:absolute;inset:0;display:none;flex-direction:column;padding:8px 14px}
 .screen.on{display:flex}
@@ -1173,7 +1173,9 @@ $('againBtn').onclick=function(){show('intro')};
    덕분에 어떤 기기에서도 버튼이 잘려 나가지 않는다.
    DESIGN : 태블릿·PC 기준 크기. 지금 레이아웃이 실제로 요구하는 높이가 약 713px이다.
    COMPACT: 폰 가로처럼 높이가 아주 낮은 화면. .compact CSS로 눌러 담은 뒤의 요구 높이다. */
-var DESIGN={w:1024,h:740},COMPACT={w:900,h:540};
+/* MAX_S: 기준 크기보다 크게는 키우지 않는다. 큰 모니터에서 화면이 부풀지 않게 하려는 것으로,
+   three-chances의 .game-container{max-width:1100px;margin:0 auto}와 같은 뜻이다 */
+var DESIGN={w:1024,h:740},COMPACT={w:900,h:540},MAX_S=1;
 var VIEW={w:1024,h:716,s:1,q:1,compact:false};
 var stage=$('stage');
 var DBG=(function(){try{return new URLSearchParams(location.search).has('debug')}catch(e){return false}})();
@@ -1212,7 +1214,7 @@ function fit(){
   var D=compact?COMPACT:DESIGN;
   document.documentElement.classList.toggle('compact',compact);
   stage.style.width=D.w+'px';stage.style.height=D.h+'px';
-  var s=Math.min(v.w/D.w,v.h/D.h);
+  var s=Math.min(v.w/D.w,v.h/D.h,MAX_S);
   stage.style.transform='translate('+((v.w-D.w*s)/2)+'px,'+((v.h-D.h*s)/2)+'px) scale('+s+')';
   VIEW.w=v.w;VIEW.h=v.h;VIEW.s=s;VIEW.compact=compact;
   if(setupCanvases())invalidate();
