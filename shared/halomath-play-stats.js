@@ -1,5 +1,5 @@
 /**
- * Play counters via existing sessionUsage/byGame/*/qualified writes (auth required).
+ * Play counters via existing sessionUsage/byGame/<game>/qualified writes (auth required).
  * Keys are namespaced with play_ so they do not mix into classroom session totals.
  */
 (function (global) {
