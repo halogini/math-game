@@ -79,8 +79,12 @@ h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
   width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
   border-top:9px solid #e0c9a0;z-index:1;pointer-events:none;
 }
-.slot .cat{font-size:30px;line-height:1;margin-top:8px;position:relative;z-index:1}
-.slot .cat .md{font-size:14px;vertical-align:top}
+/* 손님은 이 게임의 주인공이다. 「거인이 큰 빵을 주문한다」가 한눈에 읽히려면
+   손님이 실제로 커야 한다. 넓은 화면에는 세로 여유가 남아돌았다(1280x800에서
+   손님 줄 109px / 주방 551px). 그 여유를 손님에게 돌린다.
+   좁은 화면(.compact)은 세로가 없으므로 작은 값을 그대로 쓴다. */
+.slot .cat{font-size:clamp(30px,11vh,104px);line-height:1;margin-top:6px;position:relative;z-index:1}
+.slot .cat .md{font-size:.3em;vertical-align:top}
 .slot.empty{opacity:.4}
 .slot.empty .bubble{visibility:hidden}
 .slot.happy .bubble-body{border-color:#9bd6b3;background:#f0faf4}
@@ -89,7 +93,7 @@ h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
 .slot.drop .bubble-body{box-shadow:0 0 0 4px #4f86f7;border-color:#4f86f7}
 .slot.enter{animation:enter .45s ease-out}
 .slot.giant .bubble-body{border-color:#d94b43;box-shadow:0 0 0 2px #f6c9c5}
-.slot.giant .cat{font-size:34px}
+.slot.giant .cat{font-size:clamp(34px,13vh,124px)}
 .slot.low .bubble-body{border-color:#d94b43}
 .slot.low .bubble-fill{background:linear-gradient(180deg,rgba(255,100,80,.25),rgba(200,40,35,.85))}
 .slot.giant .bubble::before{border-top-color:#d94b43}
@@ -339,8 +343,14 @@ html.force-landscape #rot{display:none!important}
 /* 말풍선을 조금 낮춘다. 「닮음비 1 : k」는 캔버스 안에서 따로 키운다 */
 .compact .slot .bubble,.compact .slot .bubble-body{min-height:40px}
 .compact .slot .bubble canvas{height:40px}
-.compact .slot .cat,.compact .cust .cat{font-size:23px;margin-top:3px}
-.compact .slot.giant .cat{font-size:27px}
+/* 좁은 화면도 높이에 여유가 있으면 손님을 키운다. 545px 태블릿에는 자리가 있고
+   340px 폰에는 없다 — vh로 묶어 두면 기기마다 알아서 갈린다 */
+/* 7.6vh는 눈대중이 아니다. 300px 폰에서 정확히 최소값(23px)이 되도록 잡았다.
+   더 키우면 작은 폰에서 주방 칸이 넘친다 */
+.compact .slot .cat,.compact .cust .cat{font-size:clamp(23px,7.6vh,58px);margin-top:3px}
+/* 자이언트는 transform으로 키운다. font-size로 키우면 손님 줄이 몇 px 늘어나고
+   그게 주방 칸을 밀어내 작은 폰에서 넘친다. transform은 배치를 건드리지 않는다 */
+.compact .slot.giant .cat{transform:scale(1.2);transform-origin:bottom center}
 .compact .trash{font-size:16px;padding:1px}
 .compact .benchwrap{min-height:0;border-width:1.5px}
 .compact .bench-actions{gap:4px;margin-top:4px}
