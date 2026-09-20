@@ -66,8 +66,9 @@
   </div>
 </section>
 
-<!-- 영업 -->
-<section id="play" class="screen">
+<!-- 영업: 배경 한 장 위 · 손님은 카운터 너머 · 도구는 카운터 위 -->
+<section id="play" class="screen play-scene">
+  <div class="scene-bg" aria-hidden="true"></div>
   <div class="hud">
     <div class="title" id="hudTitle">R1</div>
     <div class="timer" aria-label="남은 시간">
@@ -77,30 +78,32 @@
     <div class="coins" id="coinsTxt">🪙 0</div>
     <button type="button" class="btn-end-hud" id="endBtn" hidden>끝내기</button>
   </div>
-  <div class="custrow" id="custRow"></div>
-  <div class="kitchen">
-    <div class="cook-row">
-      <div class="card bench">
-        <h2>🍳 작업판 <span class="title2" id="benchInfo"></span></h2>
-        <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
-        <div class="bench-actions">
-          <button class="btn ghost" id="um1">↩ 1개 빼기</button>
-          <button class="btn ghost" id="clearBtn">🧹 비우기</button>
-          <button class="btn" id="toOven">🔥 오븐에 넣기</button>
+  <div class="scene-body">
+    <div class="custrow" id="custRow"></div>
+    <div class="counter">
+      <div class="counter-rail">
+        <div class="station trash-station">
+          <div class="trash" id="trash" title="끌어서 버리기"></div>
+        </div>
+        <div class="station shelf-station">
+          <div class="shelfgrid" id="shelf"></div>
+        </div>
+        <div class="station bench-station card bench">
+          <div class="station-label"><span id="benchInfo"></span></div>
+          <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
+          <div class="bench-actions">
+            <button class="btn ghost" id="um1">↩</button>
+            <button class="btn ghost" id="clearBtn">🧹</button>
+            <button class="btn" id="toOven">🔥</button>
+          </div>
+        </div>
+        <div class="station oven-station card oven" id="ovenBox">
+          <div class="oven-head">
+            <button type="button" class="upg" id="ovenUp"></button>
+          </div>
+          <canvas id="ovenCv" width="260" height="280"></canvas>
         </div>
       </div>
-      <div class="card oven" id="ovenBox">
-        <div class="oven-head">
-          <h2>🔥 오븐</h2>
-          <button type="button" class="upg" id="ovenUp"></button>
-        </div>
-        <canvas id="ovenCv" width="260" height="280"></canvas>
-        <div class="trash" id="trash">🗑️<small>끌어서 버리기</small></div>
-      </div>
-    </div>
-    <div class="card shelf-strip">
-      <h2>🧺 재료 선반 <span class="title2">개수를 톡!</span></h2>
-      <div class="shelfgrid" id="shelf"></div>
     </div>
   </div>
 </section>

@@ -78,7 +78,10 @@ var SLOTS=3,BEAT=0.7,WRONG_COST=5,BASE_R=16,PAT_BONUS=0.3,GIANT_MULT=1.5,ROUND_T
 var SPAWN_LOCK=18;
 /* 오븐 집중 모드 동안 손님 인내심(대기)이 흐르는 배율. 1이면 평소와 같고, 작을수록 느리게 기다린다 */
 var PATIENCE_SLOW=0.35;
-var ANIMALS=[['🦁','사자'],['🐯','호랑이'],['🦛','하마'],['🐘','코끼리'],['🦒','기린'],['🦏','코뿔소'],['🐻','곰']];
+var ANIMALS=[
+  ['🦁','사자','cust-lion'],['🐯','호랑이','cust-tiger'],['🦛','하마','cust-hippo'],
+  ['🐘','코끼리','cust-elephant'],['🦒','기린','cust-giraffe'],['🦏','코뿔소','cust-rhino'],['🐻','곰','cust-bear']
+];
 var DISHES=[
   {name:'냥 바게트',ing:'반죽',ico:'🥖',dim:1,max:15,tile:'#e8a94f',edge:'#b8742a',raw:'#f6e6c8',rawEdge:'#dcc08e',unit:'개',price:0,unlockR:1,up:[70,140],lvDesc:['','','깨를 솔솔 뿌린 바게트','윤기 나는 황금 바게트']},
   {name:'냥 토스트',ing:'식빵',ico:'🍞',dim:2,max:120,tile:'#ffd24a',edge:'#e0a800',raw:'#f6e8b8',rawEdge:'#d8c48a',unit:'개',price:60,unlockR:2,up:[85,160],lvDesc:['','','버터를 올린 토스트','딸기잼 토스트']},
@@ -248,7 +251,7 @@ function makeCust(giant){
   var N=needOf(dish,k),an=pick(ANIMALS);
   var pat=giant?Math.min(95,Math.round(60+4*Math.sqrt(N))):Math.round(44+7*Math.sqrt(N));
   return{id:S.nid++,k:k,dish:dish,giant:!!giant,N:N,pat:pat,fails:0,state:'wait',wait:0,slot:-1,until:0,
-         an:an[0],anName:an[1],got:null,gotUntil:0,mood:''};
+         an:an[0],anName:an[1],spr:an[2]||'',got:null,gotUntil:0,mood:''};
 }
 function freeSeat(){
   var used={};S.cust.forEach(function(c){if(c.slot>=0&&c.state!=='gone')used[c.slot]=true});
@@ -334,6 +337,10 @@ function drawPizza(c,x,y,w,h,o){  // 토스트(네모난 빵) : 귀 + 고양이 
   rr(c,x,y,w,h,m*0.12);c.fillStyle=pal.rim;c.fill();c.stroke();
   var p=m*0.07,gx=x+p,gy=y+p,gw=w-2*p,gh=h-2*p;
   rr(c,gx,gy,gw,gh,m*0.08);c.fillStyle=pal.base;c.fill();
+  /* 윗면 하이라이트 — 납작한 그림체에 약한 빛만 */
+  var hg=c.createLinearGradient(gx,gy,gx,gy+gh*0.35);
+  hg.addColorStop(0,'rgba(255,255,255,.28)');hg.addColorStop(1,'rgba(255,255,255,0)');
+  rr(c,gx,gy,gw,gh*0.35,m*0.08);c.fillStyle=hg;c.fill();
   var cols=o.cols||1,rows=o.rows||1;
   if(o.grid){
     var cw=gw/cols,ch=gh/rows;
@@ -658,34 +665,51 @@ function steam(c,o,cx,top,w,pr){
   if(o.state==='done'){for(var k=0;k<4;k++){var a=(t*1.2+k/4)%1;c.globalAlpha=Math.sin(a*Math.PI);c.font='18px sans-serif';c.textAlign='center';c.fillText('✨',cx+(k-1.5)*w/4,top+10+Math.cos(k*2+t)*6);c.globalAlpha=1}}
 }
 /* ===== 스프라이트 =====
-   그림은 배경이 형광 초록(#00FF00)으로 채워져 온다. "투명 배경"으로 요청하면
-   생성기가 투명을 나타내는 체크무늬를 진짜 물감으로 그려 버려서 못 쓴다.
-   그래서 단색으로 받아 여기서 빼낸다. */
+   그림은 배경이 형광 초록(#00FF00)으로 채워져 오거나, 미리 투명으로 빼 둔다.
+   네온 초록만 지운다. 쓰레기통·나뭇잎처럼 일반 초록은 남긴다. */
 var SPRITE={},SPRITE_READY={};
 function loadKeyed(name){
   if(SPRITE[name]!==undefined)return SPRITE[name];
   SPRITE[name]=null;
   var im=new Image();
   im.onload=function(){
+    var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;
+    var g=cv.getContext('2d');g.drawImage(im,0,0);
     try{
-      var cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;
-      var g=cv.getContext('2d');g.drawImage(im,0,0);
-      var d=g.getImageData(0,0,cv.width,cv.height),p=d.data;
+      var d=g.getImageData(0,0,cv.width,cv.height),p=d.data,kept=0;
       for(var i=0;i<p.length;i+=4){
-        /* 초록이 뚜렷한 화소만 지운다. 빵의 노란색까지 지우지 않도록 여유를 좁게 */
-        if(p[i+1]>150&&p[i]<120&&p[i+2]<120&&(p[i+1]-p[i])>60&&(p[i+1]-p[i+2])>60)p[i+3]=0;
+        var r=p[i],gr=p[i+1],b=p[i+2],a=p[i+3];
+        /* 네온 크로마만 제거 (#00FF00 근처). 나무·크림 오븐은 건드리지 않음 */
+        if(a>0&&gr>=200&&r<=100&&b<=100&&(gr-r)>=90&&(gr-b)>=90){p[i+3]=0;continue}
+        if(p[i+3]>8)kept++;
       }
-      g.putImageData(d,0,0);
-      SPRITE[name]=cv;SPRITE_READY[name]=true;
-      if(S&&S.phase==='play')updateAll();
-    }catch(e){}
+      if(kept>80)g.putImageData(d,0,0);
+    }catch(e){/* file:// 등에서 getImageData가 막혀도 원본 그림은 씀 */}
+    SPRITE[name]=cv;SPRITE_READY[name]=true;
+    if(name==='trash')applyTrashArt();
+    if(S&&S.phase==='play')updateAll();
   };
   im.onerror=function(){SPRITE[name]=null};
-  im.src='assets/'+name+'.png';
+  /* 캐시에 깨진 예전 파일이 남지 않게 */
+  im.src='assets/'+name+'.png?v=3';
   return null;
 }
 function sprite(name){return SPRITE_READY[name]?SPRITE[name]:null}
 ['oven-basic','oven-brick','oven-gold','trash'].forEach(loadKeyed);
+function applyTrashArt(){
+  var el=$('trash');if(!el)return;
+  var cv=sprite('trash');
+  if(cv){
+    el.style.backgroundImage='url('+cv.toDataURL('image/png')+')';
+  }else{
+    el.style.backgroundImage='url(assets/trash.png?v=3)';
+  }
+  el.style.backgroundColor='transparent';
+  el.style.backgroundSize='contain';
+  el.style.backgroundRepeat='no-repeat';
+  el.style.backgroundPosition='center';
+  el.textContent='';
+}
 var OVEN_SPR=[null,'oven-basic','oven-brick','oven-gold'];
 /* 스프라이트를 칸에 맞춰(비율 유지) 그리고, 그려진 영역을 돌려준다 */
 function drawSpriteFit(c,cv,x,y,w,h){
@@ -718,9 +742,17 @@ function renderOven(){
   ovenFrame(octx,G.u.oven);
   var o=S.oven,d=o.dish;
   if(!d){
-    octx.fillStyle='#8f7350';octx.font='700 17px Malgun Gothic,sans-serif';octx.textAlign='center';
-    octx.fillText('빈 오븐',OW/2,OH/2);
-    octx.font='15px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
+    var useSpr=!!sprite(OVEN_SPR[G.u.oven]);
+    octx.font='800 16px Malgun Gothic,sans-serif';octx.textAlign='center';
+    if(useSpr){
+      octx.lineWidth=4;octx.strokeStyle='rgba(59,42,26,.55)';octx.fillStyle='#fff8ec';
+      octx.strokeText('빈 오븐',OW/2,OH*0.78);
+      octx.fillText('빈 오븐',OW/2,OH*0.78);
+    }else{
+      octx.fillStyle='#8f7350';
+      octx.fillText('빈 오븐',OW/2,OH/2);
+      octx.font='15px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
+    }
     return;
   }
   /* 스프라이트 오븐은 창이 가운데 있다. 캔버스 바닥(OBASE)에 그리면 빵이
@@ -859,7 +891,9 @@ function renderSlots(){
     var low=c.state==='wait'&&anger>=0.7;
     el.className='slot'+(c.giant?' giant':'')+(el.classList.contains('enter')?' enter':'')+(c.state==='happy'?' happy':c.state==='angry'?' angry':(showGot?' sad':''))+(low?' low':'')+(S.hover===i?' drop':'');
     var md=c.state==='happy'?'💖':c.state==='angry'?'💢':(showGot?(c.mood||'💧'):(low?'💢':''));
-    var html=c.an+(md?'<span class="md">'+md+'</span>':'');
+    var html=c.spr
+      ?('<img class="guest-spr" alt="" src="assets/'+c.spr+'.png">'+(md?'<span class="md">'+md+'</span>':''))
+      :(c.an+(md?'<span class="md">'+md+'</span>':''));
     if(cat.innerHTML!==html)cat.innerHTML=html;
   }
 }
@@ -1565,7 +1599,7 @@ document.addEventListener('dblclick',function(e){if(!inField(e))e.preventDefault
 document.addEventListener('contextmenu',function(e){if(!inField(e))e.preventDefault()});
 
 gateAdminPreview(function(){
-  fit();syncFsBtn();sndSync();
+  fit();syncFsBtn();sndSync();applyTrashArt();
 });
 
 window.__api={chooseDish:chooseDish,selectDish:selectDish,addFromShelf:addFromShelf,addN:addN,toOven:toOven,cookTap:cookTap,setClock:function(f){clock=f},
