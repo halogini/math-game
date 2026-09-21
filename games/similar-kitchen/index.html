@@ -18,7 +18,7 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="description" content="사자·코끼리 같은 큰 동물 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=4">
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -32,6 +32,7 @@
 <canvas id="ghost" width="200" height="200"></canvas>
 <div id="dbg"></div>
 <div id="stage" style="visibility:hidden">
+<canvas id="flyCv" aria-hidden="true"></canvas>
 <div id="chrome">
   <button id="fsBtn">⛶ 전체화면</button>
   <button id="sndBtn" title="소리 켜기/끄기">🔊</button>
@@ -82,6 +83,7 @@
     <div class="custrow" id="custRow"></div>
     <div class="counter">
       <div class="counter-rail">
+        <div class="sources" id="sources"></div>
         <div class="station trash-station">
           <div class="trash" id="trash" title="끌어서 버리기"></div>
         </div>
@@ -146,10 +148,10 @@
   <div class="gcard">
     <h2>🦁 이렇게 일해요!</h2>
     <div class="steps">
-      <div class="step"><div class="ic">🧺</div><b>① 재료 넣기</b><br>주문한 빵 열에서 <b>개수 칩</b>을 톡해요</div>
+      <div class="step"><div class="ic">🧺</div><b>① 재료 넣기</b><br>주문한 빵의 <b>재료</b>를 톡해요</div>
       <div class="step"><div class="ic">🔥</div><b>② 오븐 굽기</b><br>오븐에 넣으면 <b>박자 링에 맞춰 톡!</b></div>
       <div class="step"><div class="ic">🦒</div><b>③ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
-      <div class="step"><div class="ic">⬆</div><b>④ 업그레이드</b><br>번 코인으로 <b>칩·오븐·빵 등급</b>을 바로 올려요</div>
+      <div class="step"><div class="ic">⬆</div><b>④ 업그레이드</b><br>번 코인으로 <b>재료·오븐·빵 등급</b>을 바로 올려요</div>
     </div>
     <div class="foot"><span>번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (칩·🔒·⬆을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
   </div>
@@ -190,6 +192,6 @@
 <script src="../../shared/halomath-profile.js"></script>
 <script src="../../shared/halomath-play-stats.js"></script>
 <script src="../../shared/halomath-scores.js"></script>
-<script src="game.js"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>

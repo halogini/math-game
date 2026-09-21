@@ -48,11 +48,16 @@ def convert(src, dst, key='auto', thresh=110):
     im = Image.open(src).convert('RGB')
     W, H = im.size
     px = im.load()
+    kc = None
     if key == 'auto':
         key, med, err = guess_key(px, W, H)
-        if err > 90:
+        if err > 140:
             print('  ! %s: 배경이 초록/자홍 단색이 아닌 것 같아요 (모서리 색 %s). 그대로 시도합니다.' % (os.path.basename(src), med))
-    kc = KEYS[key]
+        else:
+            # 생성기는 정확히 #FF00FF를 못 낸다(분홍에 가까운 자홍이 나온다). 실제 배경색을 기준으로 삼는다
+            kc = med
+    if kc is None:
+        kc = KEYS[key]
     def far(p): return max(abs(p[0]-kc[0]), abs(p[1]-kc[1]), abs(p[2]-kc[2]))
     isbg = [[False]*W for _ in range(H)]
     q = deque()

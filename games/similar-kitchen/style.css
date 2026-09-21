@@ -558,7 +558,7 @@ html.compact .play-scene .trash{width:48px;height:58px}
 html.scene-v2 #play{background:#411f1d}
 html.scene-v2 #play .scene-bg{background:#411f1d;background-image:none}   /* 그림 위에 남는 띠 = 천장 보 색 */
 html.scene-v2 #play .scene-body{
-  position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;aspect-ratio:1280/856;
+  position:absolute;left:0;right:0;bottom:0;width:100%;height:var(--bh,auto);aspect-ratio:1280/856;
   padding:0;display:block;container-type:size;
   background:url('assets/kitchen-play.png') center/100% 100% no-repeat;
   image-rendering:auto;
@@ -611,3 +611,68 @@ html.scene-v2 #play .oven-head{position:absolute;left:0;top:140%;width:100%;z-in
 /* 끌고 가는 동안은 캔버스가 손님·쓰레기통 판정을 가리지 않게 */
 html.dragging #play canvas#benchCv,
 html.dragging #play canvas#ovenCv{pointer-events:none!important}
+
+/* =====================================================================
+   재료 그림(누르면 도마에 올라감) + 배율 버튼 — 장면 배치에서만 보인다
+   ===================================================================== */
+#flyCv{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:30}
+#play .sources,#play .mults{display:none}
+html.scene-v2 #play .shelf-station{display:none}          /* 예전 칩 카드는 숨김(폰 가로는 아직 씀) */
+html.scene-v2 #play .sources{
+  position:absolute;left:10.6%;top:58.4%;width:31.9%;height:40.3%;display:flex;gap:1.5%;z-index:3;
+}
+html.scene-v2 #play .src{
+  flex:1;min-width:0;position:relative;background:none;border:0;padding:0;cursor:pointer;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+}
+html.scene-v2 #play .src canvas{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
+html.scene-v2 #play .src.on{filter:drop-shadow(0 0 7px rgba(255,210,74,.95))}
+html.scene-v2 #play .src.locked canvas{filter:brightness(.42) saturate(.55)}
+html.scene-v2 #play .src.off{opacity:.5;pointer-events:none}
+html.scene-v2 #play .src.tap{animation:srcTap .24s ease-out}
+@keyframes srcTap{0%{transform:scale(1)}35%{transform:scale(.9,.84)}72%{transform:scale(1.06,1.1)}100%{transform:scale(1)}}
+html.scene-v2 #play .src .src-lock{
+  position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;color:#fff8ec;font-size:max(24px,3.6cqw);line-height:1.1;text-shadow:0 2px 0 rgba(30,18,10,.85);
+  pointer-events:none;
+}
+html.scene-v2 #play .src.locked .src-lock{display:flex}
+html.scene-v2 #play .src .src-lock small{font-size:max(15px,1.9cqw);font-weight:800;color:#ffd24a}
+html.scene-v2 #play .src.canbuy .src-lock{animation:glow 1.1s infinite}
+html.scene-v2 #play .src.canbuy canvas{filter:brightness(.75) saturate(.9)}
+
+/* 재료별 ×5 ×10 ×50 ×100 버튼: 재료 그림 바로 아래(2×2). 누르면 바로 그 개수가 올라간다 */
+html.scene-v2 #play .srccol{flex:1;min-width:0;display:flex;flex-direction:column;gap:2%}
+html.scene-v2 #play .srccol .src{flex:0 0 54%}
+html.scene-v2 #play .amts{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5%}
+html.scene-v2 #play .amt{
+  min-width:0;min-height:0;position:relative;border:3px solid #5a3418;border-radius:12px;
+  background:linear-gradient(180deg,#d8b888,#b58a52);color:#3b2a1a;
+  font-weight:800;font-size:max(16px,1.95cqw);line-height:1.05;padding:0;
+  box-shadow:0 3px 0 #4a2a14;cursor:pointer;touch-action:manipulation;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+html.scene-v2 #play .amt:active{transform:translateY(2px);box-shadow:0 1px 0 #4a2a14}
+html.scene-v2 #play .amt.locked{background:rgba(45,30,18,.88);color:#fff8ec;border-color:#2b1a0e}
+html.scene-v2 #play .amt .ac{font-size:max(14px,1.5cqw);font-weight:800;color:#ffd24a}
+html.scene-v2 #play .amt.canbuy{background:rgba(47,158,99,.94);border-color:#1f7444;color:#fff;animation:glow 1.1s infinite}
+html.scene-v2 #play .amt.off{opacity:.4;pointer-events:none}
+html.scene-v2 #play .src .src-x1{
+  position:absolute;right:2%;bottom:1%;padding:0 7px;border-radius:9px;pointer-events:none;
+  font-size:max(14px,1.7cqw);font-weight:800;color:#fff8ec;background:rgba(59,36,20,.82);
+}
+html.scene-v2 #play .src.locked .src-x1{display:none}
+
+/* =====================================================================
+   폰 가로(html.compact): 같은 장면을 쓰되, 손님 줄은 「카운터 뒤 가장자리에서 위로 --rowh」 안에 들어가게 줄인다.
+   장면은 세로로 눌리고 위쪽이 잘리므로(game.js fit()), 손님·말풍선 크기는 cqh가 아니라 --rowh에서 뺀다.
+   ===================================================================== */
+html.compact.scene-v2 #play .custrow{top:auto;bottom:48%;height:var(--rowh,100px);gap:1%}
+html.compact.scene-v2 #play .slot{gap:0}
+html.compact.scene-v2 #play .slot .bubble,
+html.compact.scene-v2 #play .slot .bubble-body{min-height:0;border-radius:12px;border-width:2px}
+html.compact.scene-v2 #play .slot .bubble canvas{height:auto;aspect-ratio:260/52}
+html.compact.scene-v2 #play .slot .cat{min-height:0;margin:0 0 -2px;font-size:calc(var(--rowh,100px) - 60px)}
+html.compact.scene-v2 #play .slot .cat img.guest-spr{height:min(29cqh,calc(var(--rowh,100px) - 46px))}
+html.compact.scene-v2 #play .slot.giant .cat img.guest-spr{height:min(33cqh,calc(var(--rowh,100px) - 38px))}
+html.compact.scene-v2 #play .slot.giant .cat{transform:none}
