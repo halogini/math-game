@@ -662,3 +662,19 @@
 })(typeof window !== 'undefined' ? window : global);
 
 
+
+// --- [보안(Anti-Cheat) 모듈] ---
+(function() {
+  if (typeof window === 'undefined') return;
+  // 1. 우클릭 및 개발자 도구 단축키 차단
+  window.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'F12' || e.keyCode === 123) e.preventDefault();
+    if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j')) e.preventDefault();
+    if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) e.preventDefault();
+  });
+  // 2. 디버거 덫 (개발자 도구 오픈 시 브라우저 정지)
+  setInterval(function() {
+    (function() { return false; }['constructor']('debugger')());
+  }, 1000);
+})();
