@@ -46,20 +46,24 @@ h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
 .play-scene .scene-body{position:relative;z-index:1}
 .play-scene .hud{
   position:absolute;left:0;right:0;top:0;z-index:5;
-  height:40px;margin:0;padding:6px 108px 0 10px;
-  background:linear-gradient(180deg,rgba(60,40,24,.28),transparent);
+  height:48px;margin:0;padding:8px 108px 0 12px;
+  background:linear-gradient(180deg,rgba(60,40,24,.22),transparent);
+  gap:10px;
 }
 .play-scene .hud .title,
 .play-scene .hud .coins{
-  background:rgba(255,248,236,.92);border:2px solid #c9a57a;border-radius:999px;
-  padding:4px 12px;box-shadow:0 2px 0 rgba(59,42,26,.12);
+  background:rgba(255,248,236,.94);border:2px solid #8a5a2b;border-radius:999px;
+  padding:6px 14px;box-shadow:0 2px 0 rgba(59,42,26,.16);
+  font-size:var(--fs-xl);font-weight:800;
 }
 .play-scene .timer{
-  background:rgba(255,248,236,.9);border:2px solid #c9a57a;border-radius:999px;height:24px;
+  background:rgba(255,248,236,.94);border:2px solid #8a5a2b;border-radius:999px;height:28px;
 }
+.play-scene .timer-txt{font-size:var(--fs-md)}
+.play-scene .btn-end-hud{min-height:40px;padding:6px 12px;font-size:var(--fs-md);border-radius:12px}
 .play-scene .scene-body{
   flex:1;min-height:0;display:flex;flex-direction:column;
-  padding:44px 8px 8px;
+  padding:52px 10px 10px;
 }
 .play-scene .custrow{
   flex:1 1 38%;min-height:96px;max-height:46%;
@@ -70,16 +74,16 @@ h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
   display:flex;flex-direction:column;justify-content:flex-end;
 }
 .play-scene .counter-rail{
-  display:flex;align-items:stretch;gap:6px;
-  min-height:clamp(168px,34vh,280px);
-  padding:8px 6px 6px;
-  background:linear-gradient(180deg,rgba(92,58,32,.18),rgba(92,58,32,.02));
+  display:flex;align-items:stretch;gap:8px;
+  min-height:clamp(180px,36vh,300px);
+  padding:10px 8px 8px;
+  background:linear-gradient(180deg,rgba(92,58,32,.12),rgba(92,58,32,0));
   border-radius:16px 16px 0 0;
 }
-.play-scene .station{min-width:0;display:flex;flex-direction:column;gap:4px}
-.play-scene .trash-station{flex:0 0 72px;align-items:center;justify-content:flex-end}
+.play-scene .station{min-width:0;display:flex;flex-direction:column;gap:6px}
+.play-scene .trash-station{flex:0 0 76px;align-items:center;justify-content:flex-end}
 .play-scene .trash{
-  width:64px;height:78px;margin:0;padding:0;border:0;border-radius:12px;
+  width:70px;height:84px;margin:0;padding:0;border:0;border-radius:12px;
   background-color:transparent;
   background-image:url('assets/trash.png?v=3');
   background-position:center;background-size:contain;background-repeat:no-repeat;
@@ -87,14 +91,94 @@ h2{margin:0 0 6px;font-size:var(--fs-lg);font-weight:800}
 }
 .play-scene .trash small{display:none}
 .play-scene .trash.drop{outline:3px solid #4f86f7;outline-offset:2px;background-color:transparent}
-.play-scene .shelf-station{flex:1.1 1 0;min-width:120px}
-.play-scene .bench-station{flex:1.2 1 0;min-width:140px;padding:6px;background:rgba(255,248,236,.82);border:2px solid #c9a57a;border-radius:14px;box-shadow:none}
-.play-scene .oven-station{flex:0 0 clamp(140px,20vw,220px);padding:4px;background:rgba(255,248,236,.55);border:2px solid #c9a57a;border-radius:14px;box-shadow:none;min-height:160px}
-.play-scene .oven-station #ovenCv{flex:1 1 auto;min-height:120px;height:100%;width:100%;object-fit:contain}
-.play-scene .station-label{font-size:var(--fs-xs);font-weight:800;color:#6b5236;min-height:16px;text-align:center}
-.play-scene .bench-actions .btn{min-height:40px;font-size:var(--fs-sm);padding:4px 6px}
-.play-scene .shelfgrid{gap:4px;height:100%}
-.play-scene .mold{background:rgba(255,248,236,.9);box-shadow:0 2px 0 rgba(59,42,26,.1)}
+.play-scene .shelf-station{flex:1.2 1 0;min-width:140px}
+.play-scene .bench-station{
+  flex:1.1 1 0;min-width:150px;padding:8px;
+  background:transparent;border:0;border-radius:0;box-shadow:none;
+}
+.play-scene .oven-station{
+  flex:0 0 clamp(150px,21vw,230px);padding:0;background:transparent;border:0;border-radius:0;
+  box-shadow:none;min-height:170px;
+}
+.play-scene .oven-station #ovenCv{flex:1 1 auto;min-height:130px;height:100%;width:100%;object-fit:contain}
+.play-scene .station-label{
+  font-size:clamp(18px,2.4vw,22px);font-weight:800;color:#3b2a1a;min-height:24px;
+  text-align:center;text-shadow:0 1px 0 rgba(255,248,236,.8);
+}
+.play-scene .bench-actions{gap:8px;margin-top:8px}
+.play-scene .bench-actions .btn{
+  min-height:48px;font-size:var(--fs-lg);padding:6px 10px;border-radius:14px;
+}
+.play-scene .shelfgrid{gap:8px;height:100%;align-content:end}
+/* 선반: 그림·숫자 위주 */
+.play-scene .mold{
+  background:linear-gradient(180deg,#c9a06a,#a8733e);
+  border:3px solid #5a3418;border-radius:16px;padding:8px 6px 8px;
+  box-shadow:0 4px 0 #4a2a14, inset 0 1px 0 rgba(255,248,236,.28);
+}
+.play-scene .mold.on{
+  border-color:#ffd24a;background:linear-gradient(180deg,#d8b888,#c09050);
+  box-shadow:0 0 0 3px rgba(255,210,74,.5),0 4px 0 #4a2a14;
+}
+.play-scene .mold-head{gap:6px;justify-content:space-between}
+.play-scene .mold-head canvas{width:52px;filter:drop-shadow(0 2px 0 rgba(59,42,26,.22))}
+.play-scene .mold-meta{display:none}
+.play-scene .mold .upb{
+  background:rgba(255,248,236,.95);color:#3b2a1a;box-shadow:0 3px 0 #6e4220;
+  min-width:52px;min-height:44px;padding:6px 8px;border-radius:12px;
+  font-size:15px;font-weight:800;line-height:1.1;
+}
+.play-scene .mold .upb.can{background:#2f9e63;color:#fff;box-shadow:0 3px 0 #1f7444}
+.play-scene .mold .lock{
+  background:rgba(45,30,18,.82)!important;border-radius:14px;color:#fff8ec;
+  font-size:34px;gap:4px;
+}
+.play-scene .mold .lock .lk{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:34px;line-height:1;
+}
+.play-scene .mold .lock .lk-cost{
+  font-size:18px;font-weight:800;color:#ffd24a;letter-spacing:0.02em;
+}
+.play-scene .mold.canbuy .lock{background:rgba(47,158,99,.9)!important}
+.play-scene .oven .upg{
+  min-width:56px;min-height:44px;padding:6px 10px;border-radius:12px;
+  font-size:15px;font-weight:800;background:rgba(255,248,236,.95);color:#3b2a1a;
+  box-shadow:0 3px 0 #6e4220;
+}
+.play-scene .oven .upg.can{background:#2f9e63;color:#fff;box-shadow:0 3px 0 #1f7444}
+.play-scene .oven .upg small{display:none}
+.play-scene .chips{gap:4px}
+.play-scene .chip{
+  min-height:56px;border:0;border-radius:0;background:transparent;box-shadow:none;
+  background-image:url('assets/bag.png?v=4');background-size:contain;background-repeat:no-repeat;background-position:center bottom;
+  color:#3b2a1a;font-size:18px;padding:0 0 2px;align-items:flex-end;
+}
+.play-scene .chip .cl{
+  display:inline-block;min-width:1.6em;padding:2px 7px;margin-bottom:12px;
+  background:rgba(255,248,236,.96);border:2px solid #5a3418;border-radius:10px;
+  font-weight:800;font-size:17px;line-height:1.15;box-shadow:0 2px 0 rgba(59,42,26,.2);
+}
+.play-scene .chip:active{transform:translateY(2px)}
+.play-scene .chip.locked{opacity:1;filter:none}
+.play-scene .chip .ck{
+  background:rgba(45,30,18,.78);border-radius:12px;color:#fff8ec;
+  font-size:22px;gap:2px;flex-direction:column;
+}
+.play-scene .chip .ck .ck-cost{font-size:15px;font-weight:800;color:#ffd24a}
+.play-scene .chip.canbuy .ck{background:rgba(47,158,99,.92)!important}
+.play-scene .chip.off{opacity:.35}
+.play-scene .benchwrap{
+  background:#c9a06a url('assets/bench.png?v=2') center / cover no-repeat;
+  border:3px solid #5a3418;border-radius:16px;
+  box-shadow:0 4px 0 rgba(59,42,26,.2);
+  min-height:120px;
+}
+.play-scene .bench-actions .btn.ghost{
+  background:rgba(255,248,236,.95);border:2px solid #5a3418;color:#3b2a1a;
+  box-shadow:0 3px 0 #6e4220;
+}
+.play-scene .bench-actions #toOven{box-shadow:0 4px 0 #c9631f;font-weight:800}
 .hud{display:flex;align-items:center;gap:12px;height:42px;flex:none;padding-right:108px;box-sizing:border-box}
 .hud .title{font-weight:800;font-size:var(--fs-lg);white-space:nowrap}
 .timer{flex:1;height:22px;background:#f0dfc0;border-radius:99px;overflow:hidden;position:relative}
@@ -365,8 +449,12 @@ html.compact .play-scene .counter-rail{min-height:140px;gap:4px;padding:4px}
 html.compact .play-scene .trash-station{flex-basis:56px}
 .compact.play-scene .trash,
 html.compact .play-scene .trash{width:48px;height:58px}
-.compact.play-scene .oven-station,
-html.compact .play-scene .oven-station{flex-basis:clamp(120px,24vw,170px);min-height:130px}
+.compact.play-scene .chip{min-height:48px}
+.compact.play-scene .chip .cl{margin-bottom:10px;font-size:15px;padding:1px 6px}
+.compact.play-scene .mold-head canvas{width:40px}
+.compact.play-scene .mold{padding:6px 5px 6px}
+.compact.play-scene .mold .upb{min-height:40px;font-size:14px}
+.compact.play-scene .station-label{font-size:16px}
 .compact .custrow{margin:0 0 2px;padding-bottom:2px;border-bottom-width:4px;gap:6px}
 .compact .play-scene .custrow{border-bottom-width:0;padding-bottom:0}
 .compact .slot .bubble,.compact .slot .bubble-body{min-height:44px;border-radius:14px}
@@ -460,3 +548,66 @@ html.compact .play-scene .oven-station{flex-basis:clamp(120px,24vw,170px);min-he
 #rankTable .me td{font-weight:800;color:#c9631f;background:#fff7e6}
 #rankMsg.ok{color:var(--ok);font-weight:700}
 #rankMsg.err{color:var(--bad);font-weight:700}
+
+/* =====================================================================
+   장면 배치 v2 (태블릿·PC, html.scene-v2)
+   kitchen-play.png(1280x856) 한 장이 배경이고, 조작 요소를 그 위 정해진 자리에 올린다.
+   자리는 그림에서 잰 좌표를 %로 적은 것이다(가로 1280, 세로 856 기준).
+   #play를 앞에 붙여서 기존 .play-scene / .compact 규칙보다 항상 이기게 한다.
+   ===================================================================== */
+html.scene-v2 #play{background:#411f1d}
+html.scene-v2 #play .scene-bg{background:#411f1d;background-image:none}   /* 그림 위에 남는 띠 = 천장 보 색 */
+html.scene-v2 #play .scene-body{
+  position:absolute;left:0;right:0;bottom:0;width:100%;height:auto;aspect-ratio:1280/856;
+  padding:0;display:block;container-type:size;
+  background:url('assets/kitchen-play.png') center/100% 100% no-repeat;
+  image-rendering:auto;
+}
+/* 기존 가로줄 레이아웃을 풀어서 각 칸이 장면 기준으로 자리를 잡게 한다 */
+html.scene-v2 #play .counter,
+html.scene-v2 #play .counter-rail{display:contents}
+
+/* 손님: 카운터 뒤 벽 앞. 카운터 뒤쪽 가장자리(그림의 y=445)에서 잘려서 몸통 아래가 카운터에 가려진 것처럼 보인다 */
+html.scene-v2 #play .custrow{
+  position:absolute;left:1%;top:0;width:77%;height:52%;margin:0;padding:0;border:0;
+  overflow:hidden;display:flex;gap:1.2%;align-items:flex-end;z-index:2;
+}
+html.scene-v2 #play .slot .cat{
+  font-size:25cqh;line-height:1;margin:0 0 -3cqh;display:flex;justify-content:center;
+}
+html.scene-v2 #play .slot .cat img.guest-spr{height:29cqh;width:auto;display:block}
+html.scene-v2 #play .slot.giant .cat img.guest-spr{height:33cqh}
+
+/* 쓰레기통: 그림에 있는 통 위에 터치 영역만 얹는다 */
+html.scene-v2 #play .trash-station{position:absolute;left:1.1%;top:58.5%;width:9.6%;height:21%;z-index:3;padding:0}
+html.scene-v2 #play .trash{width:100%;height:100%;background:none!important;border:0;box-shadow:none}
+
+/* 재료 자리 3곳 */
+html.scene-v2 #play .shelf-station{position:absolute;left:10.6%;top:57%;width:31.9%;height:30%;z-index:3}
+
+/* 조리대(도마): 빵이 서는 캔버스. 도마 위쪽으로 넉넉히 뻗어서 큰 빵도 들어간다 */
+html.scene-v2 #play .bench-station{
+  position:absolute;left:43.4%;top:37.4%;width:36%;height:44.5%;z-index:4;
+  padding:0;background:none;border:0;border-radius:0;box-shadow:none;display:block;
+}
+html.scene-v2 #play .bench-station .station-label{display:none}
+html.scene-v2 #play .benchwrap{position:absolute;inset:0;background:none;border:0;box-shadow:none;min-height:0;border-radius:0}
+html.scene-v2 #play canvas#benchCv{width:100%;height:100%;object-fit:contain}
+/* 조작 버튼: 카운터 앞면(그림의 y=745~845) */
+html.scene-v2 #play .bench-actions{
+  position:absolute;left:1%;top:111.5%;width:98%;height:25%;margin:0;display:flex;gap:2%;
+}
+html.scene-v2 #play .bench-actions .btn{flex:1;min-height:0;height:100%;font-size:max(15px,2.1cqw)}
+html.scene-v2 #play .bench-actions #toOven{flex:1.4}
+
+/* 오븐: 그림의 오븐 입구 위에 빵과 박자 링만 그린다 */
+html.scene-v2 #play .oven-station{
+  position:absolute;left:81.2%;top:28.5%;width:17.6%;height:34%;z-index:3;
+  padding:0;background:none;border:0;border-radius:0;box-shadow:none;min-height:0;
+}
+html.scene-v2 #play .oven-station #ovenCv{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;min-height:0}
+html.scene-v2 #play .oven-head{position:absolute;left:0;top:140%;width:100%;z-index:4}
+
+/* 끌고 가는 동안은 캔버스가 손님·쓰레기통 판정을 가리지 않게 */
+html.dragging #play canvas#benchCv,
+html.dragging #play canvas#ovenCv{pointer-events:none!important}

@@ -454,7 +454,6 @@ var chipEls=[]; /* [dishIndex][bagSize] -> element */
     }).join('');
     b.innerHTML='<div class="mold-head">'
       +'<canvas width="100" height="70"></canvas>'
-      +'<div class="mold-meta"><b>'+m.ico+' '+m.ing+'</b><span>'+m.name+'</span></div>'
       +'<button type="button" class="upb"></button>'
       +'</div>'
       +'<div class="chips" style="grid-template-columns:repeat('+bags.length+',minmax(0,1fr))">'+chipsHtml+'</div>'
@@ -515,23 +514,25 @@ function renderBench(){
   bctx.clearRect(0,0,BW,BH);
   var d=S.bench;
   if(!d){
-    bctx.fillStyle='#b59a72';bctx.font='800 20px Malgun Gothic,sans-serif';bctx.textAlign='center';
-    bctx.fillText('👆 선반에서 개수를 톡!',BW/2,BH/2);
+    bctx.fillStyle='#5a3a1e';bctx.font='800 22px Malgun Gothic,sans-serif';bctx.textAlign='center';
+    bctx.fillText('봉지 톡!',BW/2,BH/2);
   }else{
     if(d.n===0){
-      bctx.fillStyle='#b59a72';bctx.font='800 18px Malgun Gothic,sans-serif';bctx.textAlign='center';
-      bctx.fillText('개수 칩을 톡해요',BW/2,BH/2-30);
+      bctx.fillStyle='#5a3a1e';bctx.font='800 20px Malgun Gothic,sans-serif';bctx.textAlign='center';
+      bctx.fillText('봉지 톡!',BW/2,BH/2-24);
       var e=newDish(d.type);drawDishState(bctx,BW/2,BBASE,64,e,0);
     }else drawDishState(bctx,BW/2,BBASE,benchCell(d),d,0);
-    bctx.fillStyle='#3b2a1a';bctx.font='800 16px Malgun Gothic,sans-serif';bctx.textAlign='center';
-    if(d.n>0)bctx.fillText(DISHES[d.type].ico+' '+d.n+'개',BW/2,BBASE+15);
+    bctx.fillStyle='#3b2a1a';bctx.font='800 20px Malgun Gothic,sans-serif';bctx.textAlign='center';
+    if(d.n>0)bctx.fillText(d.n+'개',BW/2,BBASE+18);
   }
   var nw=performance.now();
   fx=fx.filter(function(f){return nw-f.t0<f.dl+700});
   fx.forEach(function(f){var a=nw-f.t0-f.dl;if(a<0)return;var q=Math.min(1,a/320),y=-20+(f.y1+20)*q*q;bctx.save();bctx.globalAlpha=a>320?Math.max(0,1-(a-320)/380):1;bctx.font='28px sans-serif';bctx.textAlign='center';bctx.translate(f.x,y);bctx.rotate(f.rot*q);bctx.fillText(f.ico,0,0);bctx.restore()});
+  bcv.style.pointerEvents=(d&&d.n>0)?'auto':'none';
   $('benchWrap').classList.toggle('sel',S.sel==='bench');
   var t=$('benchInfo');
-  if(!d)t.textContent='';else t.textContent=DISHES[d.type].name+' · '+DISHES[d.type].ing+' '+d.n+'개';
+  if(!d||!d.n)t.textContent='';
+  else t.textContent=d.n+'개';
 }
 var fx=[];
 function spawnFx(d,n){
@@ -570,7 +571,7 @@ function renderChips(){
       ch.classList.toggle('canbuy',own&&!has&&G.wallet>=BAGCOST[n]);
       var ck=ch.querySelector('.ck');
       if(!has){
-        var h='🔒<small>🪙 '+BAGCOST[n]+'</small>';
+        var h='🔒<span class="ck-cost">'+BAGCOST[n]+'</span>';
         if(ck.innerHTML!==h)ck.innerHTML=h;
       }else if(ck.innerHTML)ck.innerHTML='';
     });
@@ -718,7 +719,9 @@ function drawSpriteFit(c,cv,x,y,w,h){
   c.drawImage(cv,dx,dy,dw,dh);
   return{x:dx,y:dy,w:dw,h:dh};
 }
+function sceneOven(){return document.documentElement.classList.contains('scene-v2')}
 function ovenFrame(c,lv){
+  if(sceneOven())return;
   var cv=sprite(OVEN_SPR[lv]);
   if(cv){drawSpriteFit(c,cv,0,0,OW,OH);return}
   if(lv===1){rr(c,0,0,OW,OH,14);c.fillStyle='#4a2f1d';c.fill();rr(c,8,8,OW-16,OH-16,10);c.fillStyle='#2b1b10';c.fill();return}
@@ -742,6 +745,7 @@ function renderOven(){
   ovenFrame(octx,G.u.oven);
   var o=S.oven,d=o.dish;
   if(!d){
+    if(sceneOven())return;
     var useSpr=!!sprite(OVEN_SPR[G.u.oven]);
     octx.font='800 16px Malgun Gothic,sans-serif';octx.textAlign='center';
     if(useSpr){
@@ -758,8 +762,9 @@ function renderOven(){
   /* 스프라이트 오븐은 창이 가운데 있다. 캔버스 바닥(OBASE)에 그리면 빵이
      오븐 발밑에 놓인 것처럼 보이므로, 창 안으로 올려서 그린다 */
   var useSpr=!!sprite(OVEN_SPR[G.u.oven]);
-  var OB=useSpr?Math.round(OH*0.60):OBASE;
-  var CO=fitCell(d,useSpr?150:220,useSpr?92:135,useSpr?30:44);
+  var scn=sceneOven();
+  var OB=scn?228:(useSpr?Math.round(OH*0.60):OBASE);
+  var CO=scn?fitCell(d,118,78,28):fitCell(d,useSpr?150:220,useSpr?92:135,useSpr?30:44);
   var bs=1+(o.last&&clock()-o.last.at<260?0.09*(1-(clock()-o.last.at)/260):0);
   var pr=o.state==='done'?1:Math.min(0.95,o.n/o.need),bx=dishBox(d,CO,OW/2,OB);
   octx.save();octx.translate(OW/2,OB);octx.scale(bs,bs);octx.translate(-OW/2,-OB);
@@ -973,6 +978,7 @@ function beginGhost(d){
   gctx.clearRect(0,0,200,200);
   drawDishState(gctx,100,190,fitCell(d,170,120,56),d,d.cooked?1:0);
   ghost.style.display='block';
+  document.documentElement.classList.add('dragging');
 }
 /* 끌고 다니는 그림은 손가락을 따라간다. 돌아갔으면 손가락 좌표를 게임 좌표로 바꿔야 한다 */
 function moveGhost(x,y){
@@ -1001,6 +1007,7 @@ window.addEventListener('pointermove',function(e){
 function finishDrag(e,cancel){
   if(!drag||e.pointerId!==drag.pid)return;
   var dr=drag;drag=null;
+  document.documentElement.classList.remove('dragging');
   if(dr.started){
     ghost.style.display='none';clearHover();
     if(cancel)return;
@@ -1220,22 +1227,22 @@ function renderUpg(){
     var D=DISHES[i],lk=el.querySelector('.lk'),ub=el.querySelector('.upb'),h;
     if(!owned(i)){
       var can=S.round>=D.unlockR;
-      h=can?'🔒<small>🪙 '+D.price+' 열기</small>':'🔒<small>'+D.unlockR+'라운드부터</small>';
+      h=can?'🔒<span class="lk-cost">'+D.price+'</span>':'🔒<span class="lk-cost">R'+D.unlockR+'</span>';
       if(lk.innerHTML!==h)lk.innerHTML=h;
       el.classList.toggle('canbuy',can&&G.wallet>=D.price);
       ub.style.display='none';
     }else{
       var lv=LV(i);el.classList.remove('canbuy');ub.style.display='';
-      if(lv<3){ub.innerHTML='⬆Lv'+(lv+1)+'<small>🪙'+D.up[lv-1]+'</small>';ub.classList.toggle('can',G.wallet>=D.up[lv-1])}
-      else{ub.innerHTML='⭐Lv3';ub.classList.remove('can')}
+      if(lv<3){ub.innerHTML='⬆ '+D.up[lv-1];ub.classList.toggle('can',G.wallet>=D.up[lv-1])}
+      else{ub.innerHTML='★';ub.classList.remove('can')}
     }
   });
   var ov=G.u.oven,ob=$('ovenUp');
   if(ov<3){
-    ob.innerHTML='⬆<small>🪙'+OVEN[ov+1].cost+'</small>';
+    ob.innerHTML='⬆ '+OVEN[ov+1].cost;
     ob.title=OVEN[ov+1].name+' · '+OVEN[ov+1].desc;
     ob.classList.toggle('can',G.wallet>=OVEN[ov+1].cost);ob.style.display='';
-  }else{ob.innerHTML='⭐';ob.title='황금 오븐';ob.classList.remove('can')}
+  }else{ob.innerHTML='★';ob.title='황금 오븐';ob.classList.remove('can')}
 }
 $('nextBtn').onclick=function(){startRound(G.round+1,false)};
 
@@ -1524,6 +1531,9 @@ function fit(){
      PHONE_MIN보다 작은 화면에서만 줄인다. */
   var D=compact?{w:Math.max(v.w,PHONE_MIN.w),h:Math.max(v.h,PHONE_MIN.h)}:DESIGN;
   document.documentElement.classList.toggle('compact',compact);
+  /* 장면 배치(kitchen-play.png 한 장 위에 조작 요소를 올림)는 태블릿·PC에서만 쓴다 */
+  document.documentElement.classList.toggle('scene-v2',!compact);
+  BBASE=compact?282:229;
   stage.style.width=D.w+'px';stage.style.height=D.h+'px';
   var s=Math.min(v.w/D.w,v.h/D.h,MAX_S);
   VIEW.w=v.w;VIEW.h=v.h;VIEW.s=s;VIEW.compact=compact;
