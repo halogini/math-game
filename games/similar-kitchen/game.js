@@ -813,10 +813,10 @@ function viewDish(d){
 function renderBench(){
   bctx.clearRect(0,0,BW,BH);
   landFliers();
-  var d=S.bench,hid=!!(d&&d.hideUntil&&performance.now()<d.hideUntil),vd=(d&&!hid)?viewDish(d):null;
+  var d=S.bench,hid=!!(d&&d.hideUntil&&performance.now()<d.hideUntil),lifted=isDragActive('bench'),vd=(d&&!hid&&!lifted)?viewDish(d):null;
   if(!d){
     /* 빈 도마에는 글씨를 쓰지 않는다 */
-  }else if(!hid){
+  }else if(!hid&&!lifted){
     if(vd.n===0){
       var e=newDish(d.type);drawDishState(bctx,BW/2,BBASE,64,e,0);
     }else{
@@ -1090,7 +1090,7 @@ function renderOven(){
   var pr=o.state==='done'?1:Math.min(0.95,o.n/o.need),bx=dishBox(d,CO,OW/2,OB);
   var inFlight=!!(o.showAt&&performance.now()<o.showAt);
   octx.save();octx.translate(OW/2,OB);octx.scale(bs,bs);octx.translate(-OW/2,-OB);
-  if(!inFlight)drawDishState(octx,OW/2,OB,CO,d,pr);
+  if(!inFlight&&!isDragActive('oven'))drawDishState(octx,OW/2,OB,CO,d,pr);
   if(DISHES[d.type].dim===2&&!piecesOn(d)){
     var w=d.w*CO,h=d.h*CO;
     octx.save();rr(octx,OW/2-w/2,OB-h,w,h,Math.min(w,h)*0.12);octx.fillStyle='rgba(150,70,15,'+(0.03+0.4*(o.state==='done'?1:pr))+')';octx.fill();octx.restore();
@@ -1223,11 +1223,11 @@ function renderSlots(){
 
 /* ===== 판정 + 서빙 + 버리기 ===== */
 function judge(d,c){
+  if(!d.cooked)return 'raw';
   if(d.type!==c.dish)return 'wrongDish';
   var dim=DISHES[d.type].dim;
   if(dim>=2&&!isSimilar(d))return 'notSimilar';
   if(d.n!==c.N)return 'wrongSize';
-  if(!d.cooked)return 'raw';
   return 'ok';
 }
 function getDish(src){return src==='bench'?S.bench:S.oven.dish}
@@ -1239,7 +1239,7 @@ function serveDish(src,c){
   if(d.n<=0){toast('접시가 비었어요');return false}
   if(src==='oven'&&S.oven.state==='cooking'){toast('🔥 아직 굽는 중이에요');return false}
   var r=judge(d,c);
-  removeDish(src);
+  if(r!=='raw')removeDish(src);
   if(r==='ok'){
     var base=baseOf(c.dish,c.k)*LVMULT[LV(c.dish)]*(c.giant?GIANT_MULT:1);
     var q=d.quality,rw=Math.round(base*q),pb=Math.round(base*PAT_BONUS*(1-c.wait/c.pat)),gain=rw+pb;
@@ -1255,6 +1255,9 @@ function serveDish(src,c){
     if(c.giant)doShake(5,320);
     if(S.streak%3===0){comboBanner('콤보 ×'+S.streak+'  +'+COMBO_BONUS);sfx('combo')}
     toast(msg);
+  }else if(r==='raw'){
+    S.wrong.raw++;G.wrongAll.raw++;
+    toast('💧 안 익었어요! 오븐에서 구워 주세요');
   }else{
     S.wrong[r]++;G.wrongAll[r]++;S.streak=0;
     var frac=r==='notSimilar'?0.5:0.3;
@@ -1264,8 +1267,7 @@ function serveDish(src,c){
     sfx('fail');doShake(4,240);
     if(r==='wrongDish'){c.mood='💢';toast('💢 주문은 「'+DISHES[c.dish].name+'」인데 「'+DISHES[d.type].name+'」이 왔어요!')}
     else if(r==='notSimilar'){S.penalty+=WRONG_COST;pay(WRONG_COST);c.mood='💢';floatAtSlot(c.slot,'−'+WRONG_COST,'bad');bumpCoins();toast('💢 원본과 모양이 달라요!  −'+WRONG_COST+'코인')}
-    else if(r==='wrongSize'){c.mood='💧';floatAtSlot(c.slot,d.n<c.N?'너무 작아요':'너무 커요','bad');toast('💧 이 크기가 아니에요. '+(d.n<c.N?'너무 작아요':'너무 커요')+'!')}
-    else{c.mood='💧';floatAtSlot(c.slot,'안 익었어요','bad');toast('💧 안 익었어요! 오븐에서 구워 주세요')}
+    else{c.mood='💧';floatAtSlot(c.slot,d.n<c.N?'너무 작아요':'너무 커요','bad');toast('💧 이 크기가 아니에요. '+(d.n<c.N?'너무 작아요':'너무 커요')+'!')}
   }
   updateAll();return true;
 }
@@ -1284,24 +1286,64 @@ $('ovenBox').addEventListener('click',function(){
 
 /* ===== 요리 끌어다 놓기 ===== */
 var drag=null,ghost=$('ghost'),gctx=ghost.getContext('2d');
+function canvasPtViewport(cnv,W,H,x,y){
+  var r=cnv.getBoundingClientRect(),s=Math.min(r.width/W,r.height/H);
+  return{x:r.left+(r.width-W*s)/2+x*s,y:r.top+(r.height-H*s)/2+y*s,s:s};
+}
+function dragDishGeom(src,d){
+  if(src==='bench'){
+    var vd=viewDish(d),cell=benchCell(vd);
+    return{cnv:bcv,W:BW,H:BH,cell:cell,cx:BW/2,baseY:BBASE};
+  }
+  var useSpr=!!sprite(OVEN_SPR[G.u.oven]),scn=sceneOven();
+  var OB=scn?228:(useSpr?Math.round(OH*0.60):OBASE);
+  var cell=scn?fitCell(d,118,78,28):fitCell(d,useSpr?150:220,useSpr?92:135,useSpr?30:44);
+  return{cnv:ocv,W:OW,H:OH,cell:cell,cx:OW/2,baseY:OB};
+}
+function isDragActive(src){return !!(drag&&drag.started&&drag.src===src)}
+function canDragFrom(src){
+  if(S.phase!=='play'||S.guide||isOvenFocus())return false;
+  var d=getDish(src);
+  if(src==='bench'){
+    if(!d||!d.n)return false;
+    if(d.hideUntil&&performance.now()<d.hideUntil)return false;
+    return true;
+  }
+  return !!(d&&S.oven.state==='done');
+}
 function setupDish(cnv,src,W,H){
   cnv.addEventListener('pointerdown',function(e){
-    if(S.phase!=='play'||S.guide||isOvenFocus())return;
+    if(!canDragFrom(src))return;
     e.preventDefault();
-    drag={src:src,cnv:cnv,W:W,H:H,x0:e.clientX,y0:e.clientY,started:false,pid:e.pointerId};
+    try{cnv.setPointerCapture(e.pointerId)}catch(err){}
+    var d=getDish(src);
+    drag={src:src,cnv:cnv,W:W,H:H,x0:e.clientX,y0:e.clientY,started:true,pid:e.pointerId};
+    beginGhost(d,src,e.clientX,e.clientY);
+    moveGhost(e.clientX,e.clientY);
+    if(src==='bench')renderBench();else renderOven();
   });
 }
 setupDish(bcv,'bench',BW,BH);setupDish(ocv,'oven',OW,OH);
-function beginGhost(d){
-  gctx.clearRect(0,0,200,200);
-  drawDishState(gctx,100,190,fitCell(d,170,120,56),d,d.cooked?1:0);
+function beginGhost(d,src,fx,fy){
+  var g=dragDishGeom(src,d),box=dishBox(d,g.cell,g.cx,g.baseY),pad=6;
+  var gw=Math.ceil(box.w+pad*2),gh=Math.ceil(box.h+pad*2);
+  var gcx=gw/2,gbaseY=gh-pad;
+  var vp=canvasPtViewport(g.cnv,g.W,g.H,g.cx,g.baseY);
+  var fp=toGame(fx,fy),ap=toGame(vp.x,vp.y);
+  drag.geom={gw:gw,gh:gh,gcx:gcx,gbaseY:gbaseY,vscale:vp.s};
+  drag.ox=fp.x-ap.x;drag.oy=fp.y-ap.y;
+  hidpi(ghost,gw,gh,VIEW.q);
+  ghost.style.width=(gw*vp.s)+'px';ghost.style.height=(gh*vp.s)+'px';
+  gctx.clearRect(0,0,gw,gh);
+  drawDishState(gctx,gcx,gbaseY,g.cell,d,d.cooked?1:0);
   ghost.style.display='block';
   document.documentElement.classList.add('dragging');
 }
 /* 끌고 다니는 그림은 손가락을 따라간다. 돌아갔으면 손가락 좌표를 게임 좌표로 바꿔야 한다 */
 function moveGhost(x,y){
-  var p=toGame(x,y);
-  ghost.style.transform='translate('+(p.x-100*VIEW.s)+'px,'+(p.y-160*VIEW.s)+'px)';
+  if(!drag||!drag.geom)return;
+  var p=toGame(x,y),gm=drag.geom;
+  ghost.style.transform='translate('+(p.x-drag.ox-gm.gcx*gm.vscale)+'px,'+(p.y-drag.oy-gm.gbaseY*gm.vscale)+'px)';
 }
 function targetAt(x,y){
   var el=document.elementFromPoint(x,y);if(!el)return {};
@@ -1317,30 +1359,30 @@ function hoverTargets(x,y){
 }
 function clearHover(){S.hover=-1;$('trash').classList.remove('drop');$('ovenBox').classList.remove('drop');renderSlots()}
 window.addEventListener('pointermove',function(e){
-  if(!drag||e.pointerId!==drag.pid)return;
-  var d=getDish(drag.src);
-  if(!drag.started&&d&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>DRAG_SLOP){drag.started=true;beginGhost(d)}
-  if(drag.started){moveGhost(e.clientX,e.clientY);hoverTargets(e.clientX,e.clientY)}
+  if(!drag||e.pointerId!==drag.pid||!drag.started)return;
+  moveGhost(e.clientX,e.clientY);hoverTargets(e.clientX,e.clientY);
 });
 function finishDrag(e,cancel){
   if(!drag||e.pointerId!==drag.pid)return;
   var dr=drag;drag=null;
+  try{dr.cnv.releasePointerCapture(e.pointerId)}catch(err){}
   document.documentElement.classList.remove('dragging');
-  if(dr.started){
-    ghost.style.display='none';clearHover();
-    if(cancel)return;
-    var t=targetAt(e.clientX,e.clientY);
-    if(t.slot>=0){var c=slotCust(t.slot);if(c)serveDish(dr.src,c);else toast('손님이 없는 자리예요')}
-    else if(t.trash)discard(dr.src);
-    else if(t.oven&&dr.src==='bench')toOven();
+  ghost.style.display='none';clearHover();
+  if(dr.src==='bench')renderBench();else if(dr.src==='oven')renderOven();
+  if(cancel)return;
+  var moved=Math.hypot(e.clientX-dr.x0,e.clientY-dr.y0);
+  if(moved<=DRAG_SLOP){
+    if(dr.src==='bench'){
+      if(S.bench){S.sel=S.sel==='bench'?null:'bench';updateAll()}
+    }else if(dr.src==='oven'){
+      if(S.oven.dish&&S.oven.state==='done'){S.sel=S.sel==='oven'?null:'oven';updateAll()}
+    }
     return;
   }
-  if(cancel)return;
-  if(dr.src==='bench'){
-    if(S.bench){S.sel=S.sel==='bench'?null:'bench';updateAll()}
-  }else if(dr.src==='oven'){
-    if(S.oven.dish&&S.oven.state==='done'){S.sel=S.sel==='oven'?null:'oven';updateAll()}
-  }
+  var t=targetAt(e.clientX,e.clientY);
+  if(t.slot>=0){var c=slotCust(t.slot);if(c)serveDish(dr.src,c);else toast('손님이 없는 자리예요')}
+  else if(t.trash)discard(dr.src);
+  else if(t.oven&&dr.src==='bench')toOven();
 }
 window.addEventListener('pointerup',function(e){finishDrag(e,false)});
 window.addEventListener('pointercancel',function(e){finishDrag(e,true)});
@@ -1823,12 +1865,16 @@ function setupCanvases(){
   var q=clamp(Math.round((window.devicePixelRatio||1)*VIEW.s*100)/100,1,3);
   if(q===VIEW.q)return false;
   VIEW.q=q;
-  hidpi(bcv,BW,BH,q);hidpi(ocv,OW,OH,q);hidpi(ghost,200,200,q);
+  hidpi(bcv,BW,BH,q);hidpi(ocv,OW,OH,q);
+  if(drag&&drag.geom){
+    hidpi(ghost,drag.geom.gw,drag.geom.gh,q);
+    ghost.style.width=(drag.geom.gw*drag.geom.vscale)+'px';
+    ghost.style.height=(drag.geom.gh*drag.geom.vscale)+'px';
+  }else{hidpi(ghost,200,200,q);ghost.style.width='0';ghost.style.height='0'}
   if(focusCv)hidpi(focusCv,FOCUS_W,FOCUS_H,q);
   slotEls.forEach(function(el){hidpi(el.querySelector('canvas'),SLOT_W,SLOT_H,q)});
   dishEls.forEach(function(el){hidpi(el.querySelector('canvas'),100,70,q)});
   srcEls.forEach(function(el){hidpi(el.querySelector('canvas'),200,180,q)});
-  ghost.style.width=(200*VIEW.s)+'px';ghost.style.height=(200*VIEW.s)+'px';
   return true;
 }
 function invalidate(){
