@@ -316,13 +316,17 @@ function isSimilar(d){
   if(dim===2)return d.w===d.h&&d.n===d.w*d.h;
   return d.s===d.L&&d.n===d.s*d.s*d.s;
 }
+/* 바게트 통그림의 「토막 단위」개수. 양 끝(L·R) + 가운데 n개 */
+/* 바게트 길이 = 개수 × (개수 1일 때의 길이). 그래서 k개는 1개보다 정확히 k배 길다 (길이의 닮음비 1 : k).
+   cell = 개수 1일 때의 길이(px). 굵기는 개수와 상관없이 같고(cell × BAG_THICK), 그림은 원래 비율로 그린다.
+   양 끝(왼쪽 L, 오른쪽 R0~)은 그대로 두고 가운데 토막 수만 늘려서 전체 길이를 n·cell에 맞춘다. */
+var BAG_REF=10,BAG_THICK=0.62;   /* BAG_REF개일 때 칸을 가득 채운다 / 굵기 = cell × BAG_THICK */
 function fitCell(d,mw,mh,cap){
   var dim=DISHES[d.type].dim,c;
   if(piecesOn(d)){
     var e=pieceExt(d,1),cc=Math.min(cap,mw/e.w,mh/e.h);
-    if(dim===1){ /* 한 줄 : 덩어리 폭이 최소 9px라서 줄이 길 때만 계산이 달라진다 */
-      var P0=PIECE[d.type];cc=Math.min(cap,mw/(d.w-1+P0.wk),mh/(P0.wk*P0.hr));
-      if(cc*P0.wk<9&&d.w>1)cc=Math.min(cc,(mw-9)/(d.w-1));
+    if(dim===1){ /* 바게트 : 10개일 때 칸을 꽉 채우는 크기가 기준. 10개 이하는 같은 크기로 짧아지고, 10개를 넘으면 칸에 맞춰 줄어든다 */
+      cc=Math.min(cap,mw/Math.max(BAG_REF,d.n),mh/BAG_THICK);
     }
     return Math.max(1.5,Math.floor(cc*4)/4);
   }
@@ -347,16 +351,22 @@ function dishBox(d,cell,cx,baseY){
    구운 그림(full)은 날것(raw)과 「아랫가운데」를 맞춰 겹쳐 그린다. 그래서 구운 그림 파일만 바꿔 끼워도 된다.
    rT = 윗면 마름모의 높이/폭, tk = 식빵 두께/폭, eg = 큐브 옆면 높이/폭, hr = 반죽 높이/폭 (그림에서 잰 값) */
 var PIECE=[
-  {raw:'piece-dough-raw',full:'piece-dough-baked',wk:1.1,hr:0.778},
+  /* 바게트는 한 개를 통째로 그린 그림을 「왼쪽 끝 / 반복 토막 / 오른쪽 끝」으로 잘라 이어 붙인다.
+     전체 길이는 항상 최대 개수(max)일 때와 같고, 개수가 적으면 가로로 늘려 맞춘다.
+     bag = 그림 크기 W×H, 왼쪽 끝 L, 토막 폭 T(칼집 한 주기), 오른쪽 끝이 시작하는 곳 R0 (모두 그림 픽셀).
+     minH = 개수가 많아도 줄어들지 않는 최소 높이(px) */
+  {raw:'piece-baguette-raw',full:'piece-baguette-baked',bag:{W:1160,H:258,L:245,T:241,R0:900,minH:7}},
   {raw:'piece-toast-raw',full:'piece-toast-baked',wk:1.5,rT:0.505,tk:0.139},
   {raw:'piece-sponge-raw',full:'piece-sponge-baked',wk:1.732,rT:0.4575,eg:0.564}
 ];
 function piecesOn(d){var P=PIECE[d.type];return !!(P&&SPRITE_READY&&SPRITE_READY[P.raw]&&SPRITE_READY[P.full])}
 /* cell = 조각 하나의 기준 크기. 전체 폭·높이는 조각 수(d.w·d.h·d.s·d.L)로 정해진다 */
 function pieceExt(d,cell){
-  var dim=DISHES[d.type].dim,P=PIECE[d.type],W=cell*P.wk;
-  if(dim===1)W=Math.max(W,9); /* 개수가 많아 칸이 좁아져도 덩어리가 보이게 : 서로 겹쳐 이어진다 */
-  if(dim===1)return{W:W,w:(d.w-1)*cell+W,h:W*P.hr};
+  var dim=DISHES[d.type].dim,P=PIECE[d.type],W=cell*(P.wk||1);
+  if(dim===1){
+    var B=P.bag;
+    return{W:W,w:cell*Math.max(1,d.n),h:Math.max(B.minH,cell*BAG_THICK)};
+  }
   if(dim===2)return{W:W,w:(d.w+d.h)/2*W,h:W*((d.w+d.h)/2*P.rT+P.tk)};
   return{W:W,w:d.s*W,h:W*(d.s*P.rT+d.L*P.eg)};
 }
@@ -387,13 +397,33 @@ function dashRhomb(c,px,py,W,dT){ /* 비어 있는 자리 : 점선 마름모(위
   c.save();c.setLineDash([4,3]);c.strokeStyle='rgba(180,150,100,.5)';c.lineWidth=1.5;c.lineJoin='round';
   c.beginPath();c.moveTo(px,cy-y);c.lineTo(px+x,cy);c.lineTo(px,cy+y);c.lineTo(px-x,cy);c.closePath();c.stroke();c.restore();
 }
+/* 바게트 통그림을 잘라 둔 조각(왼쪽 끝 #L, 반복 토막 #M, 오른쪽 끝 #R). 처음 쓸 때 한 번만 만든다 */
+function bagSlice(name,B,k){
+  var key=name+'#'+k;
+  if(SPRITE_READY[key])return key;
+  var src=sprite(name),x0=k==='L'?0:k==='M'?B.L:B.R0,x1=k==='L'?B.L:k==='M'?B.L+B.T:B.W;
+  var cv=document.createElement('canvas');cv.width=x1-x0;cv.height=src.height;
+  cv.getContext('2d').drawImage(src,x0,0,x1-x0,src.height,0,0,x1-x0,src.height);
+  SPRITE[key]=cv;SPRITE_READY[key]=true;return key;
+}
+function blitSlice(c,key,x,y,w,h){
+  var sc=1;try{sc=Math.abs(c.getTransform().a)||1}catch(e){}
+  c.drawImage(pieceImg(key,w*sc),x,y,w+0.8,h);   /* 조각 사이에 실금이 안 생기게 살짝 겹친다 */
+}
 function drawPieces(c,cx,baseY,cell,d,full){
   var dim=DISHES[d.type].dim,P=PIECE[d.type],e=pieceExt(d,cell),W=e.W,name=full?P.full:P.raw,i,j,l;
   if(dim===1){
-    var x0=cx-e.w/2+W/2;
-    for(i=0;i<d.w;i++){
-      if(i<d.n)blitPiece(c,name,W,x0+i*cell,baseY);
-      else if(d.n===0&&i===0){c.save();c.setLineDash([4,3]);c.strokeStyle='rgba(180,150,100,.5)';c.lineWidth=1.5;c.beginPath();c.ellipse(x0,baseY-W*P.hr/2,W*0.45,W*P.hr*0.4,0,0,7);c.stroke();c.restore()}
+    var B=P.bag,H=e.h;
+    if(d.n<=0){c.save();c.setLineDash([4,3]);c.strokeStyle='rgba(180,150,100,.5)';c.lineWidth=1.5;c.beginPath();c.ellipse(cx,baseY-H/2,e.w*0.45,H*0.4,0,0,7);c.stroke();c.restore();return}
+    var s0=H/B.H,Lw=B.L*s0,Rw=(B.W-B.R0)*s0,Tw=B.T*s0,tot=e.w,capsW=Lw+Rw,x=cx-tot/2,y=baseY-H;
+    var kL=bagSlice(name,B,'L'),kM=bagSlice(name,B,'M'),kR=bagSlice(name,B,'R');
+    if(tot<capsW+Tw){                     /* 아주 짧을 때(1개)는 양 끝 + 토막 하나를 통째로 조금 눌러서 붙인다(칼집이 한 줄 보이게) */
+      var q=tot/(capsW+Tw);blitSlice(c,kL,x,y,Lw*q,H);x+=Lw*q;blitSlice(c,kM,x,y,Tw*q,H);x+=Tw*q;blitSlice(c,kR,x,y,Rw*q,H);
+    }else{                                /* 가운데 토막을 원래 비율로 깔고, 길이에 맞게 조금만 늘이거나 줄인다 */
+      var Lt=tot-capsW,nt=Math.max(1,Math.round(Lt/Tw)),mw=Lt/nt;
+      blitSlice(c,kL,x,y,Lw,H);x+=Lw;
+      for(i=0;i<nt;i++){blitSlice(c,kM,x,y,mw,H);x+=mw}
+      blitSlice(c,kR,x,y,Rw,H);
     }
     return;
   }
@@ -617,6 +647,21 @@ function benchToStage(x,y){
   var r=elRectStage(bcv),s=Math.min(r.w/BW,r.h/BH);
   return{x:r.x+(r.w-BW*s)/2+x*s,y:r.y+(r.h-BH*s)/2+y*s,s:s};
 }
+/* 오븐 캔버스 안의 점 -> 무대 좌표 */
+function ovenToStage(x,y){
+  var r=elRectStage(ocv),s=Math.min(r.w/OW,r.h/OH);
+  return{x:r.x+(r.w-OW*s)/2+x*s,y:r.y+(r.h-OH*s)/2+y*s,s:s};
+}
+/* 빵이 도마에서 오븐 입구로 들어가고(in), 다 구워지면 입구에서 도마로 나오는(out) 연출.
+   규칙(S.bench·S.oven)은 바로 바뀌고, 이 그림과 「보이는 시점」만 늦춘다. */
+var ENTER_MS=460,EXIT_MS=560,dishFly=[];
+function benchDishGeom(d){var p=benchToStage(BW/2,BBASE);return{x:p.x,y:p.y,cell:benchCell(d)*p.s}}
+function ovenDishGeom(d){var p=ovenToStage(OW/2,228);return{x:p.x,y:p.y,cell:fitCell(d,118,78,28)*p.s}}
+function launchDishFly(mode,d){
+  var b=benchDishGeom(d),o=ovenDishGeom(d),a=mode==='in'?b:o,z=mode==='in'?o:b;
+  dishFly.push({mode:mode,dish:d,t0:performance.now(),dur:mode==='in'?ENTER_MS:EXIT_MS,
+    ax:a.x,ay:a.y,ac:a.cell,bx:z.x,by:z.y,bc:z.cell,arc:Math.max(36,Math.abs(b.y-o.y)*0.35)});
+}
 function launchFliers(d,can,srcEl){
   var f=Math.min(can,8),per=Math.floor(can/f),rem=can-per*f,now=performance.now();
   var cell=benchCell(d),box=dishBox(d,cell,BW/2,BBASE),dim=DISHES[d.type].dim;
@@ -625,13 +670,15 @@ function launchFliers(d,can,srcEl){
     var tx,ty;
     if(dim===1){
       var idx=Math.max(0,Math.min(d.n-1,d.n-can+Math.round((i+1)*can/f)-1));
-      tx=piecesOn(d)?box.x+cell*0.55+idx*cell:box.x+6+idx*cell+cell/2;ty=BBASE-cell*0.5;
+      if(piecesOn(d)){
+        tx=box.x+box.w*(idx+0.5)/Math.max(1,d.n);ty=BBASE-box.h*0.5;
+      }else{tx=box.x+6+idx*cell+cell/2;ty=BBASE-cell*0.45}
     }else{
       tx=box.x+box.w*(0.2+0.6*rnd());ty=box.y+box.h*(0.35+0.5*rnd());
     }
     var to=benchToStage(tx,ty);
     fliers.push({t0:now+i*70,dur:380,sx:src.x+src.w/2,sy:src.y+src.h*0.4,tx:to.x,ty:to.y,type:d.type,
-                 inc:per+(i===f-1?rem:0),dish:d,size:Math.max(24,cell*to.s*0.95)});
+                 inc:per+(i===f-1?rem:0),dish:d,size:dim===1&&piecesOn(d)?Math.max(8,cell*to.s*0.3):Math.max(24,cell*to.s*0.95)});
   }
   /* 순식간에 많이 부를 때 쌓이지 않게: 넘치는 것은 바로 도착 처리 */
   while(fliers.length>40){var o=fliers.shift();if(o.dish.shown!==undefined)o.dish.shown=Math.min(o.dish.n,o.dish.shown+o.inc)}
@@ -648,9 +695,20 @@ function landFliers(){
   }
 }
 function renderFly(){
-  if(!fliers.length){if(flyDirty){fctx.clearRect(0,0,FLYW,FLYH);flyDirty=false}return}
+  if(!fliers.length&&!dishFly.length){if(flyDirty){fctx.clearRect(0,0,FLYW,FLYH);flyDirty=false}return}
   fctx.clearRect(0,0,FLYW,FLYH);flyDirty=true;
   var now=performance.now();
+  for(var di=dishFly.length-1;di>=0;di--){
+    var g=dishFly[di],gp=Math.min(1,(now-g.t0)/g.dur);
+    if(gp>=1){dishFly.splice(di,1);continue}
+    var ge=g.mode==='in'?gp*gp*(3-2*gp):1-Math.pow(1-gp,3);         // 들어갈 땐 부드럽게, 나올 땐 톡 튀어나오며 감속
+    var gx=g.ax+(g.bx-g.ax)*ge,gy=g.ay+(g.by-g.ay)*ge-Math.sin(Math.PI*ge)*g.arc;
+    var gc=Math.max(3,g.ac+(g.bc-g.ac)*ge);
+    fctx.save();
+    fctx.globalAlpha=g.mode==='in'?(gp<0.72?1:(1-gp)/0.28):Math.min(1,gp*5);
+    drawDishState(fctx,gx,gy,gc,g.dish,g.dish.cooked?1:0);
+    fctx.restore();
+  }
   fliers.forEach(function(f){
     var p=(now-f.t0)/f.dur;if(p<0)return;p=Math.min(1,p);
     var e=p*p*(3-2*p);                                  // 부드럽게 가속·감속
@@ -752,20 +810,14 @@ function viewDish(d){
   if(d.shown===d.n)return d;
   var v={type:d.type,n:d.shown,cooked:d.cooked,quality:d.quality};refresh(v);return v;
 }
-function benchHint(){return sceneOven()?'재료를 톡!':'봉지 톡!'}
 function renderBench(){
   bctx.clearRect(0,0,BW,BH);
   landFliers();
-  var d=S.bench,vd=d?viewDish(d):null;
+  var d=S.bench,hid=!!(d&&d.hideUntil&&performance.now()<d.hideUntil),vd=(d&&!hid)?viewDish(d):null;
   if(!d){
-    bctx.fillStyle='#5a3a1e';bctx.font='800 22px Malgun Gothic,sans-serif';bctx.textAlign='center';
-    bctx.fillText(benchHint(),BW/2,BH/2);
-  }else{
+    /* 빈 도마에는 글씨를 쓰지 않는다 */
+  }else if(!hid){
     if(vd.n===0){
-      if(d.n===0){
-        bctx.fillStyle='#5a3a1e';bctx.font='800 20px Malgun Gothic,sans-serif';bctx.textAlign='center';
-        bctx.fillText(benchHint(),BW/2,BH/2-24);
-      }
       var e=newDish(d.type);drawDishState(bctx,BW/2,BBASE,64,e,0);
     }else{
       /* 오븐에서 막 돌아온 빵은 톡 튀어 오른다 */
@@ -780,7 +832,7 @@ function renderBench(){
   var nw=performance.now();
   fx=fx.filter(function(f){return nw-f.t0<f.dl+700});
   fx.forEach(function(f){var a=nw-f.t0-f.dl;if(a<0)return;var q=Math.min(1,a/320),y=-20+(f.y1+20)*q*q;bctx.save();bctx.globalAlpha=a>320?Math.max(0,1-(a-320)/380):1;bctx.font='28px sans-serif';bctx.textAlign='center';bctx.translate(f.x,y);bctx.rotate(f.rot*q);bctx.fillText(f.ico,0,0);bctx.restore()});
-  bcv.style.pointerEvents=(d&&d.n>0)?'auto':'none';
+  bcv.style.pointerEvents=(d&&d.n>0&&!hid)?'auto':'none';
   $('benchWrap').classList.toggle('sel',S.sel==='bench');
   var t=$('benchInfo');
   if(!d||!d.n)t.textContent='';
@@ -857,9 +909,12 @@ function toOven(){
     else toast('🔥 오븐이 차 있어요. 완성품을 꺼내 오븐을 비워 주세요');
     return;
   }
-  S.oven={dish:d,state:'cooking',t0:clock(),n:0,need:OVEN[G.u.oven].taps,grades:[],last:null};
-  S.bench=null;S.sel=null;fx=[];drag=null;
-  setOvenFocus(true);
+  /* 빵이 오븐에 들어가는 동안(ENTER_MS)은 박자도 안내 창도 시작하지 않는다 */
+  d.shown=d.n;
+  S.oven={dish:d,state:'cooking',t0:clock()+ENTER_MS,n:0,need:OVEN[G.u.oven].taps,grades:[],last:null,showAt:performance.now()+ENTER_MS};
+  S.bench=null;S.sel=null;fx=[];fliers.length=0;drag=null;
+  launchDishFly('in',d);sfx('bag');
+  setTimeout(function(){if(S.phase==='play'&&isOvenFocus())setOvenFocus(true)},ENTER_MS);
   updateAll();
 }
 $('toOven').onclick=toOven;
@@ -875,8 +930,9 @@ function cookTap(){
     sfx('done');
     setOvenFocus(false);
     /* 구운 빵은 오븐에 두지 않고 도마로 돌아온다. 오븐은 바로 다음 빵을 받을 수 있다 */
-    S.bench=o.dish;S.bench.shown=S.bench.n;S.bench.popAt=performance.now();
+    S.bench=o.dish;S.bench.shown=S.bench.n;S.bench.hideUntil=S.bench.popAt=performance.now()+EXIT_MS;
     S.oven=ovenIdle();S.sel=null;fx=[];fliers.length=0;
+    launchDishFly('out',S.bench);
     toast('✅ 완성! 완성도 '+Math.round(S.bench.quality*100)+'% · 손님에게 끌어다 주세요',2200);
   }
   updateAll();
@@ -923,7 +979,6 @@ function steam(c,o,cx,top,w,pr){
     var ph=(t*0.55+i/n)%1,x=cx+(i-(n-1)/2)*w/(n+0.5)+Math.sin(t*2+i)*6,y=top-6-ph*64;
     c.beginPath();c.arc(x,y,5+ph*9,0,7);c.fillStyle='rgba(255,255,255,'+(0.28*(1-ph)*heat+0.02)+')';c.fill();
   }
-  if(o.state==='cooking'){c.font='800 14px Malgun Gothic,sans-serif';c.textAlign='center';c.fillStyle='rgba(255,200,120,'+(0.55+0.45*Math.sin(t*9))+')';c.fillText(pr<0.5?'지글…':'지글지글~',cx,Math.max(96,top-80))}
   if(o.state==='done'){for(var k=0;k<4;k++){var a=(t*1.2+k/4)%1;c.globalAlpha=Math.sin(a*Math.PI);c.font='18px sans-serif';c.textAlign='center';c.fillText('✨',cx+(k-1.5)*w/4,top+10+Math.cos(k*2+t)*6);c.globalAlpha=1}}
 }
 /* ===== 스프라이트 =====
@@ -1033,19 +1088,16 @@ function renderOven(){
   var CO=scn?fitCell(d,118,78,28):fitCell(d,useSpr?150:220,useSpr?92:135,useSpr?30:44);
   var bs=1+(o.last&&clock()-o.last.at<260?0.09*(1-(clock()-o.last.at)/260):0);
   var pr=o.state==='done'?1:Math.min(0.95,o.n/o.need),bx=dishBox(d,CO,OW/2,OB);
+  var inFlight=!!(o.showAt&&performance.now()<o.showAt);
   octx.save();octx.translate(OW/2,OB);octx.scale(bs,bs);octx.translate(-OW/2,-OB);
-  drawDishState(octx,OW/2,OB,CO,d,pr);
+  if(!inFlight)drawDishState(octx,OW/2,OB,CO,d,pr);
   if(DISHES[d.type].dim===2&&!piecesOn(d)){
     var w=d.w*CO,h=d.h*CO;
     octx.save();rr(octx,OW/2-w/2,OB-h,w,h,Math.min(w,h)*0.12);octx.fillStyle='rgba(150,70,15,'+(0.03+0.4*(o.state==='done'?1:pr))+')';octx.fill();octx.restore();
   }
   octx.restore();
   steam(octx,o,OW/2,bx.y,bx.w,pr);
-  if(o.state==='cooking'){
-    /* 박자 링·판정은 집중 모드 패널에만 표시 (오븐 안 중복 제거) */
-    octx.fillStyle='#e8d4b0';octx.font='800 16px Malgun Gothic,sans-serif';octx.textAlign='center';
-    octx.fillText('굽는 중…',OW/2,OB+16);
-  }else if(o.state==='done'){
+  if(o.state==='done'){
     var q=d.quality;
     octx.fillStyle='#5fe08f';octx.font='800 18px Malgun Gothic,sans-serif';octx.textAlign='center';
     octx.fillText('✅ 완성! 끌어다 서빙',OW/2,44);
@@ -1389,7 +1441,7 @@ function setOverlay(id,on){
   if(on)el.style.display='flex';else el.style.display='';
 }
 function startRound(r,withGuide){
-  G.round=r;newRound(r);drag=null;fx=[];fxClear();fliers.length=0;
+  G.round=r;newRound(r);drag=null;fx=[];fxClear();fliers.length=0;dishFly.length=0;
   shake.mag=0;shake.until=0;applyStage(0,0);
   setOvenFocus(false);
   setOverlay('endConfirm',false);
@@ -1803,10 +1855,9 @@ function fit(){
   document.documentElement.classList.toggle('scene-v2',true);
   BBASE=229;
   stage.style.width=D.w+'px';stage.style.height=D.h+'px';
-  /* 장면 그림은 폭에 맞추되, 낮은 화면(폰 가로)에서는 세로만 조금 눌러서 손님이 설 띠를 남긴다.
-     장면 높이 bh = 자연 높이(폭×0.6688)와 「위 136px(HUD 36 + 손님 100) 빼고 카운터 48%」 중 작은 쪽.
-     그림의 위쪽은 화면 밖으로 잘리고, 손님 줄은 카운터 뒤 가장자리(52%)에서 위로 rowh만큼 선다. */
-  var bh=Math.min(D.w*0.6688,(D.h-136)/0.48),crop=Math.max(0,bh-D.h);
+  /* 장면은 kitchen-play(1280×856) 비율을 유지한 채 폭에 맞춘다. 납작한 폰에서는
+     세로를 누르지 않고 위쪽이 잘리며, 손님 줄은 카운터 뒤(compact CSS)에 --rowh로 선다. */
+  var ART_H=856/1280,bh=D.w*ART_H,crop=Math.max(0,bh-D.h);
   stage.style.setProperty('--bh',bh.toFixed(1)+'px');
   stage.style.setProperty('--rowh',Math.max(64,Math.min(0.52*bh,0.52*bh-crop-36)).toFixed(1)+'px');
   var s=Math.min(v.w/D.w,v.h/D.h,MAX_S);
@@ -1893,5 +1944,6 @@ window.__api={chooseDish:chooseDish,selectDish:selectDish,addFromShelf:addFromSh
   setRnd:function(f){rnd=f},refresh:refresh,newDish:newDish,earn:earn,
   fit:fit,view:function(){return VIEW},
   tapSource:tapSource,fliers:function(){return fliers.length},
+  renderFly:function(){renderFly()},renderBench:function(){renderBench()},renderOven:function(){renderOven()},dishFly:function(){return dishFly.length},
   tapAmt:function(i,n){return tapSource(i,srcEls[i],n)}};
 })();

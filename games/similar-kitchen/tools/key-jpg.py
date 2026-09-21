@@ -51,7 +51,9 @@ def convert(src, dst, key='auto', thresh=110):
     kc = None
     if key == 'auto':
         key, med, err = guess_key(px, W, H)
-        if err > 140:
+        # 진한 자홍(예: 194,17,103)도 자홍 배경이다. 초록기가 거의 없고 빨강이 센 색이면 실제 배경색을 기준으로 삼는다
+        magentaish = med[1] < 60 and med[0] > 150 and med[2] > 60
+        if err > 140 and not magentaish:
             print('  ! %s: 배경이 초록/자홍 단색이 아닌 것 같아요 (모서리 색 %s). 그대로 시도합니다.' % (os.path.basename(src), med))
         else:
             # 생성기는 정확히 #FF00FF를 못 낸다(분홍에 가까운 자홍이 나온다). 실제 배경색을 기준으로 삼는다

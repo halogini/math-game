@@ -550,17 +550,19 @@ html.compact .play-scene .trash{width:48px;height:58px}
 #rankMsg.err{color:var(--bad);font-weight:700}
 
 /* =====================================================================
-   장면 배치 v2 (태블릿·PC, html.scene-v2)
+   장면 배치 v2 (html.scene-v2)
    kitchen-play.png(1280x856) 한 장이 배경이고, 조작 요소를 그 위 정해진 자리에 올린다.
    자리는 그림에서 잰 좌표를 %로 적은 것이다(가로 1280, 세로 856 기준).
+   장면은 비율을 유지한 채 폭에 맞추고 하단에 붙인다. 폰처럼 납작하면 위쪽만 잘린다.
    #play를 앞에 붙여서 기존 .play-scene / .compact 규칙보다 항상 이기게 한다.
    ===================================================================== */
-html.scene-v2 #play{background:#411f1d}
+html.scene-v2 #play{background:#411f1d;overflow:hidden}
 html.scene-v2 #play .scene-bg{background:#411f1d;background-image:none}   /* 그림 위에 남는 띠 = 천장 보 색 */
+/* 장면은 그림 비율(1280/856)을 유지하고 하단에 붙인다. 폰처럼 납작하면 위쪽만 잘린다(찌그러지지 않음). */
 html.scene-v2 #play .scene-body{
   position:absolute;left:0;right:0;bottom:0;width:100%;height:var(--bh,auto);aspect-ratio:1280/856;
   padding:0;display:block;container-type:size;
-  background:url('assets/kitchen-play.png') center/100% 100% no-repeat;
+  background:url('assets/kitchen-play.png') center bottom / 100% 100% no-repeat;
   image-rendering:auto;
 }
 /* 기존 가로줄 레이아웃을 풀어서 각 칸이 장면 기준으로 자리를 잡게 한다 */
@@ -665,7 +667,7 @@ html.scene-v2 #play .src.locked .src-x1{display:none}
 
 /* =====================================================================
    폰 가로(html.compact): 같은 장면을 쓰되, 손님 줄은 「카운터 뒤 가장자리에서 위로 --rowh」 안에 들어가게 줄인다.
-   장면은 세로로 눌리고 위쪽이 잘리므로(game.js fit()), 손님·말풍선 크기는 cqh가 아니라 --rowh에서 뺀다.
+   장면 비율은 유지되고 위쪽만 잘리므로(game.js fit()), 손님·말풍선 크기는 cqh가 아니라 --rowh에서 뺀다.
    ===================================================================== */
 html.compact.scene-v2 #play .custrow{top:auto;bottom:48%;height:var(--rowh,100px);gap:1%}
 html.compact.scene-v2 #play .slot{gap:0}
