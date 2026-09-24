@@ -18,7 +18,7 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="description" content="사자·코끼리 같은 큰 동물 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
 
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=18">
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -38,32 +38,41 @@
   <button id="sndBtn" title="소리 켜기/끄기">🔊</button>
 </div>
 
-<!-- 시작 -->
+<!-- 시작: 논리 화면 720×360 안에 스크롤 없이 다 보이게 둔다 -->
 <section id="intro" class="screen on">
+  <div class="intro-cast" aria-hidden="true">
+    <img src="assets/cust-lion.png" alt="">
+    <img src="assets/cust-tiger.png" alt="">
+    <img src="assets/cust-elephant.png" alt="">
+    <img src="assets/cust-giraffe.png" alt="">
+  </div>
   <div class="intro">
-    <div class="big">🦁🐯🐘🦒 🥖🍞🍰</div>
     <h1>냥셰프의 빵집</h1>
     <div class="sub">4라운드 · 큰 동물 손님들의 주문</div>
-    <ol>
-      <li>🦁🐯🐘 사자·코뿔소처럼 <b>몸집 큰 동물 손님</b>들이 빵집에 몰려와요! 우리 크기 빵의 <b>몇 배 크기</b>를 주문해요.</li>
-      <li><b>재료 선반</b>에서 빵 열의 <b>개수(1·5·10…)</b>를 톡하면 접시에 바로 쌓여요.</li>
-      <li><b>오븐</b>에 넣으면 화면이 집중 모드로 바뀌고, <b>박자에 맞춰 톡!</b></li>
-      <li>완성품을 <b>손님에게 끌어다 놓으면</b> 서빙! 번 코인으로 <b>가게를 업그레이드</b>해요!</li>
+    <ol class="intro-steps">
+      <li><b>1. 주문</b><span><b class="em">몇 배</b> 크기로<br>만들어 주세요</span></li>
+      <li><b>2. 재료</b><span>개수를 톡하면<br>접시에 쌓여요</span></li>
+      <li><b>3. 굽기</b><span>오븐에 넣고<br>박자에 맞춰 톡!</span></li>
+      <li><b>4. 서빙</b><span>끌어다 놓으면<br>코인으로 업그레이드</span></li>
     </ol>
-    <p class="profile-lead" id="profileLead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
-    <div class="profile">
-      <div class="pf">
-        <label for="inName" id="labName">이름:</label>
-        <input type="text" id="inName" maxlength="12" placeholder="예: 홍길동" autocomplete="nickname">
+    <div class="intro-go">
+      <p class="profile-lead" id="profileLead">이름과 학번을 입력해야 시작할 수 있습니다.</p>
+      <div class="intro-go-row">
+        <div class="profile">
+          <div class="pf">
+            <label for="inName" id="labName">이름:</label>
+            <input type="text" id="inName" maxlength="12" placeholder="예: 홍길동" autocomplete="nickname">
+          </div>
+          <div class="pf" id="idGroup">
+            <label for="inId" id="labId">학번:</label>
+            <input type="text" id="inId" maxlength="10" placeholder="4글자로 입력 (예: 2230)" autocomplete="off">
+          </div>
+        </div>
+        <button class="btn" id="startBtn">영업 시작 ▶</button>
       </div>
-      <div class="pf" id="idGroup">
-        <label for="inId" id="labId">학번:</label>
-        <input type="text" id="inId" maxlength="10" placeholder="4글자로 입력 (예: 2230)" autocomplete="off">
-      </div>
+      <div class="perr" id="pErr"></div>
+      <div class="priv"><a href="../../privacy.html" target="_blank" rel="noopener noreferrer">개인정보처리방침</a></div>
     </div>
-    <div class="perr" id="pErr"></div>
-    <button class="btn" id="startBtn">영업 시작 ▶</button>
-    <div class="priv"><a href="../../privacy.html" target="_blank" rel="noopener noreferrer">개인정보처리방침</a></div>
   </div>
 </section>
 
@@ -196,6 +205,6 @@
 <script src="../../shared/halomath-profile.js"></script>
 <script src="../../shared/halomath-play-stats.js"></script>
 <script src="../../shared/halomath-scores.js"></script>
-<script src="game.js?v=17"></script>
+<script src="game.js?v=25"></script>
 </body>
 </html>

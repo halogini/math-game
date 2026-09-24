@@ -663,11 +663,17 @@ function ovenToStage(x,y){
 }
 /* 빵이 도마에서 오븐 입구로 들어가고(in), 다 구워지면 입구에서 도마로 나오는(out) 연출.
    규칙(S.bench·S.oven)은 바로 바뀌고, 이 그림과 「보이는 시점」만 늦춘다. */
-var ENTER_MS=460,EXIT_MS=560,dishFly=[];
+var ENTER_MS=720,EXIT_MS=560,dishFly=[];
 function benchDishGeom(d){var p=benchToStage(BW/2,BBASE);return{x:p.x,y:p.y,cell:benchCell(d)*p.s}}
-/* 장면에서는 빵이 오븐 입구(도마 끝과 맞닿은 아치)로 들어가고 나온다. 입구에서는 작게 */
+/* 오븐 안 빵 칸. 도마와 같은 크기로 두되, 입구(가로 124·세로 88)보다 크면 그만큼만 줄인다 */
+function ovenCell(d){
+  var b=benchCell(d),e=piecesOn(d)?pieceExt(d,b):{w:Math.max(b,b*(d.n||1)),h:b*1.2};
+  var s=Math.min(1,124/Math.max(8,e.w),88/Math.max(8,e.h));
+  return Math.max(6,Math.round(b*s*4)/4);
+}
+/* 장면에서는 빵이 오븐 아치 바닥으로 들어가고 나온다 */
 function ovenDishGeom(d){
-  if(sceneOven()){var m=ovenToStage(OVEN_MOUTH.x,OVEN_MOUTH.y);return{x:m.x,y:m.y,cell:fitCell(d,46,40,12)*m.s}}
+  if(sceneOven()){var m=ovenToStage(OVEN_REST.x,OVEN_REST.y);return{x:m.x,y:m.y,cell:ovenCell(d)*m.s}}
   var p=ovenToStage(OW/2,228);return{x:p.x,y:p.y,cell:fitCell(d,118,78,28)*p.s}
 }
 function launchDishFly(mode,d){
@@ -718,7 +724,7 @@ function renderFly(){
     var gx=g.ax+(g.bx-g.ax)*ge,gy=g.ay+(g.by-g.ay)*ge-Math.sin(Math.PI*ge)*g.arc;
     var gc=Math.max(3,g.ac+(g.bc-g.ac)*ge);
     fctx.save();
-    fctx.globalAlpha=g.mode==='in'?(gp<0.72?1:(1-gp)/0.28):Math.min(1,gp*5);
+    fctx.globalAlpha=g.mode==='in'?(gp<0.88?1:(1-gp)/0.12):Math.min(1,gp*5);
     drawDishState(fctx,gx,gy,gc,g.dish,g.dish.cooked?1:0);
     fctx.restore();
   }
@@ -940,16 +946,31 @@ function renderChips(){
 /* 오븐 캔버스 = 장면 그림의 (940,140)~(1260,480) 영역. 좌표 1 = 그림 1px.
    OVEN_MOUTH = 입구 안쪽(빵이 드나드는 곳), OVEN_SEE = 옆면에서 안이 비쳐 보이는 타원(가운데·반지름) */
 var OW=320,OH=340,OBASE=262;
-var OVEN_MOUTH={x:52,y:240},OVEN_SEE={x:208,y:186,rx:94,ry:124,floor:250};
+/* 입구 = oven-v3 아치 안쪽 바닥. 그림 (60,368) → 캔버스 (52,198). y=240은 아치 아래 벽돌이라 빵이 입구 밖에 멈췄다 */
+var OVEN_MOUTH={x:72,y:188},OVEN_SEE={x:208,y:186,rx:94,ry:124,floor:250};
+/* 굽는 빵이 머무는 곳 = 옆면 불빛 한가운데 */
+var OVEN_REST={x:208,y:210};
 var ovenFade=null;   /* 다 구운 뒤 옆면 비침이 서서히 사라지는 동안 */
 var ocv=$('ovenCv'),octx=ocv.getContext('2d');
 var focusCv=$('ovenFocusCv'),focusCtx=focusCv?focusCv.getContext('2d'):null;
 var FOCUS_W=220,FOCUS_H=220;
+function placeOvenFocus(){
+  var panel=document.querySelector('.oven-focus-panel'),st=stage.getBoundingClientRect();
+  var bench=document.querySelector('.bench-station');
+  if(!panel||!st.width||!bench)return;
+  var br=bench.getBoundingClientRect();
+  var left=st.left+6;
+  panel.style.left=left+'px';
+  panel.style.width=Math.max(160,br.right-left)+'px';
+  panel.style.top=br.top+'px';
+  panel.style.height=br.height+'px';
+}
 function setOvenFocus(on){
   var el=$('ovenFocus');if(!el)return;
   el.hidden=!on;el.classList.toggle('is-on',!!on);
   document.documentElement.classList.toggle('oven-focus-on',!!on);
-  if(!on&&focusCtx)focusCtx.clearRect(0,0,FOCUS_W,FOCUS_H);
+  if(on)placeOvenFocus();
+  else if(focusCtx)focusCtx.clearRect(0,0,FOCUS_W,FOCUS_H);
 }
 function toOven(){
   if(S.phase!=='play'||S.guide||isOvenFocus())return;
@@ -1118,7 +1139,7 @@ function ovenSeeThrough(a,d,prog){
   var rg=c.createRadialGradient(E.x+30,E.floor-10,4,E.x+30,E.floor-10,E.rx*1.1);   /* 안쪽 끝 불씨 */
   rg.addColorStop(0,'rgba(255,190,90,'+(0.75*flick)+')');rg.addColorStop(1,'rgba(255,120,40,0)');
   c.fillStyle=rg;c.fillRect(x0,y0,x1-x0,y1-y0);
-  if(d)drawDishState(c,E.x,E.floor,fitCell(d,E.rx*1.8,E.ry*0.9,30),d,prog);
+  /* 빵은 옆면 창이 아니라 입구에 그린다. 날아 들어온 자리와 같아야 한다 */
   c.strokeStyle='rgba(210,200,190,.2)';c.lineWidth=2;         /* 벽 너머로 본다는 느낌: 돌 줄눈을 옅게 */
   for(var y=y0+14,r=0;y<y1;y+=34,r++){
     c.beginPath();c.moveTo(x0,y+4);c.lineTo(x1,y-4);c.stroke();
@@ -1145,7 +1166,11 @@ function renderOvenScene(){
   var o=S.oven,d=o.dish,now=performance.now();
   if(d&&o.state==='cooking'){
     var age=o.showAt?now-o.showAt:1e9;if(age<0)return;          /* 빵이 입구로 들어가는 동안은 아직 안 비친다 */
-    ovenSeeThrough(clamp(age/350,0,1),d,Math.min(0.95,o.n/o.need));
+    var pr=Math.min(0.95,o.n/o.need);
+    ovenSeeThrough(clamp(age/350,0,1),d,pr);
+    octx.save();octx.globalAlpha=clamp(age/180,0,1);
+    drawDishState(octx,OVEN_REST.x,OVEN_REST.y,ovenCell(d),d,pr);
+    octx.restore();
     return;
   }
   if(ovenFade){
@@ -1435,9 +1460,21 @@ function moveGhost(x,y){
   ghost.style.transform='translate('+(p.x-drag.ox-gm.gcx*gm.vscale)+'px,'+(p.y-drag.oy-gm.gbaseY*gm.vscale)+'px)';
 }
 function targetAt(x,y){
-  var el=document.elementFromPoint(x,y);if(!el)return {};
-  var sl=el.closest&&el.closest('.slot');
-  return {slot:sl?slotEls.indexOf(sl):-1,trash:!!(el.closest&&el.closest('#trash')),oven:!!(el.closest&&el.closest('#ovenBox'))};
+  /* 손님 그림은 도마·오븐 칸 뒤에 있다. 맨 위만 보면 말풍선에만 놓을 수 있다. */
+  var list=document.elementsFromPoint?document.elementsFromPoint(x,y):[];
+  if(!list.length){var one=document.elementFromPoint(x,y);if(one)list=[one]}
+  var slot=-1,trash=false,oven=false;
+  for(var i=0;i<list.length;i++){
+    var el=list[i];if(!el.closest)continue;
+    if(slot<0){
+      var part=el.closest('.cat')||el.closest('.bubble');
+      var sl=part&&part.closest('.slot');
+      if(sl&&!sl.classList.contains('empty'))slot=slotEls.indexOf(sl);
+    }
+    if(!trash&&el.closest('#trash'))trash=true;
+    if(!oven&&el.closest('#ovenBox'))oven=true;
+  }
+  return {slot:slot,trash:trash,oven:oven};
 }
 function hoverTargets(x,y){
   var t=targetAt(x,y);
@@ -1572,7 +1609,7 @@ function setOverlay(id,on){
   if(on)el.style.display='flex';else el.style.display='';
 }
 function startRound(r,withGuide){
-  G.round=r;newRound(r);drag=null;fx=[];fxClear();fliers.length=0;dishFly.length=0;
+  G.round=r;newRound(r);fx=[];fxClear();clearFlight();
   shake.mag=0;shake.until=0;applyStage(0,0);
   setOvenFocus(false);
   setOverlay('endConfirm',false);
@@ -1639,8 +1676,33 @@ function row(a,b){return '<tr><td>'+a+'</td><td class="r">'+(b>0?'+':'')+b+'</td
 function ledgerRows(o){
   return row('서빙 보상',o.reward)+row('빨리 서빙 보너스',o.patience)+row('콤보 보너스',o.combo)+row('닮은 모양이 아닌 빵 서빙 ('+o.notSimilar+'회)',-o.penalty);
 }
+/* 라운드가 끝나는 프레임에는 루프가 날아가는 빵을 더 그리지 않는다.
+   그때 무대 캔버스·끌고 있던 그림에 남은 빵이 장부 위에 그대로 보인다. */
+function clearFlight(){
+  fliers.length=0;dishFly.length=0;
+  if(fctx){
+    fctx.save();
+    fctx.setTransform(1,0,0,1,0,0);
+    fctx.clearRect(0,0,flyCv.width,flyCv.height);
+    fctx.restore();
+    flyDirty=false;
+  }
+  if(bctx)bctx.clearRect(0,0,BW,BH);
+  if(octx)octx.clearRect(0,0,OW,OH);
+  if(drag){
+    try{if(drag.cnv)drag.cnv.releasePointerCapture(drag.pid)}catch(err){}
+    drag=null;
+  }
+  document.documentElement.classList.remove('dragging');
+  if(ghost)ghost.style.display='none';
+  var trash=$('trash');if(trash)trash.classList.remove('drop');
+  var box=$('ovenBox');if(box)box.classList.remove('drop');
+  if(S)S.hover=-1;
+}
 function finishRound(){
   S.phase='roundEnd';
+  S.bench=null;S.oven=ovenIdle();S.sel=null;
+  clearFlight();
   setOvenFocus(false);
   setEndBtn(true);
   shake.mag=0;shake.until=0;applyStage(0,0);fxClear();
@@ -1717,6 +1779,8 @@ $('endConfirmBtn').onclick=confirmEndGame;
 $('endCancelBtn').onclick=cancelEndGame;
 
 function finishGame(){
+  if(S){S.bench=null;if(G.u)S.oven=ovenIdle();S.sel=null}
+  clearFlight();
   setOvenFocus(false);
   setEndBtn(false);
   setOverlay('endConfirm',false);
@@ -1992,6 +2056,7 @@ function fit(){
   if(setupCanvases())invalidate();
   syncFly();
   layoutChrome();
+  if(isOvenFocus())placeOvenFocus();
   renderDbg();
 }
 var fitQ=0;
