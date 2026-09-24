@@ -18,7 +18,7 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="description" content="사자·코끼리 같은 큰 동물 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
 
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -85,7 +85,10 @@
       <div class="counter-rail">
         <div class="sources" id="sources"></div>
         <div class="station trash-station">
-          <div class="trash" id="trash" title="끌어서 버리기"></div>
+          <div class="trash" id="trash" title="끌어서 버리기">
+            <img class="trash-body" src="assets/trash-body-v3.png" alt="" draggable="false">
+            <img class="trash-lid" src="assets/trash-lid-v3.png" alt="" draggable="false">
+          </div>
         </div>
         <div class="station shelf-station">
           <div class="shelfgrid" id="shelf"></div>
@@ -94,16 +97,17 @@
           <div class="station-label"><span id="benchInfo"></span></div>
           <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
           <div class="bench-actions">
-            <button class="btn ghost" id="um1" title="1개 빼기">↩</button>
-            <button class="btn ghost" id="clearBtn" title="비우기">🧹</button>
-            <button class="btn" id="toOven" title="오븐에 넣기">🔥</button>
+            <button class="btn ghost" id="um1" title="1개 빼기">되돌리기</button>
+            <button class="btn ghost" id="clearBtn" title="비우기">비우기</button>
+            <button class="btn" id="toOven" title="오븐에 넣기">굽기</button>
           </div>
         </div>
         <div class="station oven-station card oven" id="ovenBox">
+          <img class="oven-art" src="assets/oven-v3.png" alt="" draggable="false">
+          <canvas id="ovenCv" width="320" height="340"></canvas>
           <div class="oven-head">
             <button type="button" class="upg" id="ovenUp"></button>
           </div>
-          <canvas id="ovenCv" width="260" height="280"></canvas>
         </div>
       </div>
     </div>
@@ -192,6 +196,6 @@
 <script src="../../shared/halomath-profile.js"></script>
 <script src="../../shared/halomath-play-stats.js"></script>
 <script src="../../shared/halomath-scores.js"></script>
-<script src="game.js?v=16"></script>
+<script src="game.js?v=17"></script>
 </body>
 </html>
