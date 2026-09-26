@@ -93,8 +93,8 @@ var PAT_SCALE=0.6;
 /* 화나서 떠난 손님이 판 전체(4라운드)에서 이 수가 되면 가게가 무너진다 */
 var COLLAPSE_AT=5;
 var ANIMALS=[
-  ['🦁','사자','cust-lion'],['🐯','호랑이','cust-tiger'],['🦛','하마','cust-hippo'],
-  ['🐘','코끼리','cust-elephant'],['🦒','기린','cust-giraffe'],['🦏','코뿔소','cust-rhino'],['🐻','곰','cust-bear']
+  ['🦁','사자','cust2-lion'],['🐯','호랑이','cust2-tiger'],['🦛','하마','cust2-hippo'],
+  ['🐘','코끼리','cust2-elephant'],['🦒','기린','cust2-giraffe'],['🦏','코뿔소','cust2-rhino'],['🐻','곰','cust2-bear']
 ];
 var DISHES=[
   {name:'냥 바게트',ing:'반죽',ico:'🥖',dim:1,max:15,tile:'#e8a94f',edge:'#b8742a',raw:'#f6e6c8',rawEdge:'#dcc08e',unit:'개',unlockR:1},
@@ -344,13 +344,23 @@ window.__S=function(){return S};window.__G=function(){return G};
 
 /* 손님 만들기 */
 /* ===== 새 손님 종류 =====
-   roo = 캥거루(만족시키면 주머니에서 아기가 나와 같은 빵을 1 : 1로 한 번 더 주문. 이때 손님은 joey = 아기가 나온 캥거루)
+   roo = 캥거루(만족시키면 자리를 뜨지 않고, 아기가 나온 모습으로 바뀌어 같은 빵을 1 : 1로 한 번 더 주문. 이때 kind는 joey)
    hurry = 급한 손님(예전 인내심의 절반, 보상 ×1.5, 2배 주문만).
    [종류, 이 라운드부터]. 한 번에 한 종류씩만 화면에 나온다. 첫 손님은 늘 보통 손님이다 */
 var KINDS=[['roo',1],['hurry',4]];
 var KIND_CHANCE=0.25,HURRY_MULT=1.5;
 /* 그림이 생기기 전까지는 이모지로 보인다. 그림이 생기면 spr에 파일 이름(assets/*.png, 확장자 없이)을 넣는다 */
-var KIND_LOOK={roo:['🦘','캥거루',''],joey:['🦘','아기 캥거루',''],hurry:['🐰','거대 토끼','']};   // 그림: roo=cust-kangaroo, joey=cust-kangaroo-joey, hurry=cust-rabbit
+var KIND_LOOK={roo:['🦘','캥거루','cust2-kangaroo'],joey:['🦘','아기 캥거루','cust2-kangaroo-joey'],hurry:['🐎','경주마','cust2-horse']};
+/* 표정 프레임이 있는 손님 그림(tools/face-frames.py가 만든 -blink, -happy). 기본 그림 위에 겹쳐 두고 CSS로 켠다:
+   기다릴 때 가끔 눈 깜빡임, 서빙 성공(.happy)이면 웃는 얼굴. 윤곽은 기본 그림과 픽셀까지 같아 넘겨도 떨리지 않는다 */
+/* 손님 그림 버전. 같은 파일 이름으로 그림을 바꾸면 이 숫자를 올린다(태블릿이 예전 그림을 저장해 두고 계속 보여 주지 않게) */
+var ART_V=3;
+var FACE_FRAMES={};   // 2026-09-26: 손님 그림을 「배경만 지우기」로 바꿔 예전 프레임과 어긋난다. tools/face-frames.py를 원본 격자(약 57칸)에 맞게 고친 뒤 다시 만들어 넣는다
+function faceFrames(spr){
+  if(!FACE_FRAMES[spr])return '';
+  return '<span class="fr fr-blink"><img class="guest-spr" alt="" src="assets/'+spr+'-blink.png?v='+ART_V+'"></span>'
+    +'<span class="fr fr-happy"><img class="guest-spr" alt="" src="assets/'+spr+'-happy.png?v='+ART_V+'"></span>';
+}
 function pickKind(){
   if(G.first)return '';
   var live={};S.cust.forEach(function(c){if(c.state!=='gone'&&c.kind)live[c.kind]=1});
@@ -1410,7 +1420,7 @@ var slotEls=[],SLOT_W=110,SLOT_H=160,CARD_BAR=18;
   var row=$('custRow');
   for(var i=0;i<SLOTS;i++){
     var d=document.createElement('div');d.className='slot empty';
-    d.innerHTML='<div class="bubble"><div class="bubble-body"><canvas width="'+SLOT_W+'" height="'+SLOT_H+'"></canvas><i class="pat"><i class="bubble-fill"></i></i></div></div>'
+    d.innerHTML='<div class="bubble"><div class="bubble-body"><canvas width="'+SLOT_W+'" height="'+SLOT_H+'"></canvas><i class="pat"><i class="bubble-fill"></i></i></div><b class="giant-stamp">특대</b></div>'
       +'<div class="cat">🪑</div>';
     (function(idx){d.addEventListener('click',function(){
       if(S.phase!=='play'||S.guide||isOvenFocus())return;
@@ -1496,7 +1506,7 @@ function renderSlots(){
     el.className='slot'+(c.giant?' giant':'')+(c.kind?' k-'+c.kind:'')+(el.classList.contains('enter')?' enter':'')+(c.state==='happy'?' happy':c.state==='angry'?' angry':(showGot?' sad':''))+(low?' low':'')+(S.hover===i?' drop':'');
     var md=c.state==='happy'?'💖':c.state==='angry'?'💢':(showGot?(c.mood||'💧'):(low?'💢':''));
     var html=c.spr
-      ?('<img class="guest-spr" alt="" src="assets/'+c.spr+'.png">'+(md?'<span class="md">'+md+'</span>':''))
+      ?('<img class="guest-spr" alt="" src="assets/'+c.spr+'.png?v='+ART_V+'">'+faceFrames(c.spr)+(md?'<span class="md">'+md+'</span>':''))
       :('<span class="guest-emo">'+c.an+'</span>'+(md?'<span class="md">'+md+'</span>':''));
     if(c.kind==='hurry')html+='<span class="kind-badge">⏰</span>';   // 급한 손님: 시계로 바로 읽히게
     if(cat.innerHTML!==html)cat.innerHTML=html;
@@ -1534,7 +1544,6 @@ function serveDish(src,c){
     if(q>=0.9)floatAtSlot(c.slot,'완벽하게 구웠어요!','ok');
     flyCoins(c.slot,gain);
     sfx(c.giant?'giant':'serve');
-    if(c.giant)doShake(5,320);
     if(S.streak%3===0){comboBanner('콤보 ×'+S.streak+'  +'+COMBO_BONUS);sfx('combo')}
     toast(msg);
   }else if(r==='raw'){
@@ -1825,9 +1834,18 @@ function update(dt){
       if(c.wait>=c.pat){c.state='angry';c.until=S.time+0.9;S.streak=0;S.left++;G.leftAll++;sfx('angry');floatAtSlot(c.slot,'떠났어요','bad');toast('💢 손님이 화나서 떠났어요');shopWarn()}
     }else if((c.state==='happy'||c.state==='angry')&&S.time>=c.until){
       var sp=c.state==='happy'?c.speed:0;
-      /* 캥거루를 만족시키면 주머니에서 아기 캥거루가 나오고, 같은 빵을 원본 크기(1 : 1)로 한 번 더 주문한다 */
-      if(c.kind==='roo'&&c.state==='happy'){var j=makeCust(false,{kind:'joey',dish:c.dish,k:1});j.slot=c.slot;S.cust.push(j);floatAtSlot(c.slot,'아기도 주문해요!','ok');sfx('arrive')}
-      c.state='gone';callNext(sp);c.slot=-1;
+      /* 캥거루를 만족시키면 자리를 뜨지 않는다. 같은 손님이 아기가 나온 모습으로 바뀌고, 같은 빵을 1:1로 한 번 더 주문한다 */
+      if(c.kind==='roo'&&c.state==='happy'){
+        var an=KIND_LOOK.joey;
+        c.kind='joey';c.an=an[0];c.anName=an[1];c.spr=an[2]||'';
+        c.k=1;c.N=needOf(c.dish,1);
+        c.pat=Math.round((44+7*Math.sqrt(c.N))*PAT_SCALE);
+        c.wait=0;c.fails=0;c.got=null;c.gotUntil=0;c.mood='';c.animT0=null;
+        c.state='wait';
+        floatAtSlot(c.slot,'아기도 주문해요!','ok');sfx('arrive');
+      }else{
+        c.state='gone';callNext(sp);c.slot=-1;
+      }
     }
   });
   if(S.phase!=='play')return;          // 방금 가게가 무너졌다
