@@ -95,6 +95,7 @@ function initBingsoo2Game() {
   let highScore = parseInt(safeGetStorage(highScoreStorageKey, '0'), 10);
   
   let studentPositions = [];
+  let layoutAttempt = 0;
   let targetPoint = { x: 0, y: 0, radius: 0 };
   let placedPoint = null;
   let initialSubmittedPoint = null;
@@ -491,6 +492,15 @@ function initBingsoo2Game() {
   // Round Loading & Point Generation
   // ----------------------------------------------------
   function loadRound(roundNum) {
+    const widthNow = gameBoard.clientWidth;
+    const heightNow = gameBoard.clientHeight;
+    if ((widthNow < 80 || heightNow < 80) && layoutAttempt < 12) {
+      layoutAttempt += 1;
+      requestAnimationFrame(() => loadRound(roundNum));
+      return;
+    }
+    layoutAttempt = 0;
+
     isAnswerChecked = false;
     placedPoint = null;
     initialSubmittedPoint = null;
@@ -679,17 +689,27 @@ function initBingsoo2Game() {
 
   function generateStandardFallback(width, height, padding) {
     const compact = isCompactViewport();
-    const R = compact ? 120 : Math.round(Math.min(width, height) * 0.36);
-    targetPoint = { x: width / 2, y: height / 2, radius: R };
+    const topPad = padding + 36;
+    const bottom = height - padding;
+    const span = Math.max(48, bottom - topPad);
+    const maxR = Math.max(48, Math.min(
+      (width / 2 - padding) / 0.8,
+      span / 1.35
+    ));
+    const preferred = compact ? 120 : Math.round(Math.min(width, height) * 0.36);
+    const R = Math.min(preferred, maxR);
+    const cy = topPad + R * 0.55;
+    targetPoint = { x: width / 2, y: cy, radius: R };
     studentPositions = [
-      { name: '친구 A', baseEmoji: '👦', x: width / 2 - Math.round(R * 0.8), y: height / 2 - Math.round(R * 0.55), currentEmoji: '🤔' },
-      { name: '친구 B', baseEmoji: '👧', x: width / 2 + Math.round(R * 0.8), y: height / 2 - Math.round(R * 0.55), currentEmoji: '🤔' },
-      { name: '친구 C', baseEmoji: '🧑', x: width / 2, y: height / 2 + Math.round(R * 0.8), currentEmoji: '🤔' }
+      { name: '친구 A', baseEmoji: '👦', x: width / 2 - Math.round(R * 0.8), y: cy - Math.round(R * 0.55), currentEmoji: '🤔' },
+      { name: '친구 B', baseEmoji: '👧', x: width / 2 + Math.round(R * 0.8), y: cy - Math.round(R * 0.55), currentEmoji: '🤔' },
+      { name: '친구 C', baseEmoji: '🧑', x: width / 2, y: cy + Math.round(R * 0.8), currentEmoji: '🤔' }
     ];
   }
 
   function isPointInside(pt, width, height, pad) {
-    return pt.x >= pad && pt.x <= width - pad && pt.y >= pad && pt.y <= height - pad;
+    const topPad = pad + 36;
+    return pt.x >= pad && pt.x <= width - pad && pt.y >= topPad && pt.y <= height - pad;
   }
 
   function randomRange(min, max) {
@@ -699,6 +719,17 @@ function initBingsoo2Game() {
   // ----------------------------------------------------
   // Render Students
   // ----------------------------------------------------
+  function paintStudentEmoji(box, expr) {
+    if (!box) return;
+    const text = expr && !expr.endsWith('\uFE0F') ? `${expr}\uFE0F` : expr;
+    let glyph = box.querySelector('.emoji-glyph');
+    if (!glyph) {
+      box.innerHTML = '<span class="emoji-glyph"></span>';
+      glyph = box.querySelector('.emoji-glyph');
+    }
+    if (glyph) glyph.textContent = text;
+  }
+
   function renderStudents() {
     studentPositions.forEach((st, idx) => {
       let el = document.getElementById(`student-pin-${idx}`);
@@ -710,7 +741,7 @@ function initBingsoo2Game() {
       }
       el.style.left = `${st.x}px`;
       el.style.top = `${st.y}px`;
-      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}">🤔</div>`;
+      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}"><span class="emoji-glyph">🤔\uFE0F</span></div>`;
     });
   }
 
@@ -1242,7 +1273,7 @@ function initBingsoo2Game() {
         <div class="crosshair-v"></div>
         <div class="crosshair-dot"></div>
       </div>
-      <div class="bingsoo-icon-wrapper">🍨</div>
+      <div class="bingsoo-icon-wrapper"><span class="emoji-glyph">🍨\uFE0F</span></div>
       <div class="bingsoo-label">내 팥빙수</div>
     `;
   }
@@ -1477,7 +1508,7 @@ function initBingsoo2Game() {
       st.currentEmoji = expr;
       const box = document.getElementById(`student-emoji-${idx}`);
       const pin = document.getElementById(`student-pin-${idx}`);
-      if (box) box.textContent = expr;
+      paintStudentEmoji(box, expr);
       if (pin) pin.className = `student-pin ${moodClass}`;
     });
   }
@@ -1487,7 +1518,7 @@ function initBingsoo2Game() {
       st.currentEmoji = '🤔';
       const box = document.getElementById(`student-emoji-${idx}`);
       const pin = document.getElementById(`student-pin-${idx}`);
-      if (box) box.textContent = '🤔';
+      paintStudentEmoji(box, '🤔');
       if (pin) pin.className = 'student-pin mood-neutral';
     });
   }

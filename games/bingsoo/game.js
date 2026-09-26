@@ -93,6 +93,7 @@ function initBingsooGame() {
   
   let studentPositions = [];
   let targetPoint = { x: 0, y: 0 };
+  let layoutAttempt = 0;
   let placedPoint = null;
   let isAnswerChecked = false;
   let isDraggingBingsoo = false;
@@ -338,6 +339,15 @@ function initBingsooGame() {
   // Round Loading & Point Generation Algorithms
   // ----------------------------------------------------
   function loadRound(roundNum) {
+    const widthNow = gameBoard.clientWidth;
+    const heightNow = gameBoard.clientHeight;
+    if ((widthNow < 80 || heightNow < 80) && layoutAttempt < 12) {
+      layoutAttempt += 1;
+      requestAnimationFrame(() => loadRound(roundNum));
+      return;
+    }
+    layoutAttempt = 0;
+
     isAnswerChecked = false;
     placedPoint = null;
     ctx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
@@ -353,7 +363,8 @@ function initBingsooGame() {
 
     const width = gameBoard.clientWidth || 800;
     const height = gameBoard.clientHeight || 500;
-    const padding = 60;
+    const minSide = Math.min(width, height);
+    const padding = minSide < 480 ? Math.max(32, Math.round(minSide * 0.11)) : 60;
 
     if (roundNum <= 3) {
       generateStandardLayout(width, height, padding);
@@ -368,14 +379,22 @@ function initBingsooGame() {
   function generateStandardLayout(width, height, padding) {
     let valid = false;
     let attempts = 0;
+    const minSide = Math.min(width, height);
+    const minR = Math.min(100, Math.max(64, minSide * 0.24));
+    const maxR = Math.max(minR + 8, minSide * 0.38);
+    const inner = Math.min(width, height) - padding * 2;
+    if (inner < minR * 1.6) {
+      generateFittedFallback(width, height, padding);
+      return;
+    }
 
     while (!valid && attempts < 200) {
       attempts++;
       const target = {
-        x: randomRange(padding + 50, width - padding - 50),
-        y: randomRange(padding + 50, height - padding - 50)
+        x: randomRange(padding + minR * 0.35, width - padding - minR * 0.35),
+        y: randomRange(padding + minR * 0.35, height - padding - minR * 0.35)
       };
-      const R = randomRange(100, Math.min(width, height) * 0.38);
+      const R = randomRange(minR, maxR);
 
       const angle1 = randomRange(0, Math.PI * 2);
       const angle2 = angle1 + randomRange(Math.PI * 0.5, Math.PI * 0.85);
@@ -398,6 +417,30 @@ function initBingsooGame() {
         valid = true;
       }
     }
+
+    if (!valid) generateFittedFallback(width, height, padding);
+  }
+
+  function generateFittedFallback(width, height, padding) {
+    const topPad = padding + 36;
+    const bottom = height - padding;
+    const span = Math.max(48, bottom - topPad);
+    const cx = width / 2;
+    const R = Math.max(36, Math.min(
+      (width / 2 - padding) / 0.87,
+      span / 1.5,
+      Math.min(width, height) * 0.34
+    ));
+    const cy = topPad + R;
+    const angles = [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6];
+    const emojis = ['👦', '👧', '🧑'];
+    targetPoint = { x: cx, y: cy };
+    studentPositions = angles.map((angle, idx) => ({
+      baseEmoji: emojis[idx],
+      x: cx + R * Math.cos(angle),
+      y: cy + R * Math.sin(angle),
+      currentEmoji: '🤔'
+    }));
   }
 
   function generateSpecialLayout(width, height, padding) {
@@ -410,7 +453,9 @@ function initBingsooGame() {
         x: randomRange(padding + 60, width - padding - 60),
         y: randomRange(padding + 60, height - padding - 60)
       };
-      const R = randomRange(110, Math.min(width, height) * 0.42);
+      const minSide = Math.min(width, height);
+      const minR = Math.min(110, Math.max(70, minSide * 0.26));
+      const R = randomRange(minR, Math.max(minR + 8, minSide * 0.42));
 
       const angle1 = randomRange(0, Math.PI * 2);
       const deltaAngle = (attempts % 2 === 0) ? randomRange(Math.PI * 0.9, Math.PI * 1.05) : randomRange(Math.PI * 0.3, Math.PI * 0.45);
@@ -441,7 +486,8 @@ function initBingsooGame() {
   }
 
   function isPointInside(pt, width, height, pad) {
-    return pt.x >= pad && pt.x <= width - pad && pt.y >= pad && pt.y <= height - pad;
+    const topPad = pad + 36;
+    return pt.x >= pad && pt.x <= width - pad && pt.y >= topPad && pt.y <= height - pad;
   }
 
   function randomRange(min, max) {
@@ -449,6 +495,17 @@ function initBingsooGame() {
   }
 
   // Render Student Pins
+  function paintStudentEmoji(box, expr) {
+    if (!box) return;
+    const text = expr && !expr.endsWith('\uFE0F') ? `${expr}\uFE0F` : expr;
+    let glyph = box.querySelector('.emoji-glyph');
+    if (!glyph) {
+      box.innerHTML = '<span class="emoji-glyph"></span>';
+      glyph = box.querySelector('.emoji-glyph');
+    }
+    if (glyph) glyph.textContent = text;
+  }
+
   function renderStudents() {
     studentPositions.forEach((st, idx) => {
       let el = document.getElementById(`student-pin-${idx}`);
@@ -460,7 +517,7 @@ function initBingsooGame() {
       }
       el.style.left = `${st.x}px`;
       el.style.top = `${st.y}px`;
-      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}">🤔</div>`;
+      el.innerHTML = `<div class="student-emoji-box" id="student-emoji-${idx}"><span class="emoji-glyph">🤔\uFE0F</span></div>`;
     });
   }
 
@@ -498,7 +555,7 @@ function initBingsooGame() {
       st.currentEmoji = expr;
       const box = document.getElementById(`student-emoji-${idx}`);
       const pin = document.getElementById(`student-pin-${idx}`);
-      if (box) box.textContent = expr;
+      paintStudentEmoji(box, expr);
       if (pin) pin.className = `student-pin ${moodClass}`;
     });
   }
@@ -508,7 +565,7 @@ function initBingsooGame() {
       st.currentEmoji = '🤔';
       const box = document.getElementById(`student-emoji-${idx}`);
       const pin = document.getElementById(`student-pin-${idx}`);
-      if (box) box.textContent = '🤔';
+      paintStudentEmoji(box, '🤔');
       if (pin) pin.className = 'student-pin mood-neutral';
     });
   }
@@ -601,7 +658,7 @@ function initBingsooGame() {
     pin.style.left = `${placedPoint.x}px`;
     pin.style.top = `${placedPoint.y}px`;
     pin.innerHTML = `
-      <div class="bingsoo-icon">🍨</div>
+      <div class="bingsoo-icon"><span class="emoji-glyph">🍨\uFE0F</span></div>
       <div class="bingsoo-label">내 팥빙수</div>
     `;
 

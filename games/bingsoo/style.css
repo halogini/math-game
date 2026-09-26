@@ -18,7 +18,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Pretendard', 'Outfit', sans-serif;
+  font-family: 'Pretendard', 'Outfit', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -231,6 +231,10 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 10;
+  /* iOS clips transformed children inside overflow:hidden + border-radius
+     unless this layer is composited on its own. */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Responsive Guidance Banner */
@@ -263,12 +267,12 @@ body {
 /* Student Pin Styles */
 .student-pin {
   position: absolute;
-  transform: translate(-50%, -50%);
+  -webkit-transform: translate3d(-50%, -50%, 0);
+  transform: translate3d(-50%, -50%, 0);
   display: flex;
   flex-direction: column;
   align-items: center;
   pointer-events: none;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .student-emoji-box {
@@ -281,8 +285,26 @@ body {
   justify-content: center;
   align-items: center;
   font-size: 1.9rem;
+  line-height: 1;
+  font-weight: 400;
+  font-synthesis: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   box-shadow: 0 6px 14px rgba(0,0,0,0.18);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* iOS Safari drops color emoji when a webfont is forced on the glyph,
+   or when font-weight is bold. Keep these on the system emoji font. */
+.emoji-glyph {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  line-height: 1;
+  display: block;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Individual Student Expressions */
@@ -334,6 +356,9 @@ body {
 
 .bingsoo-icon {
   font-size: 2.6rem;
+  line-height: 1;
+  font-weight: 400;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   filter: drop-shadow(0 6px 10px rgba(0,0,0,0.3));
 }
 
@@ -991,6 +1016,9 @@ body {
     padding: 10px;
     border-radius: 16px;
     gap: 10px;
+    /* backdrop-filter hides composited pins on iOS Safari */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .brand h1 {
