@@ -87,17 +87,21 @@ var SLOTS=3,BEAT=0.7,WRONG_COST=5,BASE_R=16,PAT_BONUS=0.3,GIANT_MULT=1.5,ROUND_T
 var SPAWN_LOCK=18;
 /* 오븐 집중 모드 동안 손님 인내심(대기)이 흐르는 배율. 1이면 평소와 같고, 작을수록 느리게 기다린다 */
 var PATIENCE_SLOW=0.35;
+/* 손님 인내심 배율. 1이면 예전 값(44+7√N초, 54~86초)이다. 0.6이면 약 32~52초.
+   예전 값은 라운드(70초)보다 길어서 손님이 거의 떠나지 않았고, 가게 붕괴가 일어날 수 없었다 */
+var PAT_SCALE=0.6;
+/* 화나서 떠난 손님이 판 전체(4라운드)에서 이 수가 되면 가게가 무너진다 */
+var COLLAPSE_AT=5;
 var ANIMALS=[
   ['🦁','사자','cust-lion'],['🐯','호랑이','cust-tiger'],['🦛','하마','cust-hippo'],
   ['🐘','코끼리','cust-elephant'],['🦒','기린','cust-giraffe'],['🦏','코뿔소','cust-rhino'],['🐻','곰','cust-bear']
 ];
 var DISHES=[
-  {name:'냥 바게트',ing:'반죽',ico:'🥖',dim:1,max:15,tile:'#e8a94f',edge:'#b8742a',raw:'#f6e6c8',rawEdge:'#dcc08e',unit:'개',price:0,unlockR:1,up:[70,140],lvDesc:['','','깨를 솔솔 뿌린 바게트','윤기 나는 황금 바게트']},
-  {name:'냥 토스트',ing:'식빵',ico:'🍞',dim:2,max:120,tile:'#ffd24a',edge:'#e0a800',raw:'#f6e8b8',rawEdge:'#d8c48a',unit:'개',price:60,unlockR:2,up:[85,160],lvDesc:['','','버터를 올린 토스트','딸기잼 토스트']},
-  {name:'냥 케이크',ing:'스펀지',ico:'🍰',dim:3,max:130,tile:'#ff8fb1',edge:'#e0507c',raw:'#ffdbe6',rawEdge:'#e8b4c6',unit:'개',price:120,unlockR:3,up:[100,190],lvDesc:['','','딸기 케이크','초콜릿 케이크']}
+  {name:'냥 바게트',ing:'반죽',ico:'🥖',dim:1,max:15,tile:'#e8a94f',edge:'#b8742a',raw:'#f6e6c8',rawEdge:'#dcc08e',unit:'개',unlockR:1},
+  {name:'냥 토스트',ing:'식빵',ico:'🍞',dim:2,max:120,tile:'#ffd24a',edge:'#e0a800',raw:'#f6e8b8',rawEdge:'#d8c48a',unit:'개',unlockR:2},
+  {name:'냥 케이크',ing:'스펀지',ico:'🍰',dim:3,max:130,tile:'#ff8fb1',edge:'#e0507c',raw:'#ffdbe6',rawEdge:'#e8b4c6',unit:'개',unlockR:3}
 ];
-var LVMULT=[0,1,1.5,2.2];
-var OVEN=[null,{taps:5,name:'기본 오븐',cost:0,desc:'5번 탭'},{taps:3,name:'벽돌 오븐',cost:75,desc:'3번만 탭!'},{taps:2,name:'황금 오븐',cost:150,desc:'2번만 탭!'}];
+var OVEN=[null,{taps:3,name:'기본 오븐',cost:0,desc:'3번 탭'},{taps:2,name:'벽돌 오븐',cost:75,desc:'2번만 탭!'},{taps:1,name:'황금 오븐',cost:150,desc:'1번만 탭!'}];
 var BAGS=[1,5,10,50,100],BAGCOST={1:0,5:25,10:50,50:95,100:150};
 /* 빵마다 실제로 쓰는 칩만 노출 (바게트 최대 N=12 → 50·100 제외) */
 var DISH_BAGS=[[1,5,10],[1,5,10,50,100],[1,5,10,50,100]];
@@ -106,7 +110,7 @@ var PAL=[null,{rim:'#c98a4b',base:'#f6e3b5',tile:'#ffd24a',edge:'#e0a800',dot:'#
 var POOL=[
   [[2,1],[3,1],[4,1],[5,1],[6,2],[7,2]],
   [[2,1],[3,1],[4,1],[5,2],[6,3]],
-  [[2,1],[2,1],[2,1],[3,1],[3,2],[4,3]]
+  [[2,1],[2,1],[2,1],[3,1],[3,2]]
 ];
 var GIANT=[[10,12],[8,10],[5]];             // 자이언트 손님이 시키는 배율
 var GIANT_AT={2:[32],3:[30],4:[22,50]};     // 라운드별 자이언트 등장 시각(초)
@@ -156,6 +160,7 @@ var SFX={
   bag:function(){tone(420,0,0.1,'sine',0.3,640)},
   perfect:function(){tone(880,0,0.1,'triangle',0.5);tone(1320,0.06,0.15,'triangle',0.42)},
   good:function(){tone(740,0,0.12,'triangle',0.4)},
+  close:function(){tone(520,0,0.12,'triangle',0.32)},
   miss:function(){tone(210,0,0.17,'sawtooth',0.26,120)},
   done:function(){run([523,659,784],'triangle',0.42,0.07,0.17)},
   serve:function(){run([659,784,988,1319],'triangle',0.4,0.062,0.2)},
@@ -168,6 +173,9 @@ var SFX={
   angry:function(){tone(196,0,0.26,'sawtooth',0.26,98)},
   combo:function(){run([784,988,1175,1568,1976],'triangle',0.42,0.055,0.2)},
   warn:function(){tone(880,0,0.09,'square',0.2);tone(880,0.15,0.09,'square',0.2)},
+  rumble:function(){tone(70,0,0.5,'sawtooth',0.22,45);tone(95,0.05,0.35,'triangle',0.18,60)},
+  crack:function(){tone(1400,0,0.05,'square',0.18,300);tone(180,0.04,0.45,'sawtooth',0.28,50)},
+  collapse:function(){tone(60,0,1.4,'sawtooth',0.34,30);tone(120,0.1,1.1,'square',0.22,40);run([392,330,262,196,131],'triangle',0.3,0.16,0.3)},
   trash:function(){tone(160,0,0.14,'sawtooth',0.22,90)},
   roundEnd:function(){run([523,659,784,1047,1319],'triangle',0.42,0.09,0.28)}
 };
@@ -211,8 +219,97 @@ function comboBanner(txt){
   fxAdd(d);
 }
 function bumpCoins(){var c=$('coinsTxt');c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump')}
+/* 서빙 보상: 손님 자리에서 지갑으로 코인이 날아간다. 코인은 이미 들어왔고, 이건 보여 주기만 한다.
+   번 코인이 많을수록 금화도 많아진다. 마지막 코인이 닿을 때 지갑 숫자가 통통 튄다 */
+function flyCoins(slot,gain){
+  var el=slotEls[slot],w=$('coinsTxt');
+  if(!el||!w||!Element.prototype.animate){bumpCoins();return}
+  var a=stageXY(el),b=stageXY(w),n=Math.max(3,Math.min(16,3+Math.floor(gain/40))),DUR=620;
+  var GAP=Math.min(70,Math.floor(860/Math.max(1,n-1))),step=Math.min(14,180/n);
+  for(var i=0;i<n;i++)(function(i){
+    var d=document.createElement('div');d.className='coinfly';d.textContent='🪙';
+    d.style.left=a.x+'px';d.style.top=a.y+'px';
+    fxAdd(d);
+    var sx=(i-(n-1)/2)*step,dx=b.x-a.x,dy=b.y-a.y;
+    var an=d.animate([
+      {transform:'translate(-50%,-50%) translate(0,0) scale(.6)',opacity:0},
+      {transform:'translate(-50%,-50%) translate('+sx+'px,-36px) scale(1.1)',opacity:1,offset:0.25},
+      {transform:'translate(-50%,-50%) translate('+dx+'px,'+dy+'px) scale(.7)',opacity:1}
+    ],{duration:DUR,delay:i*GAP,easing:'ease-in',fill:'both'});
+    an.onfinish=function(){fxDrop(d);if(i===n-1){bumpCoins();sfx('coin')}};
+  })(i);
+}
 var shake={until:0,mag:0};
 function doShake(mag,ms){shake.mag=mag;shake.until=performance.now()+ms}
+
+/* ===== 가게 붕괴 =====
+   화나서 떠난 손님 수(G.leftAll, 판 전체)에 따라 숫자 없이 신호로만 알린다.
+   1회 먼지 한 번 · 2회 조명 깜빡 · 3회 먼지가 자주 + 조명이 계속 살짝 떨림 · 4회 흔들림 + 벽에 금 · 5회 무너짐.
+   어두워지는 막(.shop-dim)은 배경 그림만 덮는다(손님·카드·재료보다 아래). 주문 카드 숫자는 늘 밝게 읽힌다.
+   먼지는 화면 양 가장자리에서만 떨어진다 */
+var shopFx=null;
+function shopLayer(){
+  if(shopFx)return shopFx;
+  var body=document.querySelector('#play .scene-body');if(!body)return null;
+  var dim=document.createElement('div');dim.className='shop-dim';
+  var crack=document.createElement('div');crack.className='shop-cracks';
+  crack.innerHTML='<svg viewBox="0 0 1280 640" preserveAspectRatio="none">'
+    +'<path d="M300 18 L292 52 L310 80 L296 118 L318 150 L304 182"/><path d="M296 118 L270 132 L258 158"/>'
+    +'<path d="M720 10 L732 44 L716 70 L738 104 L726 140"/><path d="M716 70 L748 78 L760 98"/></svg>';
+  var dust=document.createElement('div');dust.className='shop-dust';
+  body.appendChild(dim);body.appendChild(crack);body.appendChild(dust);
+  shopFx={body:body,dim:dim,crack:crack,dust:dust};
+  return shopFx;
+}
+/* 라운드가 바뀌어도 금과 떨림은 남는다(판 전체로 센다) */
+function shopState(){
+  var L=shopLayer();if(!L)return;var n=G.leftAll||0;
+  L.body.classList.toggle('shop-unstable',n>=3);
+  L.body.classList.toggle('shop-cracked',n>=4);
+  L.body.classList.remove('shop-collapse');
+}
+function dustFall(n){
+  var L=shopLayer();if(!L)return;
+  for(var i=0;i<n;i++){
+    var d=document.createElement('i'),left=Math.random()<0.5;
+    d.style.left=(left?0.5+Math.random()*4:95.5+Math.random()*4)+'%';
+    d.style.animationDelay=(Math.random()*0.35)+'s';
+    d.style.animationDuration=(1+Math.random()*0.5)+'s';
+    L.dust.appendChild(d);
+    setTimeout(function(x){return function(){if(x.parentNode)x.parentNode.removeChild(x)}}(d),2000);
+  }
+}
+function lightFlicker(){
+  var L=shopLayer();if(!L)return;
+  L.dim.classList.remove('flick');void L.dim.offsetWidth;L.dim.classList.add('flick');
+}
+function shopWarn(){
+  var n=G.leftAll;
+  if(n>=COLLAPSE_AT){collapseShop();return}
+  if(n===1){dustFall(5);sfx('rumble')}
+  else if(n===2){dustFall(4);lightFlicker();sfx('rumble')}
+  else if(n===3){dustFall(7);lightFlicker();sfx('rumble')}
+  else if(n===4){dustFall(10);doShake(7,700);sfx('crack')}
+  shopState();
+}
+function collapseShop(){
+  if(S.phase!=='play')return;
+  var net=S.reward+S.patience+S.combo-S.penalty;
+  G.log.push({r:S.round,net:net,reward:S.reward,patience:S.patience,combo:S.combo,penalty:S.penalty,notSimilar:S.wrong.notSimilar,served:S.served,left:S.left});
+  G.servedAll+=S.served;G.collapsed=true;
+  S.phase='collapse';setOvenFocus(false);setEndBtn(false);
+  var L=shopLayer();
+  if(L){L.body.classList.add('shop-cracked','shop-collapse');dustFall(18)}
+  sfx('collapse');
+  /* 게임 루프가 멈췄으니 흔들림은 따로 돌린다 */
+  var t0=performance.now();
+  (function quake(now){
+    var a=now-t0;if(a>1500){applyStage(0,0);return}
+    var k=12*(1-a/1500);applyStage((Math.random()-0.5)*2*k,(Math.random()-0.5)*2*k);
+    requestAnimationFrame(quake);
+  })(t0);
+  setTimeout(function(){if(S.phase==='collapse')finishGame()},2600);
+}
 
 /* ===== 랜덤 (학생마다 다른 주문) ===== */
 function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -226,11 +323,14 @@ function baseOf(dish,k){return BASE_R*Math.sqrt(needOf(dish,k))}
 var G={},S={};
 function resetG(){
   G={round:1,wallet:0,earned:0,log:[],first:true,hintOn:true,
-     u:{oven:1,bag:{1:1},dish:{0:1}},wrongAll:{wrongDish:0,notSimilar:0,wrongSize:0,raw:0},trashedAll:0,wastedAll:0,servedAll:0,leftAll:0};
+     u:{oven:1,bag:{0:{1:1}},dish:{0:1}},wrongAll:{wrongDish:0,notSimilar:0,wrongSize:0,raw:0},trashedAll:0,wastedAll:0,servedAll:0,leftAll:0};
 }
 resetG();
-function LV(t){return (G.u&&G.u.dish[t])||0}
-function owned(t){return LV(t)>0}
+function owned(t){return !!(G.u&&G.u.dish[t])}
+/* 배율 칩은 빵마다 따로 산다. ×1은 빵이 열릴 때 함께 열린다 */
+function hasBag(t,n){var b=G.u&&G.u.bag[t];return !!(b&&b[n])}
+/* 칩은 작은 것부터 차례로 산다. 다음에 살 수 있는 칩 하나 (다 샀으면 0) */
+function nextBag(t){var a=DISH_BAGS[t];for(var j=0;j<a.length;j++)if(!hasBag(t,a[j]))return a[j];return 0}
 function ovenIdle(){return{dish:null,state:'idle',t0:0,n:0,need:OVEN[G.u.oven].taps,grades:[],last:null}}
 function earn(v){G.wallet+=v;G.earned+=v}
 function pay(v){G.wallet=Math.max(0,G.wallet-v);G.earned=Math.max(0,G.earned-v)}
@@ -243,10 +343,28 @@ function newRound(r){
 window.__S=function(){return S};window.__G=function(){return G};
 
 /* 손님 만들기 */
-function makeCust(giant){
+/* ===== 새 손님 종류 =====
+   roo = 캥거루(만족시키면 주머니에서 아기가 나와 같은 빵을 1 : 1로 한 번 더 주문. 이때 손님은 joey = 아기가 나온 캥거루)
+   hurry = 급한 손님(예전 인내심의 절반, 보상 ×1.5, 2배 주문만).
+   [종류, 이 라운드부터]. 한 번에 한 종류씩만 화면에 나온다. 첫 손님은 늘 보통 손님이다 */
+var KINDS=[['roo',1],['hurry',4]];
+var KIND_CHANCE=0.25,HURRY_MULT=1.5;
+/* 그림이 생기기 전까지는 이모지로 보인다. 그림이 생기면 spr에 파일 이름(assets/*.png, 확장자 없이)을 넣는다 */
+var KIND_LOOK={roo:['🦘','캥거루',''],joey:['🦘','아기 캥거루',''],hurry:['🐰','거대 토끼','']};   // 그림: roo=cust-kangaroo, joey=cust-kangaroo-joey, hurry=cust-rabbit
+function pickKind(){
+  if(G.first)return '';
+  var live={};S.cust.forEach(function(c){if(c.state!=='gone'&&c.kind)live[c.kind]=1});
+  if(live.joey)live.roo=1;
+  var av=KINDS.filter(function(p){return p[1]<=S.round&&!live[p[0]]}).map(function(p){return p[0]});
+  if(!av.length||rnd()>=KIND_CHANCE)return '';
+  return pick(av);
+}
+/* opt = {kind, dish, k}: 아기 캥거루처럼 주문을 정해 두고 만들 때 쓴다 */
+function makeCust(giant,opt){
   var own=[];DISHES.forEach(function(d,i){if(owned(i))own.push(i)});
-  var dish,k,tries;
-  if(giant){dish=pick(own);k=pick(GIANT[dish])}
+  var dish,k,tries,kind=opt?opt.kind:(giant?'':pickKind());
+  if(opt&&opt.dish!=null){dish=opt.dish;k=opt.k}
+  else if(giant){dish=pick(own);k=pick(GIANT[dish])}
   else{
     var bag=[];own.forEach(function(i){var w=(i===own[own.length-1]&&own.length>1)?2:1;for(var j=0;j<w;j++)bag.push(i)});
     for(tries=0;tries<30;tries++){
@@ -255,11 +373,13 @@ function makeCust(giant){
       k=pick(ks);if(dish+':'+k!==S.lastKey)break;
     }
     if(G.first){dish=0;k=pick([2,3]);G.first=false}
+    if(kind==='hurry')k=2;
   }
   S.lastKey=dish+':'+k;
-  var N=needOf(dish,k),an=pick(ANIMALS);
-  var pat=giant?Math.min(95,Math.round(60+4*Math.sqrt(N))):Math.round(44+7*Math.sqrt(N));
-  return{id:S.nid++,k:k,dish:dish,giant:!!giant,N:N,pat:pat,fails:0,state:'wait',wait:0,slot:-1,until:0,
+  var N=needOf(dish,k),an=KIND_LOOK[kind]||pick(ANIMALS);
+  var base=giant?Math.min(95,60+4*Math.sqrt(N)):44+7*Math.sqrt(N);
+  var pat=Math.round(base*(kind==='hurry'?0.5:PAT_SCALE));   // 급한 손님은 예전 인내심의 절반
+  return{id:S.nid++,k:k,dish:dish,giant:!!giant,kind:kind||'',N:N,pat:pat,fails:0,state:'wait',wait:0,slot:-1,until:0,
          an:an[0],anName:an[1],spr:an[2]||'',got:null,gotUntil:0,mood:''};
 }
 function freeSeat(){
@@ -269,6 +389,9 @@ function freeSeat(){
 function liveCustCount(){
   var n=0;S.cust.forEach(function(c){if(c.state!=='gone')n++});return n;
 }
+/* 추가 시간: 70초가 지나도 기다리는 손님이 있으면 라운드를 끝내지 않는다.
+   새 손님은 받지 않고, 남은 손님을 모두 서빙하거나 손님이 떠나면 끝난다 */
+function overtime(){return S.time>=S.roundT}
 /* 마감 임박에는 손님이 남아 있으면 더 받지 않는다. 텅 비었을 때만 예외 */
 function canSpawnMore(){
   if(S.roundT-S.time>SPAWN_LOCK)return true;
@@ -284,8 +407,6 @@ function spawn(giant){
   var c=makeCust(giant);c.slot=seat;S.cust.push(c);
   S.nextAt=S.time+8+rnd()*4;
   sfx(giant?'giantIn':'arrive');
-  if(giant)doShake(6,420);
-  toast(giant?'👑 자이언트 '+c.anName+'이(가) 나타났어요!':'🔔 '+c.anName+' 손님이 왔어요!',1300);
   return c;
 }
 
@@ -447,15 +568,41 @@ function drawPieces(c,cx,baseY,cell,d,full){
   var s=d.s,L=d.L,n=d.n,dT2=P.rT*W,eg=P.eg*W,ox2=cx,y02=baseY-e.h;
   if(n<=0){dashRhomb(c,ox2,baseY-dT2,W,dT2);return}
   for(l=0;l<L;l++)for(j=0;j<s;j++)for(i=0;i<s;i++){
-    if(l*s*s+j*s+i>=n)continue;
+    var idx=l*s*s+j*s+i;if(idx>=n)continue;
     var qx=ox2+(i-j)*W/2,top=y02+(i+j)*dT2/2+(L-1-l)*eg;
     blitPiece(c,name,W,qx,top+dT2+eg);
+    /* 구우면 크림 케이크가 된다: 위가 빈 조각 윗면에 크림, 맨 윗층에는 딸기. 옆면 스펀지는 그대로라 조각 수는 계속 셀 수 있다 */
+    if(full&&idx+s*s>=n)creamTop(c,qx,top,W,dT2,eg,l===L-1);
   }
+}
+/* 조각 하나의 윗면(위 꼭짓점 x,y · 폭 W · 마름모 높이 dT)에 크림을 얹고, 앞 두 면으로 조금 흘러내리게 한다 */
+function creamTop(c,x,y,W,dT,eg,berry){
+  var k=0.97,hw=W/2*k,cy=y+dT/2,top=cy-dT/2*k,bot=cy+dT/2*k,t=eg*0.16,lw=Math.max(0.6,W*0.02);
+  var Lx=x-hw,Rx=x+hw;
+  c.save();c.lineJoin='round';
+  /* 흘러내린 띠: 오른쪽 아래 모서리 → 아래 꼭짓점 → 왼쪽, 아래 가장자리는 물결 */
+  c.beginPath();c.moveTo(Rx,cy);c.lineTo(x,bot);c.lineTo(Lx,cy);
+  var N=6;
+  for(var q=0;q<=N;q++){var u=q/N,px=Lx+(x-Lx)*u,py=cy+(bot-cy)*u+t*(1+(q%2?0.7:0));c.lineTo(px,py)}
+  for(q=1;q<=N;q++){var u2=q/N,px2=x+(Rx-x)*u2,py2=bot+(cy-bot)*u2+t*(1+(q%2?0.7:0));c.lineTo(px2,py2)}
+  c.closePath();c.fillStyle='#f6e2cf';c.fill();c.strokeStyle='rgba(150,100,70,.45)';c.lineWidth=lw;c.stroke();
+  /* 윗면 크림 */
+  c.beginPath();c.moveTo(x,top);c.lineTo(Rx,cy);c.lineTo(x,bot);c.lineTo(Lx,cy);c.closePath();
+  var g=c.createLinearGradient(x,top,x,bot);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#fdf1e4');
+  c.fillStyle=g;c.fill();c.stroke();
+  if(berry){
+    var r=W*0.12,bx=x,by=cy-r*0.35;
+    c.beginPath();c.ellipse(bx,by,r,r*1.1,0,0,7);c.fillStyle='#e8394d';c.fill();
+    c.strokeStyle='#9c1f2e';c.lineWidth=Math.max(0.6,r*0.12);c.stroke();
+    c.fillStyle='#4caf50';c.beginPath();c.ellipse(bx,by-r*1.0,r*0.55,r*0.25,0,0,7);c.fill();
+    c.fillStyle='rgba(255,255,255,.75)';c.beginPath();c.ellipse(bx-r*0.35,by-r*0.3,r*0.18,r*0.26,-0.4,0,7);c.fill();
+  }
+  c.restore();
 }
 
 /* ===== 그리기 ===== */
 function drawPizza(c,x,y,w,h,o){  // 토스트(네모난 빵) : 귀 + 고양이 얼굴
-  o=o||{};var pal=Object.assign({},PAL[1]),LV1=LV(1);if(LV1>=3){pal.rim='#8f5a24';pal.tile='#ffdf6e'}
+  o=o||{};var pal=PAL[1];
   var m=Math.min(w,h),lw=Math.max(1.5,m*0.035),ew=w*0.3,eh=Math.min(h*0.32,w*0.42);
   c.lineJoin='round';c.lineWidth=lw;c.fillStyle='#c98a4b';c.strokeStyle='#8a5a2b';
   [0.05,0.65].forEach(function(px){c.beginPath();c.moveTo(x+w*px,y+2);c.lineTo(x+w*px+ew/2,y-eh);c.lineTo(x+w*px+ew,y+2);c.closePath();c.fill();c.stroke()});
@@ -476,8 +623,6 @@ function drawPizza(c,x,y,w,h,o){  // 토스트(네모난 빵) : 귀 + 고양이 
         c.strokeStyle=pal.edge;c.lineWidth=Math.min(2,Math.max(1,cw*0.05));c.stroke();c.fillStyle=pal.dot;
         c.beginPath();c.arc(cx+cw*0.3,cy+ch*0.35,Math.min(cw,ch)*0.07,0,7);c.fill();
         c.beginPath();c.arc(cx+cw*0.66,cy+ch*0.62,Math.min(cw,ch)*0.06,0,7);c.fill();
-        if(LV1>=2){c.fillStyle='#fff3a8';rr(c,cx+cw*0.52,cy+ch*0.14,cw*0.32,ch*0.22,2);c.fill();c.fillStyle=pal.dot}
-        if(LV1>=3){c.fillStyle='#e0304f';c.beginPath();c.arc(cx+cw*0.3,cy+ch*0.7,Math.min(cw,ch)*0.11,0,7);c.fill();c.fillStyle=pal.dot}
       }else{
         c.setLineDash([4,3]);c.strokeStyle=pal.dash;c.lineWidth=1.5;
         rr(c,cx+2,cy+2,cw-4,ch-4,Math.min(cw,ch)*0.12);c.stroke();c.setLineDash([]);
@@ -508,16 +653,14 @@ function toastRaw(c,cx,baseY,cell,d){
 }
 /* 바게트 : 반죽 마디 n개가 한 줄로 */
 function skewer(c,cx,baseY,cell,d,full){
-  var D=DISHES[0],n=d.n,W=d.w,w=W*cell,x0=cx-w/2,y=baseY-cell,lv=LV(0);
+  var D=DISHES[0],n=d.n,W=d.w,w=W*cell,x0=cx-w/2,y=baseY-cell;
   for(var i=0;i<W;i++){
     var px=x0+i*cell;
     if(i<n){
       rr(c,px+0.5,y+cell*0.18,cell-1,cell*0.64,cell*0.3);
-      c.fillStyle=full?(lv>=3?'#cf8420':lv>=2?'#dc9a3a':D.tile):D.raw;c.fill();c.lineWidth=Math.min(2,Math.max(1,cell*0.06));c.strokeStyle=full?D.edge:D.rawEdge;c.stroke();
+      c.fillStyle=full?D.tile:D.raw;c.fill();c.lineWidth=Math.min(2,Math.max(1,cell*0.06));c.strokeStyle=full?D.edge:D.rawEdge;c.stroke();
       if(full){c.strokeStyle='rgba(120,50,30,.45)';c.lineWidth=Math.max(1,cell*0.05);
-        c.beginPath();c.moveTo(px+cell*0.3,y+cell*0.32);c.lineTo(px+cell*0.5,y+cell*0.68);c.moveTo(px+cell*0.5,y+cell*0.32);c.lineTo(px+cell*0.7,y+cell*0.68);c.stroke();
-        if(lv>=2){c.fillStyle='#fff3d0';[[0.25,0.28],[0.62,0.26],[0.45,0.74],[0.78,0.6]].forEach(function(q){c.beginPath();c.ellipse(px+cell*q[0],y+cell*q[1],Math.max(1,cell*0.05),Math.max(1,cell*0.035),0.6,0,7);c.fill()})}
-        if(lv>=3){c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=Math.max(1.5,cell*0.07);c.beginPath();c.moveTo(px+cell*0.2,y+cell*0.24);c.lineTo(px+cell*0.8,y+cell*0.24);c.stroke()}}
+        c.beginPath();c.moveTo(px+cell*0.3,y+cell*0.32);c.lineTo(px+cell*0.5,y+cell*0.68);c.moveTo(px+cell*0.5,y+cell*0.32);c.lineTo(px+cell*0.7,y+cell*0.68);c.stroke()}
     }else if(n===0&&i===0){
       c.save();c.setLineDash([4,3]);c.strokeStyle='rgba(180,150,100,.5)';c.lineWidth=1.5;rr(c,px+2,y+2,cell-4,cell-4,cell*0.2);c.stroke();c.restore();
     }
@@ -536,8 +679,7 @@ function cake(c,cx,baseY,a,d,full){
   var D=DISHES[2],s=d.s,L=d.L,n=d.n,ox=cx,oy=baseY-s*a,ex=[0.866*a,0.5*a],ey=[-0.866*a,0.5*a],ez=[0,-a];
   function V(u,v,w){return[ox+u*ex[0]+v*ey[0]+w*ez[0],oy+u*ex[1]+v*ey[1]+w*ez[1]]}
   function poly(pts,fill,stroke){c.beginPath();pts.forEach(function(p,i){i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])});c.closePath();c.fillStyle=fill;c.fill();c.lineWidth=Math.max(1,a*0.06);c.strokeStyle=stroke;c.lineJoin='round';c.stroke()}
-  var top=full?'#fff0d6':'#ffeef3',lf=full?'#f2c08e':'#f6d6e0',rt=full?'#dca06a':'#eab9cc',ed=full?'#a8703e':D.rawEdge;
-  var LC=LV(2);if(full&&LC>=3){top='#6b3b24';lf='#8a4a2c';rt='#70391f';ed='#3d2012'}else if(full&&LC>=2){top='#fff8f2'}
+  var top=full?'#fffaf3':'#ffeef3',lf=full?'#f2c08e':'#f6d6e0',rt=full?'#dca06a':'#eab9cc',ed=full?'#a8703e':D.rawEdge;
   if(n<=0){
     c.save();c.setLineDash([4,3]);c.strokeStyle='rgba(180,150,100,.6)';c.lineWidth=1.5;
     c.beginPath();[V(0,0,0),V(1,0,0),V(1,1,0),V(0,1,0)].forEach(function(p,i){i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])});c.closePath();c.stroke();c.restore();return;
@@ -547,7 +689,7 @@ function cake(c,cx,baseY,a,d,full){
     poly([V(i,j+1,l),V(i+1,j+1,l),V(i+1,j+1,l+1),V(i,j+1,l+1)],lf,ed);
     poly([V(i+1,j,l),V(i+1,j+1,l),V(i+1,j+1,l+1),V(i+1,j,l+1)],rt,ed);
     poly([V(i,j,l+1),V(i+1,j,l+1),V(i+1,j+1,l+1),V(i,j+1,l+1)],top,ed);
-    if(full&&LC>=2&&(l===L-1||idx+s*s>=n)){var p=V(i+0.5,j+0.5,l+1);c.fillStyle=LC>=3?'#ffd24a':'#ff5c8a';c.beginPath();c.arc(p[0],p[1],Math.max(1.5,a*0.16),0,7);c.fill()}
+    if(full&&l===L-1){var bp=V(i+0.5,j+0.5,l+1);c.fillStyle='#e8394d';c.beginPath();c.arc(bp[0],bp[1]-a*0.08,Math.max(1.5,a*0.18),0,7);c.fill()}   // 크림 위 딸기
   }
   if(full){ // 앞쪽 면에 고양이 얼굴
     var f=V(0.5,s,Math.min(L,s)*0.5-0.0),fx=f[0]-a*0.25,fy=f[1]-a*0.1;
@@ -581,18 +723,15 @@ var chipEls=[]; /* [dishIndex][bagSize] -> element */
     }).join('');
     b.innerHTML='<div class="mold-head">'
       +'<canvas width="100" height="70"></canvas>'
-      +'<button type="button" class="upb"></button>'
       +'</div>'
       +'<div class="chips" style="grid-template-columns:repeat('+bags.length+',minmax(0,1fr))">'+chipsHtml+'</div>'
       +'<div class="lock"><div class="lk"></div></div>';
     b.querySelector('.mold-head').addEventListener('click',function(e){
-      if(e.target.closest&&e.target.closest('.upb'))return;
-      if(!owned(i))buyDish(i);else selectDish(i);
+      selectDish(i);
     });
     b.querySelector('.lock').addEventListener('click',function(e){
-      e.stopPropagation();buyDish(i);
+      e.stopPropagation();notOpen(i);
     });
-    b.querySelector('.upb').addEventListener('click',function(e){e.stopPropagation();upDish(i)});
     chipEls[i]={};
     b.querySelectorAll('.chip').forEach(function(ch){
       var n=+ch.dataset.n;
@@ -608,7 +747,7 @@ var chipEls=[]; /* [dishIndex][bagSize] -> element */
 function renderShelf(){
   dishEls.forEach(function(el,i){
     var cv=el.querySelector('canvas'),c=cv.getContext('2d');
-    var key=LV(i)+'';if(el.dataset.lv===key)return;el.dataset.lv=key;
+    var key=owned(i)+'';if(el.dataset.lv===key)return;el.dataset.lv=key;
     c.clearRect(0,0,100,70);
     var d=newDish(i,i===0?3:i===1?4:8);d.cooked=true;
     drawDishState(c,50,66,fitCell(d,90,52,i===0?24:i===1?26:18),d,1);
@@ -617,7 +756,7 @@ function renderShelf(){
 /* 선반 머리 탭: 활성 빵만 표시 (개수는 칩으로) */
 function selectDish(i){
   if(S.phase!=='play'||S.guide||isOvenFocus())return;
-  if(!owned(i)){buyDish(i);return}
+  if(!owned(i)){notOpen(i);return}
   if(benchBaked()){warnBaked();return}
   if(S.bench&&S.bench.type===i){updateAll();return}
   S.bench=newDish(i);fx=[];S.sel=null;updateAll();
@@ -628,8 +767,8 @@ function chooseDish(i){selectDish(i)}
 function addFromShelf(i,n){
   if(S.phase!=='play'||S.guide||isOvenFocus())return;
   if(DISH_BAGS[i].indexOf(n)<0)return;
-  if(!owned(i)){if(!buyDish(i))return}
-  if(!G.u.bag[n]){buyBag(n);return}                  // 배율을 사는 것뿐, 재료는 올라가지 않는다
+  if(!owned(i)){notOpen(i);return}
+  if(!hasBag(i,n)){buyBag(i,n);return}                  // 배율을 사는 것뿐, 재료는 올라가지 않는다
   if(benchBaked()){warnBaked();return}
   if(!S.bench||S.bench.type!==i){S.bench=newDish(i);fx=[];S.sel=null}
   addN(n);
@@ -748,11 +887,47 @@ function renderFly(){
    좌표는 배경 그림(1280×640) 기준이다. by = 물건 바닥, xa~xb = 그 줄의 폭, s = 물건 크기 */
 var SRC_ROWS=[{by:350,xa:95,xb:390,s:62},{by:462,xa:18,xb:422,s:72},{by:596,xa:172,xb:612,s:64}];
 var SRC_TAG=34;            /* 물건 아래 「×n」 표 높이(그림 px) */
+/* 반죽(윗단)·식빵(아랫단)은 2단 진열대 그림 한 장(stand-empty) 위에 칸별 재료 그림(stand-item-*)을 얹는다.
+   값은 assets/stand-items.json(design-refs/ingredients-2026-09-24/export-stand-assets.py가 만듦)과 같게 둔다.
+   item = 그림 자리 [x,y,w,h], cell = 칸 바닥 [x0,y0,x1,y1](칸막이 가운데로 나눔. 누르는 영역과 🔒 자리) */
+var STAND={box:[76,255,413,232],rows:[0,1],
+  item:{dough1:[157,294,71,49],dough5:[206,294,119,49],dough10:[303,294,176,49],
+    toast1:[112,399,38,27],toast5:[162,382,42,46],toast10:[215,360,42,69],toast50:[260,365,68,68],toast100:[336,365,120,68]},
+  cell:{dough1:[177,303,209,334],dough5:[224,303,308,334],dough10:[320,303,466,334],
+    toast1:[117,381,157,429],toast5:[168,381,207,429],toast10:[218,381,259,429],toast50:[269,381,331,429],toast100:[342,381,458,429]}};
+var STAND_KEY=['dough','toast'];
 var srcEls=[],amtEls=[],itemEls=[];   // srcEls[i] = i번 재료의 ×1, amtEls[i][n] = ×n, itemEls = 전부
+function placeStage(el,x,y,w,h){el.style.left=(x/12.8)+'%';el.style.top=(y/6.4)+'%';el.style.width=(w/12.8)+'%';el.style.height=(h/6.4)+'%'}
 (function(){
   var box=$('sources');
   if(!box)return;
+  var art=document.createElement('img');art.className='stand-art';art.src='assets/stand-empty.png';art.alt='';
+  placeStage(art,STAND.box[0],STAND.box[1],STAND.box[2],STAND.box[3]);box.appendChild(art);
+  var arts={};
+  STAND.rows.forEach(function(i){DISH_BAGS[i].forEach(function(n){
+    var k=STAND_KEY[i]+n,a=STAND.item[k],im=document.createElement('img');
+    im.className='stand-item';im.src='assets/stand-item-'+k+'.png';im.alt='';
+    placeStage(im,a[0],a[1],a[2],a[3]);box.appendChild(im);arts[k]=im;
+  })});
+  DISH_BAGS.forEach(function(bags,i){
+    if(STAND.rows.indexOf(i)<0)return;
+    amtEls[i]={};
+    bags.forEach(function(n){
+      var k=STAND_KEY[i]+n,c=STAND.cell[k],a=STAND.item[k];
+      var top=Math.min(c[1],a[1]),bot=c[3]+SRC_TAG,h=bot-top;
+      var b=document.createElement('button');b.type='button';b.className='src src-cell'+(n===1?' src-one':' amt');
+      b.dataset.i=i;b.dataset.n=n;b.setAttribute('aria-label',DISHES[i].ing+' '+n+'개');
+      placeStage(b,c[0],top,c[2]-c[0],h);
+      b.innerHTML='<span class="src-x">×'+n+'</span><div class="src-lock"></div>';
+      var lk=b.querySelector('.src-lock');lk.style.top=((c[1]-top)/h*100)+'%';lk.style.bottom=(SRC_TAG/h*100)+'%';
+      b.addEventListener('click',function(e){e.stopPropagation();tapSource(i,b,n)});
+      box.appendChild(b);b._art=arts[k];
+      itemEls.push({el:b,art:arts[k],i:i,n:n});
+      if(n===1)srcEls[i]=b;else amtEls[i][n]=b;
+    });
+  });
   DISHES.forEach(function(D,i){
+    if(STAND.rows.indexOf(i)>=0)return;
     var R=SRC_ROWS[i],bags=DISH_BAGS[i],step=(R.xb-R.xa)/bags.length,ch=Math.round(R.s*1.3);
     amtEls[i]={};
     bags.forEach(function(n,j){
@@ -773,11 +948,12 @@ var srcEls=[],amtEls=[],itemEls=[];   // srcEls[i] = i번 재료의 ×1, amtEls[
 function tapSource(i,el,n){
   if(S.phase!=='play'||S.guide||isOvenFocus())return;
   n=n||1;
-  if(!owned(i)){buyDish(i);return}
-  if(n>1&&!G.u.bag[n]){buyBag(n);return}             // 못 산 배율은 누르면 구입만 한다 (재료는 올라가지 않는다)
+  if(!owned(i)){notOpen(i);return}
+  if(!hasBag(i,n)){buyBag(i,n);return}             // 못 산 배율은 누르면 구입만 한다 (재료는 올라가지 않는다)
   if(benchBaked()){warnBaked();return}
   if(!S.bench||S.bench.type!==i){S.bench=newDish(i);fx=[];S.sel=null}
-  el.classList.remove('tap');void el.offsetWidth;el.classList.add('tap');
+  var tg=el._art||el;
+  tg.classList.remove('tap');void tg.offsetWidth;tg.classList.add('tap');
   addN(n,el);
 }
 /* 스프라이트의 투명 여백을 잘라 낸 그림 (한 번만 만든다) */
@@ -835,20 +1011,17 @@ function renderSources(){
   if(!itemEls.length)return;
   var dim=!!S.guide||isOvenFocus();
   itemEls.forEach(function(it){
-    var b=it.el,i=it.i,n=it.n,D=DISHES[i],own=owned(i),open=S.round>=D.unlockR;
+    var b=it.el,i=it.i,n=it.n,own=owned(i);
     var key=(itemReady(i)?1:0)+'|'+VIEW.q;
-    if(b.dataset.key!==key){b.dataset.key=key;drawItem(it)}
-    var has=n===1||!!G.u.bag[n],lk=b.querySelector('.src-lock'),h='';
-    if(n===1){
-      b.classList.toggle('locked',!own);b.classList.toggle('canbuy',!own&&open&&G.wallet>=D.price);
-      b.classList.toggle('off',dim);
-      if(!own)h='🔒<small>'+(open?'🪙 '+D.price:'R'+D.unlockR)+'</small>';
-    }else{
-      b.classList.toggle('locked',own&&!has);b.classList.toggle('canbuy',own&&!has&&G.wallet>=BAGCOST[n]);
-      b.classList.toggle('off',!own||dim);
-      if(own&&!has)h='🔒<small>🪙 '+BAGCOST[n]+'</small>';
-    }
+    if(it.cv&&b.dataset.key!==key){b.dataset.key=key;drawItem(it)}
+    /* 처음부터 다 보이면 복잡하다. 가진 칩과 바로 다음에 살 칩 하나만 보이고, 나머지 칸과 아직 안 열린 빵은 빈칸이다 */
+    var has=hasBag(i,n),next=own&&n===nextBag(i),lk=b.querySelector('.src-lock'),h='';
+    b.classList.toggle('hide',!has&&!next);
+    b.classList.toggle('locked',next);b.classList.toggle('canbuy',next&&G.wallet>=BAGCOST[n]);
+    b.classList.toggle('off',dim);
+    if(next)h='🔒<small>🪙 '+BAGCOST[n]+'</small>';
     b.classList.toggle('on',!!S.bench&&S.bench.type===i);
+    if(it.art)['hide','locked','off','on'].forEach(function(c){it.art.classList.toggle(c,b.classList.contains(c))});
     if(lk.innerHTML!==h)lk.innerHTML=h;
   });
 }
@@ -881,7 +1054,7 @@ function renderBench(){
       drawDishState(bctx,BW/2,BBASE,benchCell(vd),vd,0);
       bctx.restore();
     }
-    bctx.fillStyle='#3b2a1a';bctx.font='800 20px Malgun Gothic,sans-serif';bctx.textAlign='center';
+    bctx.fillStyle='#3b2a1a';bctx.font='800 20px Jua,Pretendard,Malgun Gothic,sans-serif';bctx.textAlign='center';
     if(vd.n>0)bctx.fillText(d.cooked?(vd.n+'개 · 완성도 '+Math.round((d.quality||0)*100)+'%'):(vd.n+'개'),BW/2,BBASE+18);
   }
   var nw=performance.now();
@@ -929,7 +1102,7 @@ function renderChips(){
   dishEls.forEach(function(el,i){
     var own=owned(i);
     DISH_BAGS[i].forEach(function(n){
-      var ch=chipEls[i][n],has=!!G.u.bag[n];
+      var ch=chipEls[i][n],has=hasBag(i,n);
       ch.classList.toggle('locked',own&&!has);
       ch.classList.toggle('off',!own||focus);
       ch.classList.toggle('canbuy',own&&!has&&G.wallet>=BAGCOST[n]);
@@ -994,8 +1167,11 @@ function toOven(){
 $('toOven').onclick=toOven;
 function cookTap(){
   var o=S.oven;if(!o||o.state!=='cooking')return;
-  var t=(clock()-o.t0)/1000,n=Math.max(1,Math.round(t/BEAT)),dev=Math.abs(t-n*BEAT);
-  var g=dev<=0.10?'perfect':(dev<=0.20?'good':'miss'),q=g==='perfect'?1:(g==='good'?0.7:0.4);
+  /* n번째 터치는 n번째 박자나 그 뒤 박자와 비교한다. 이미 쓴 박자에 또 두드리면(연타) 멀어서 빗나감이 된다.
+     늦게 시작하거나 박자를 건너뛴 것은 손해 보지 않는다. o.beat = 지난 터치가 맞춘 박자 */
+  var t=(clock()-o.t0)/1000,n=Math.max((o.beat||0)+1,Math.round(t/BEAT)),dev=Math.abs(t-n*BEAT);
+  o.beat=n;
+  var g=dev<=0.10?'perfect':dev<=0.20?'good':dev<=0.35?'close':'miss',q={perfect:1,good:0.7,close:0.4,miss:0.1}[g];
   o.grades.push(q);o.n++;o.last={g:g,at:clock()};
   sfx(g);
   if(o.n>=o.need){
@@ -1036,11 +1212,14 @@ function renderFocusRing(){
   c.beginPath();c.arc(rx,ry,r0+ph*48,0,7);c.lineWidth=6;c.strokeStyle='rgba(120,180,255,'+(0.4+0.6*(1-ph))+')';c.stroke();
   var l=o.last;
   if(l&&clock()-l.at<700){
-    c.font='800 28px Malgun Gothic,sans-serif';c.textAlign='center';
-    c.fillStyle=l.g==='perfect'?'#5fe08f':l.g==='good'?'#ffc247':'#ff7a70';
-    c.fillText(l.g==='perfect'?'PERFECT!':l.g==='good'?'GOOD':'MISS',rx,ry+8);
+    /* 글자가 링보다 넓어도 읽히게 진한 테두리를 두른다 */
+    var gt={perfect:'완벽!',good:'좋아요',close:'아쉬워요',miss:'빗나감'}[l.g];
+    c.font='800 24px Jua,Pretendard,Malgun Gothic,sans-serif';c.textAlign='center';
+    c.lineWidth=5;c.lineJoin='miter';c.strokeStyle='#2a1a10';c.strokeText(gt,rx,ry+8);
+    c.fillStyle={perfect:'#5fe08f',good:'#ffc247',close:'#ffa05a',miss:'#ff7a70'}[l.g];
+    c.fillText(gt,rx,ry+8);
   }else{
-    c.font='800 22px Malgun Gothic,sans-serif';c.textAlign='center';c.fillStyle='#fff';
+    c.font='800 22px Jua,Pretendard,Malgun Gothic,sans-serif';c.textAlign='center';c.fillStyle='#fff';
     c.fillText('톡!',rx,ry+8);
   }
   var st=$('ovenFocusStat');
@@ -1186,7 +1365,7 @@ function renderOven(){
   if(!d){
     if(sceneOven())return;
     var useSpr=!!sprite(OVEN_SPR[G.u.oven]);
-    octx.font='800 16px Malgun Gothic,sans-serif';octx.textAlign='center';
+    octx.font='800 16px Jua,Pretendard,Malgun Gothic,sans-serif';octx.textAlign='center';
     if(useSpr){
       octx.lineWidth=4;octx.strokeStyle='rgba(59,42,26,.55)';octx.fillStyle='#fff8ec';
       octx.strokeText('빈 오븐',OW/2,OH*0.78);
@@ -1194,7 +1373,7 @@ function renderOven(){
     }else{
       octx.fillStyle='#8f7350';
       octx.fillText('빈 오븐',OW/2,OH/2);
-      octx.font='15px Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
+      octx.font='15px Pretendard,Malgun Gothic,sans-serif';octx.fillText('작업판에서 🔥 오븐에 넣어요',OW/2,OH/2+24);
     }
     return;
   }
@@ -1217,7 +1396,7 @@ function renderOven(){
   steam(octx,o,OW/2,bx.y,bx.w,pr);
   if(o.state==='done'){
     var q=d.quality;
-    octx.fillStyle='#5fe08f';octx.font='800 18px Malgun Gothic,sans-serif';octx.textAlign='center';
+    octx.fillStyle='#5fe08f';octx.font='800 18px Jua,Pretendard,Malgun Gothic,sans-serif';octx.textAlign='center';
     octx.fillText('✅ 완성! 끌어다 서빙',OW/2,44);
     octx.fillText(Math.round(q*100)+'% '+(q>=0.9?'⭐⭐⭐':q>=0.7?'⭐⭐':'⭐'),OW/2,70);
   }
@@ -1242,21 +1421,15 @@ var slotEls=[],SLOT_W=110,SLOT_H=160,CARD_BAR=18;
   }
 })();
 function slotCust(i){return S.cust.filter(function(c){return c.slot===i&&c.state!=='gone'})[0]||null}
-/* 원본과 같은 모양의 '통짜' 빵 (칸 나누기 없음). k배 크기로 그려서 비교하게 한다. */
-function loaf(c,cx,base,len,h,full){
-  var D=DISHES[0],lv=LV(0),x=cx-len/2,y=base-h;
-  rr(c,x,y,len,h,h*0.5);
-  c.fillStyle=full?(lv>=3?'#cf8420':lv>=2?'#dc9a3a':D.tile):D.raw;c.fill();
-  c.lineWidth=Math.max(1.5,h*0.07);c.strokeStyle=full?D.edge:D.rawEdge;c.stroke();
-  if(!full)return;
-  c.strokeStyle='rgba(120,60,20,.5)';c.lineWidth=Math.max(1,h*0.06);c.lineCap='round';
-  var st=h*0.9,n=Math.max(1,Math.floor((len-h*0.9)/st));
-  for(var i=0;i<n;i++){var px=x+h*0.75+i*st;c.beginPath();c.moveTo(px,y+h*0.3);c.lineTo(px+h*0.3,y+h*0.7);c.stroke()}
-  c.fillStyle=lv>=3?'#cf8420':D.tile;c.strokeStyle=D.edge;c.lineWidth=Math.max(1,h*0.06);
-  [[0.12,0.42],[0.58,0.88]].forEach(function(v){c.beginPath();c.moveTo(x+h*v[0]+len*0,y+h*0.12);c.lineTo(x+h*(v[0]+v[1])/2,y-h*0.32);c.lineTo(x+h*v[1],y+h*0.12);c.closePath();c.fill();c.stroke()});
-}
+/* 말풍선 속 빵. 토스트·케이크·바게트 모두 도마와 같은 그림이다.
+   바게트는 길이만 k배(굵기는 그대로). 칸을 넘치면 길이만 거기까지 자른다. */
 function sil(c,ty,k,cx,base,cap){
-  if(ty===0){var h=16,len=Math.min(Math.max(k,0.15)*16,cap||160);loaf(c,cx,base,len,h,true)}
+  if(ty===0){
+    var cell=17,limit=cap||160,kk=Math.max(0.15,k);
+    if(kk*cell>limit)kk=limit/cell;
+    var d0=newDish(0,kk);d0.cooked=true;
+    drawDishState(c,cx,base,cell,d0,1);
+  }
   else if(ty===1){var s=Math.min(Math.max(k,0.15)*11,cap||64),d=newDish(1,1);d.cooked=true;drawDishState(c,cx,base,s,d,1)}
   else{var a=Math.min(Math.max(k,0.15)*7,cap||28),d3=newDish(2,1);d3.cooked=true;cake(c,cx,base,a,d3,true)}
 }
@@ -1278,20 +1451,20 @@ function drawBubble(cnv,c0,got,now){
   c.textAlign='center';
   if(got){
     var gd=newDish(got.type,got.n);gd.cooked=true;
-    c.fillStyle='#d94b43';c.font='800 34px Malgun Gothic,sans-serif';c.fillText('≠',cx,40);
+    c.fillStyle='#d94b43';c.font='800 34px Jua,Pretendard,Malgun Gothic,sans-serif';c.fillText('≠',cx,40);
     drawDishState(c,cx,108,fitCell(gd,cw-16,50,14),gd,1);
-    c.font='800 24px Malgun Gothic,sans-serif';c.fillText(got.n+'개',cx,146);
+    c.font='800 24px Jua,Pretendard,Malgun Gothic,sans-serif';c.fillText(got.n+'개',cx,146);
     return;
   }
   c.fillStyle=c0.giant?'#d94b43':'#3b2a1a';
-  c.font='800 30px Malgun Gothic,sans-serif';c.fillText('1 : '+k,cx,38);
+  c.font='800 30px Jua,Pretendard,Malgun Gothic,sans-serif';c.fillText('1 : '+k,cx,38);
   /* 카드가 작아서 빵 그림은 1.4배로 키워 그린다(cap도 그만큼 줄여 카드 폭을 넘지 않게) */
   var sk=orderGrowK(c0,now),z=1.4,cap=(ty===2?24:cw-12)/z,base=ty===0?92:110;   /* 케이크 cap은 큐브 한 변 */
   c.save();c.translate(cx,base);c.scale(z,z);c.translate(-cx,-base);
   c.save();c.globalAlpha=0.18;sil(c,ty,k,cx,base,cap);c.restore();
   sil(c,ty,sk,cx,base,cap);
   c.restore();
-  c.fillStyle='#8a5a2b';c.font='800 24px Malgun Gothic,sans-serif';c.fillText(dishShort(ty),cx,146);
+  c.fillStyle='#8a5a2b';c.font='800 24px Jua,Pretendard,Malgun Gothic,sans-serif';c.fillText(dishShort(ty),cx,146);
 }
 function renderSlots(){
   var now=performance.now();
@@ -1316,15 +1489,16 @@ function renderSlots(){
       }
     }
     drawBubble(el.querySelector('canvas'),c,showGot?c.got:null,now);
-    /* 카드 옆 세로 막대 = 남은 인내심. 줄어들수록 초록 → 노랑 → 빨강 */
+    /* 카드 옆 세로 막대 = 남은 인내심. 줄어들수록 초록 → 꿀색 → 빨강 (색은 style.css의 data-lv) */
     var anger=c.state==='wait'?clamp(c.wait/c.pat,0,1):(c.state==='angry'?1:0),left=1-anger;
-    if(fill){fill.style.height=(left*100)+'%';fill.style.background=left>0.5?'#50be5a':left>0.3?'#f0b428':'#e6503c'}
+    if(fill){fill.style.height=(left*100)+'%';var lv=left>0.5?'hi':left>0.3?'mid':'lo';if(fill.dataset.lv!==lv)fill.dataset.lv=lv}
     var low=c.state==='wait'&&anger>=0.7;
-    el.className='slot'+(c.giant?' giant':'')+(el.classList.contains('enter')?' enter':'')+(c.state==='happy'?' happy':c.state==='angry'?' angry':(showGot?' sad':''))+(low?' low':'')+(S.hover===i?' drop':'');
+    el.className='slot'+(c.giant?' giant':'')+(c.kind?' k-'+c.kind:'')+(el.classList.contains('enter')?' enter':'')+(c.state==='happy'?' happy':c.state==='angry'?' angry':(showGot?' sad':''))+(low?' low':'')+(S.hover===i?' drop':'');
     var md=c.state==='happy'?'💖':c.state==='angry'?'💢':(showGot?(c.mood||'💧'):(low?'💢':''));
     var html=c.spr
       ?('<img class="guest-spr" alt="" src="assets/'+c.spr+'.png">'+(md?'<span class="md">'+md+'</span>':''))
-      :(c.an+(md?'<span class="md">'+md+'</span>':''));
+      :('<span class="guest-emo">'+c.an+'</span>'+(md?'<span class="md">'+md+'</span>':''));
+    if(c.kind==='hurry')html+='<span class="kind-badge">⏰</span>';   // 급한 손님: 시계로 바로 읽히게
     if(cat.innerHTML!==html)cat.innerHTML=html;
   }
 }
@@ -1349,7 +1523,7 @@ function serveDish(src,c){
   var r=judge(d,c);
   if(r!=='raw')removeDish(src);
   if(r==='ok'){
-    var base=baseOf(c.dish,c.k)*LVMULT[LV(c.dish)]*(c.giant?GIANT_MULT:1);
+    var base=baseOf(c.dish,c.k)*(c.giant?GIANT_MULT:1)*(c.kind==='hurry'?HURRY_MULT:1);
     var q=d.quality,rw=Math.round(base*q),pb=Math.round(base*PAT_BONUS*(1-c.wait/c.pat)),gain=rw+pb;
     S.reward+=rw;S.patience+=pb;S.served++;S.streak++;S.qs.push(q);
     c.speed=1-c.wait/c.pat;c.state='happy';c.until=S.time+0.9;
@@ -1358,7 +1532,7 @@ function serveDish(src,c){
     earn(gain);
     floatAtSlot(c.slot,'+'+gain,'coin');
     if(q>=0.9)floatAtSlot(c.slot,'완벽하게 구웠어요!','ok');
-    bumpCoins();
+    flyCoins(c.slot,gain);
     sfx(c.giant?'giant':'serve');
     if(c.giant)doShake(5,320);
     if(S.streak%3===0){comboBanner('콤보 ×'+S.streak+'  +'+COMBO_BONUS);sfx('combo')}
@@ -1525,10 +1699,11 @@ function setEndBtn(on){
 }
 function updateHud(){
   $('coinsTxt').textContent='🪙 '+G.wallet;
-  var tleft=Math.max(0,S.roundT-S.time);
-  $('timerBar').style.transform='scaleX('+clamp(tleft/S.roundT,0,1)+')';
+  var tleft=Math.max(0,S.roundT-S.time),ot=overtime();
+  $('timerBar').style.transform='scaleX('+(ot?1:clamp(tleft/S.roundT,0,1))+')';
   $('timerBar').parentNode.classList.toggle('warn',tleft<=10&&tleft>0);
-  var tt=$('timerTxt');if(tt)tt.textContent=fmtTime(tleft);
+  $('timerBar').parentNode.classList.toggle('over',ot);
+  var tt=$('timerTxt');if(tt)tt.textContent=ot?'⏰ 추가 시간':fmtTime(tleft);
   renderSlots();
   var focus=isOvenFocus();
   var un=!S.bench||S.bench.cooked||S.guide||focus;
@@ -1609,19 +1784,22 @@ function setOverlay(id,on){
   if(on)el.style.display='flex';else el.style.display='';
 }
 function startRound(r,withGuide){
-  G.round=r;newRound(r);fx=[];fxClear();clearFlight();
+  G.round=r;
+  /* 빵은 라운드에 맞춰 저절로 열린다. 모두가 그 라운드의 새 개념(제곱·세제곱)을 만나야 한다 */
+  DISHES.forEach(function(D,i){if(D.unlockR<=r&&!owned(i)){G.u.dish[i]=1;G.u.bag[i]={1:1}}});
+  newRound(r);fx=[];fxClear();clearFlight();shopState();
   shake.mag=0;shake.until=0;applyStage(0,0);
   setOvenFocus(false);
   setOverlay('endConfirm',false);
   setEndBtn(false);
   S.guide=true;
   var ic=[];DISHES.forEach(function(d,i){if(owned(i))ic.push(d.ico)});
-  $('hudTitle').textContent='R'+r+' / '+LAST_ROUND;
+  $('hudTitle').textContent=r+'라운드';
   $('riIco').textContent=ic.join(' ');
   $('riTitle').textContent=r+'라운드';
   var msg=r===1?'<b>냥 바게트</b> 주문이 들어와요. 바게트는 반죽 마디가 한 줄로 길게 이어져요. <b>반죽 1개가 원본 바게트</b>예요!'
     :'오늘도 손님이 몰려와요!'+(GIANT_AT[r]?'<br>👑 <b>자이언트</b> 손님이 올 수도 있어요!':'');
-  DISHES.forEach(function(d,i){if(d.unlockR===r&&r>1)msg+='<br>🆕 <b>'+d.name+'</b>을 열 수 있어요! 재료 선반의 🔒를 눌러 코인으로 열어요.'});
+  DISHES.forEach(function(d,i){if(d.unlockR===r&&r>1)msg+='<br>🆕 <b>'+d.name+'</b> 주문이 새로 들어와요! (재료: <b>'+d.ing+'</b>)'});
   $('riDesc').innerHTML=msg;
   slotEls.forEach(function(el){el.dataset.cid='';el.dataset.mode='';el.dataset.f=''});
   if(withGuide&&G.hintOn){setOverlay('guide',true);setOverlay('rintro',false)}
@@ -1644,13 +1822,18 @@ function update(dt){
   S.cust.forEach(function(c){
     if(c.state==='wait'){
       c.wait+=waitDt;
-      if(c.wait>=c.pat){c.state='angry';c.until=S.time+0.9;S.streak=0;S.left++;G.leftAll++;sfx('angry');floatAtSlot(c.slot,'떠났어요','bad');toast('💢 손님이 화나서 떠났어요')}
+      if(c.wait>=c.pat){c.state='angry';c.until=S.time+0.9;S.streak=0;S.left++;G.leftAll++;sfx('angry');floatAtSlot(c.slot,'떠났어요','bad');toast('💢 손님이 화나서 떠났어요');shopWarn()}
     }else if((c.state==='happy'||c.state==='angry')&&S.time>=c.until){
       var sp=c.state==='happy'?c.speed:0;
+      /* 캥거루를 만족시키면 주머니에서 아기 캥거루가 나오고, 같은 빵을 원본 크기(1 : 1)로 한 번 더 주문한다 */
+      if(c.kind==='roo'&&c.state==='happy'){var j=makeCust(false,{kind:'joey',dish:c.dish,k:1});j.slot=c.slot;S.cust.push(j);floatAtSlot(c.slot,'아기도 주문해요!','ok');sfx('arrive')}
       c.state='gone';callNext(sp);c.slot=-1;
     }
   });
-  if(freeSeat()>=0&&canSpawnMore()){
+  if(S.phase!=='play')return;          // 방금 가게가 무너졌다
+  if(overtime()&&!S.otNoted&&liveCustCount()){S.otNoted=true;sfx('warn');toast('⏰ 추가 시간! 남은 손님을 마저 받아요',2200)}
+  if(G.leftAll>=3&&S.time>=(S.dustAt||0)){dustFall(3);S.dustAt=S.time+3+Math.random()*2.5}   // 3회부터 먼지가 자주 떨어진다
+  if(!overtime()&&freeSeat()>=0&&canSpawnMore()){
     if(S.giants.length&&S.time>=S.giants[0]){S.giants.shift();spawn(true)}
     else if(S.time>=S.nextAt)spawn(false);
   }
@@ -1667,8 +1850,9 @@ function loop(now){
   var dt=Math.min(0.1,(now-last)/1000);last=now;
   if(S.guide){requestAnimationFrame(loop);return}
   update(dt);
+  if(S.phase!=='play')return;          // 가게가 무너지면 update 안에서 판이 끝난다
   tickShake(now);
-  if(S.time>=S.roundT){finishRound();return}
+  if(overtime()&&!liveCustCount()){finishRound();return}
   updateHud();renderBench();renderOven();renderFocusRing();renderFly();
   requestAnimationFrame(loop);
 }
@@ -1724,29 +1908,16 @@ function spend(cost,msg){
   if(G.wallet<cost){toast('🪙 코인이 모자라요 (앞으로 '+(cost-G.wallet)+'코인)');sfx('miss');return false}
   G.wallet-=cost;sfx('buy');bumpCoins();toast('✅ '+msg,1700);return true;
 }
-function buyDish(i){var D=DISHES[i];if(owned(i))return false;
-  if(S.round<D.unlockR){toast('🔒 '+D.unlockR+'라운드부터 열 수 있어요');return false}
-  if(!spend(D.price,D.name+' 오픈! 이제 주문이 들어와요'))return false;G.u.dish[i]=1;updateAll();return true}
-function upDish(i){var lv=LV(i);if(!lv||lv>=3)return false;var D=DISHES[i];
-  if(!spend(D.up[lv-1],D.name+' Lv'+(lv+1)+'! '+D.lvDesc[lv+1]+' (코인 ×'+LVMULT[lv+1]+')'))return false;G.u.dish[i]=lv+1;updateAll();return true}
+/* 빵은 사지 않는다. 아직 안 열린 빵을 누르면 언제 열리는지만 알려 준다 */
+function notOpen(i){toast(DISHES[i].name+'는 '+DISHES[i].unlockR+'라운드부터 나와요')}
 function upOven(){var ov=G.u.oven;if(ov>=3)return false;
   if(!spend(OVEN[ov+1].cost,OVEN[ov+1].name+'! '+OVEN[ov+1].desc))return false;G.u.oven=ov+1;if(S.oven.state==='idle')S.oven.need=OVEN[ov+1].taps;updateAll();return true}
-function buyBag(n){if(G.u.bag[n])return false;if(!spend(BAGCOST[n],'한 번에 '+n+'개씩 넣을 수 있어요!'))return false;G.u.bag[n]=1;updateAll();return true}
+function buyBag(i,n){if(!owned(i)||n!==nextBag(i))return false;if(!spend(BAGCOST[n],DISHES[i].ing+' '+n+'개를 한 번에 넣을 수 있어요!'))return false;G.u.bag[i][n]=1;updateAll();return true}
 $('ovenUp').addEventListener('click',function(e){e.stopPropagation();if(!isOvenFocus())upOven()});
 function renderUpg(){
   dishEls.forEach(function(el,i){
-    var D=DISHES[i],lk=el.querySelector('.lk'),ub=el.querySelector('.upb'),h;
-    if(!owned(i)){
-      var can=S.round>=D.unlockR;
-      h=can?'🔒<span class="lk-cost">'+D.price+'</span>':'🔒<span class="lk-cost">R'+D.unlockR+'</span>';
-      if(lk.innerHTML!==h)lk.innerHTML=h;
-      el.classList.toggle('canbuy',can&&G.wallet>=D.price);
-      ub.style.display='none';
-    }else{
-      var lv=LV(i);el.classList.remove('canbuy');ub.style.display='';
-      if(lv<3){ub.innerHTML='⬆ '+D.up[lv-1];ub.classList.toggle('can',G.wallet>=D.up[lv-1])}
-      else{ub.innerHTML='★';ub.classList.remove('can')}
-    }
+    var lk=el.querySelector('.lk'),h=owned(i)?'':'<span class="lk-cost">R'+DISHES[i].unlockR+'</span>';
+    if(lk.innerHTML!==h)lk.innerHTML=h;
   });
   var ov=G.u.oven,ob=$('ovenUp');
   $('ovenBox').dataset.lv=String(ov);   /* 오븐 단계별 전용 그림이 오기 전까지는 CSS 색으로 구분 */
@@ -1759,8 +1930,7 @@ function renderUpg(){
 $('nextBtn').onclick=function(){startRound(G.round+1,false)};
 
 function askEndGame(){
-  if(S.phase!=='play'&&S.phase!=='roundEnd')return;
-  if(S.phase==='play'&&S.guide)return;
+  if(S.phase!=='play'||S.guide)return;
   setOverlay('endConfirm',true);
 }
 function cancelEndGame(){setOverlay('endConfirm',false)}
@@ -1774,7 +1944,6 @@ function confirmEndGame(){
   finishGame();
 }
 $('endBtn').onclick=askEndGame;
-$('reEndBtn').onclick=askEndGame;
 $('endConfirmBtn').onclick=confirmEndGame;
 $('endCancelBtn').onclick=cancelEndGame;
 
@@ -1787,17 +1956,18 @@ function finishGame(){
   setOverlay('guide',false);
   setOverlay('rintro',false);
   var sum=G.earned+30;
-  $('resTitle').textContent=sum>=1200?'🏆 대성공!':sum>=600?'👍 잘했어요!':'😺 수고했어요!';
-  $('resSub').textContent='총 벌어들인 코인이 점수예요!';
+  $('resTitle').textContent=G.collapsed?'🏚️ 가게가 무너졌어요!':sum>=1200?'🏆 대성공!':sum>=600?'👍 잘했어요!':'😺 수고했어요!';
+  $('resSub').textContent=G.collapsed?'화나서 떠난 손님이 '+COLLAPSE_AT+'명이 되었어요. 그래도 번 코인은 그대로 점수예요!':'총 벌어들인 코인이 점수예요!';
   var h='<tr><th>라운드</th><th class="r">코인</th></tr>';
   G.log.forEach(function(l){h+='<tr><td>R'+l.r+' · 손님 '+l.served+'명</td><td class="r">'+l.net+'</td></tr>'});
   h+=row('참여 보너스',30)+'<tr class="total"><td>최종 점수</td><td class="r">'+sum+'코인</td></tr>';
   $('ledger').innerHTML=h;
   var t=[],w=G.wrongAll;
-  t.push('🗣️ <b>함께 생각해 봐요</b><br>① 닮음비가 커질 때 재료 개수는 어떻게 달라졌나요?<br>② 바게트, 토스트, 케이크는 왜 늘어나는 방식이 다를까요?');
   if(w.notSimilar>0)t.push('🙅 원본과 모양이 다른 빵을 서빙한 적이 있어요. 어떻게 하면 원본과 닮은 모양이 될까요?');
   if(G.trashedAll>0)t.push('🗑️ 버린 빵 '+G.trashedAll+'개 (낭비한 재료 '+G.wastedAll+'개).');
-  $('insight').innerHTML=t.join('<br>');
+  var insight=$('insight');
+  insight.innerHTML=t.join('<br>');
+  insight.hidden=!t.length;
   S.phase='result';show('result');
   submitScore(sum);
   fetchRanking();
@@ -2031,7 +2201,7 @@ function setupCanvases(){
   if(focusCv)hidpi(focusCv,FOCUS_W,FOCUS_H,q);
   slotEls.forEach(function(el){hidpi(el.querySelector('canvas'),SLOT_W,SLOT_H,q)});
   dishEls.forEach(function(el){hidpi(el.querySelector('canvas'),100,70,q)});
-  itemEls.forEach(function(it){hidpi(it.cv,it.w,it.h,q)});
+  itemEls.forEach(function(it){if(it.cv)hidpi(it.cv,it.w,it.h,q)});
   return true;
 }
 function invalidate(){
@@ -2128,10 +2298,20 @@ gateAdminPreview(function(){
   fit();syncFsBtn();sndSync();
 });
 
+/* 캔버스는 글꼴이 다 받아지기 전에 그리면 기본 글꼴로 남는다. 받아지면 주문 카드를 한 번 다시 그린다 */
+if(document.fonts&&document.fonts.load){
+  Promise.all([document.fonts.load("16px Jua"),document.fonts.load("16px Pretendard")]).then(function(){
+    slotEls.forEach(function(el){el.dataset.cid='';el.dataset.mode='';el.dataset.f=''});
+    if(S&&S.phase==='play')updateAll();
+  },function(){});
+}
 window.__api={chooseDish:chooseDish,selectDish:selectDish,addFromShelf:addFromShelf,addN:addN,toOven:toOven,cookTap:cookTap,setClock:function(f){clock=f},
   serveDish:serveDish,discard:discard,tick:function(d){update(d);updateAll()},endGuide:endGuide,startGame:startGame,startRound:startRound,
-  finishRound:finishRound,slotCust:slotCust,judge:judge,needOf:needOf,baseOf:baseOf,spawn:spawn,buyDish:buyDish,upDish:upDish,upOven:upOven,buyBag:buyBag,
-  setRnd:function(f){rnd=f},refresh:refresh,newDish:newDish,earn:earn,
+  finishRound:finishRound,slotCust:slotCust,judge:judge,needOf:needOf,baseOf:baseOf,spawn:spawn,upOven:upOven,buyBag:buyBag,
+  setRnd:function(f){rnd=f},
+  /* 테스트·시뮬레이션용 값 바꾸기 (game.js는 함수로 감싸여 있어 window에서 바꿀 수 없다) */
+  tune:function(o){if(o.pat!=null)PAT_SCALE=o.pat;if(o.kind!=null)KIND_CHANCE=o.kind;return{pat:PAT_SCALE,kind:KIND_CHANCE}},
+  refresh:refresh,newDish:newDish,earn:earn,
   fit:fit,view:function(){return VIEW},
   tapSource:tapSource,fliers:function(){return fliers.length},
   renderFly:function(){renderFly()},renderBench:function(){renderBench()},renderOven:function(){renderOven()},dishFly:function(){return dishFly.length},

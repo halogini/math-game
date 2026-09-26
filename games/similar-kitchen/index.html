@@ -18,7 +18,7 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="description" content="사자·코끼리 같은 큰 동물 손님이 주문한 몇 배 크기의 빵을 만들어 서빙하며, 닮음비와 넓이·부피의 관계를 스스로 발견하는 중학교 2학년 수학 게임">
 
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=34">
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -80,7 +80,7 @@
 <section id="play" class="screen play-scene">
   <div class="scene-bg" aria-hidden="true"></div>
   <div class="hud">
-    <div class="title" id="hudTitle">R1</div>
+    <div class="title" id="hudTitle">1라운드</div>
     <div class="timer" aria-label="남은 시간">
       <i id="timerBar"></i>
       <span class="timer-txt" id="timerTxt">1:10</span>
@@ -106,9 +106,9 @@
           <div class="station-label"><span id="benchInfo"></span></div>
           <div class="benchwrap" id="benchWrap"><canvas id="benchCv" width="360" height="300"></canvas></div>
           <div class="bench-actions">
-            <button class="btn ghost" id="um1" title="1개 빼기">되돌리기</button>
-            <button class="btn ghost" id="clearBtn" title="비우기">비우기</button>
-            <button class="btn" id="toOven" title="오븐에 넣기">굽기</button>
+            <button class="btn ghost" id="um1" title="재료 1개 빼기">1개 빼기</button>
+            <button class="btn ghost" id="clearBtn" title="재료 모두 빼기">모두 빼기</button>
+            <button class="btn" id="toOven" title="오븐에 넣어 굽기">굽기</button>
           </div>
         </div>
         <div class="station oven-station card oven" id="ovenBox">
@@ -133,7 +133,7 @@
         <h2>이번 라운드 장부</h2><table id="reLedger"></table>
       </div>
     </div>
-    <div class="row row-center"><button class="btn" id="nextBtn">다음 라운드 ▶</button><button class="btn ghost" id="reEndBtn">영업 끝내기</button></div>
+    <div class="row row-center"><button class="btn" id="nextBtn">다음 라운드 ▶</button></div>
   </div>
 </section>
 
@@ -161,10 +161,10 @@
   <div class="gcard">
     <h2>🦁 이렇게 일해요!</h2>
     <div class="steps">
-      <div class="step"><div class="ic">🧺</div><b>① 재료 넣기</b><br>주문한 빵의 <b>재료</b>를 톡해요</div>
-      <div class="step"><div class="ic">🔥</div><b>② 오븐 굽기</b><br>오븐에 넣으면 <b>박자 링에 맞춰 톡!</b></div>
-      <div class="step"><div class="ic">🦒</div><b>③ 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
-      <div class="step"><div class="ic">⬆</div><b>④ 업그레이드</b><br>번 코인으로 <b>재료·오븐·빵 등급</b>을 바로 올려요</div>
+      <div class="step"><div class="ic">🧺</div><b>1. 재료 넣기</b><br>주문한 빵의 <b>재료</b>를 톡해요</div>
+      <div class="step"><div class="ic">🔥</div><b>2. 오븐 굽기</b><br>오븐에 넣으면 <b>박자 링에 맞춰 톡!</b></div>
+      <div class="step"><div class="ic">🦒</div><b>3. 서빙</b><br>완성품을 <b>손님에게 끌어다</b> 놓아요. 잘못 만들면 🗑️</div>
+      <div class="step"><div class="ic">⬆</div><b>4. 업그레이드</b><br>번 코인으로 <b>재료 묶음·오븐</b>을 바로 사요</div>
     </div>
     <div class="foot"><span>번 코인으로 <b>그 자리에서 바로</b> 업그레이드! (칩·🔒·⬆을 눌러요)</span><button class="btn" id="guideBtn">알겠어요! ▶</button></div>
   </div>
@@ -205,6 +205,6 @@
 <script src="../../shared/halomath-profile.js"></script>
 <script src="../../shared/halomath-play-stats.js"></script>
 <script src="../../shared/halomath-scores.js"></script>
-<script src="game.js?v=25"></script>
+<script src="game.js?v=44"></script>
 </body>
 </html>
